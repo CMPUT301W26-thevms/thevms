@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "823106586300",
+    "project_id": "thevms",
+    "storage_bucket": "thevms.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:823106586300:android:89f14b4de9d0d78faff2b9",
+        "android_client_info": {
+          "package_name": "com.example.thevms"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB9_ag_TE33q_ykpjdhtIbgJuBHEdRWbZ8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
