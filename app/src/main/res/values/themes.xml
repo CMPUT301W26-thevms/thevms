@@ -6,4 +6,8 @@
     </style>
 
     <style name="Theme.Thevms" parent="Base.Theme.Thevms" />
+
+    <style name="CircleAppearance">
+        <item name="cornerSize">50%</item>
+    </style>
 </resources>

@@ -9,6 +9,10 @@
         android:icon="@android:drawable/ic_menu_agenda"
         android:title="Events" />
     <item
+        android:id="@+id/nav_add"
+        android:icon="@android:drawable/ic_menu_add"
+        android:title="Add" />
+    <item
         android:id="@+id/nav_favorites"
         android:icon="@android:drawable/btn_star"
         android:title="Favorites" />
