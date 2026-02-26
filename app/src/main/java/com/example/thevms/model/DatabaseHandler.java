@@ -1,4 +1,4 @@
-package com.example.thevms;
+package com.example.thevms.model;
 
 import com.google.android.gms.tasks.Task;
 import com.google.firebase.firestore.DocumentSnapshot;
