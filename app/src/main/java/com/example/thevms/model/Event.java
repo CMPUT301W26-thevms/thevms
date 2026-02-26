@@ -88,7 +88,7 @@ public class Event {
         this.eventEndTime = eventEndTime;
         this.entrantList = new HashMap<>();
 
-        this.qrCode = "NULL FOR NOW";
+        this.qrCode = null;
     }
 
     /**
