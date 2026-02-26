@@ -25,18 +25,19 @@ public class Event {
 
     private HashMap<Entrant, Boolean> entrantList;
 
-    public Event(String name, String description, Organizer organizer, Location location, String qrCode, String imageUrl, Date registrationStartTime, Date registrationEndTime, Date eventStartTime, Date eventEndTime) {
+    public Event(String name, String description, Organizer organizer, Location location, String imageUrl, Date registrationStartTime, Date registrationEndTime, Date eventStartTime, Date eventEndTime) {
         this.name = name;
         this.description = description;
         this.organizer = organizer;
         this.location = location;
-        this.qrCode = qrCode;
         this.imageUrl = imageUrl;
         this.registrationStartTime = registrationStartTime;
         this.registrationEndTime = registrationEndTime;
         this.eventStartTime = eventStartTime;
         this.eventEndTime = eventEndTime;
         this.entrantList = new HashMap<>();
+
+        // Set the QR Code
     }
 
     public String getName() {
