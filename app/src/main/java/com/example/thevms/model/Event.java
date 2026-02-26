@@ -71,20 +71,16 @@ public class Event {
         this.location = location;
     }
 
-    public String getQrCode() {
-        return qrCode;
-    }
-
-    public void setQrCode(String qrCode) {
-        this.qrCode = qrCode;
-    }
-
     public String getImageUrl() {
         return imageUrl;
     }
 
     public void setImageUrl(String imageUrl) {
         this.imageUrl = imageUrl;
+    }
+
+    public void removeImageUrl() {
+        this.imageUrl = null;
     }
 
     public Date getRegistrationStartTime() {
@@ -123,7 +119,11 @@ public class Event {
         return entrantList;
     }
 
-    public void setEntrantList(HashMap<Entrant, Boolean> entrantList) {
-        this.entrantList = entrantList;
+    public void addEntrant(Entrant entrant, Boolean isSelected) {
+        this.entrantList.put(entrant, isSelected);
+    }
+
+    public void removeEntrant(Entrant entrant) {
+        this.entrantList.remove(entrant);
     }
 }

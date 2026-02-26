@@ -38,11 +38,11 @@ public class Entrant {
         this.email = email;
     }
 
-    public void registerInEvent(Event event){
-        event.addEntrant(this);
+    public void registerInEvent(Event event) {
+        event.addEntrant(this, Boolean.FALSE);
     }
 
-    public void unregisterFromEvent(Event event){
+    public void unregisterFromEvent(Event event) {
         event.removeEntrant(this);
     }
 }
