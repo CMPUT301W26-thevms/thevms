@@ -9,14 +9,14 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * Represents an event. This class uses a factory pattern for object creation.
+ * Represents an event Object.
  *
  * <p><b>Creation Workflow:</b></p>
  * <ol>
  *     <li>Call the static {@link #create(String, String, Organizer, Location, String, Date, Date, Date, Date)} method.</li>
  *     <li>This method asynchronously fetches a unique ID from the database.</li>
  *     <li>It then returns a {@code Task<Event>}. You use an {@code .addOnSuccessListener} to get the in-memory Event object.</li>
- *     <li>The created object exists ONLY in the app's memory at this point.</li>
+ *     <li>The created object does NOT yet exist in the database.</li>
  * </ol>
  *
  * <p><b>Saving and Updating:</b></p>
@@ -24,6 +24,24 @@ import java.util.Map;
  *     <li>To save the event to the database for the first time, or to update it after making changes, you MUST call the {@link #save()} method.</li>
  *     <li>The {@code save()} method is also asynchronous and returns a {@code Task<Void>} that you can listen to for success or failure.</li>
  * </ul>
+ * <p>
+ * Example Usage:
+ * <pre>
+ * {@code
+ * // 1. Create the event in memory (gets a unique ID async)
+ * Event.create(name, desc, org, loc, imgUrl, date, date, date, date)
+ *      .addOnSuccessListener(event -> {
+ *          // 2. Save the event to the database
+ *          event.save()
+ *               .addOnSuccessListener(aVoid -> {
+ *                   // Success!
+ *               });
+ *               .addOnFailureListener(e -> {
+ *                   // Error!
+ *               });
+ *      });
+ * }
+ * </pre>
  */
 public class Event {
     private final DatabaseHandler dbHandler;
