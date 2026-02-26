@@ -7,7 +7,7 @@ public class Entrant {
     private String email;
     private String username;
     private String phoneNumber;
-    
+
     public Entrant(String email, String username, String phoneNumber) {
         this.email = email;
         this.username = username;
@@ -38,5 +38,11 @@ public class Entrant {
         this.email = email;
     }
 
+    public void registerInEvent(Event event){
+        event.addEntrant(this);
+    }
 
+    public void unregisterFromEvent(Event event){
+        event.removeEntrant(this);
+    }
 }
