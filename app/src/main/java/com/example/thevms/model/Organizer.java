@@ -18,4 +18,8 @@ public class Organizer extends Entrant {
     public void createEvent(Date startReg, Date endReg, Date startEvent, Date endEvent, String name, String description, Location location, Integer radius, Integer maxEntrants) {
         throw new UnsupportedOperationException("Not supported yet.");
     }
+
+    public void sendNotification(List<Entrant> entrants, Event event) {
+        throw new UnsupportedOperationException("Not supported yet.");
+    }
 }
