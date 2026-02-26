@@ -3,5 +3,5 @@ package com.example.thevms.model;
 /**
  * Represents an administrator user.
  */
-public class Admin {
+public class Admin extends Organizer {
 }
