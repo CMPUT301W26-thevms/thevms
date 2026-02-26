@@ -3,5 +3,5 @@ package com.example.thevms.model;
 /**
  * Represents an event organizer.
  */
-public class Organizer {
+public class Organizer extends Entrant {
 }
