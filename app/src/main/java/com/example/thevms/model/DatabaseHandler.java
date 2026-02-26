@@ -5,6 +5,7 @@ import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.EventListener;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.ListenerRegistration;
+import com.google.firebase.firestore.Query;
 import com.google.firebase.firestore.QuerySnapshot;
 import com.google.firebase.firestore.SetOptions;
 
@@ -27,14 +28,39 @@ public class DatabaseHandler {
     }
 
     /**
+     * Gets the next available event ID.
+     *
+     * @return A Task that will resolve to the next available event ID.
+     */
+    public Task<Long> getNextEventId() {
+        return db.collection(COLLECTION_EVENTS)
+                .orderBy("eventId", Query.Direction.DESCENDING)
+                .limit(1)
+                .get()
+                .continueWith(task -> {
+                    if (task.isSuccessful()) {
+                        QuerySnapshot snapshot = task.getResult();
+                        if (snapshot != null && !snapshot.isEmpty()) {
+                            DocumentSnapshot lastEvent = snapshot.getDocuments().get(0);
+                            return lastEvent.getLong("eventId") + 1;
+                        } else {
+                            return 1L; // First event
+                        }
+                    } else {
+                        throw task.getException();
+                    }
+                });
+    }
+
+    /**
      * Stores or updates an event's details.
      *
      * @param eventId   Unique identifier for the event.
      * @param eventData Map containing event attributes.
      * @return Task representing the async operation.
      */
-    public Task<Void> saveEvent(String eventId, Map<String, Object> eventData) {
-        return db.collection(COLLECTION_EVENTS).document(eventId).set(eventData, SetOptions.merge());
+    public Task<Void> saveEvent(Long eventId, Map<String, Object> eventData) {
+        return db.collection(COLLECTION_EVENTS).document(String.valueOf(eventId)).set(eventData, SetOptions.merge());
     }
 
     /**
