@@ -1,6 +1,7 @@
-package com.example.thevms.ui;
+package com.example.thevms.ui.Event;
 
 import android.os.Bundle;
+
 import androidx.appcompat.app.AppCompatActivity;
 
 /**

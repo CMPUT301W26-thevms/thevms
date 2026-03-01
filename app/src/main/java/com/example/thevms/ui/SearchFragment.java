@@ -7,12 +7,15 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.LinearLayout;
 import android.widget.TextView;
+
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
+
 import com.example.thevms.R;
 import com.example.thevms.model.DatabaseHandler;
 import com.example.thevms.model.Event;
+import com.example.thevms.ui.Event.EventCardHelper;
 import com.google.firebase.firestore.DocumentSnapshot;
 
 import java.util.Map;
@@ -33,16 +36,16 @@ public class SearchFragment extends Fragment {
         eventListContainer = view.findViewById(R.id.event_list_container);
         resultsCountText = view.findViewById(R.id.results_count);
         dbHandler = new DatabaseHandler();
-        
+
         loadEvents();
-        
+
         return view;
     }
 
     private void loadEvents() {
         dbHandler.getAllEvents().addOnSuccessListener(queryDocumentSnapshots -> {
             eventListContainer.removeAllViews(); // Clear dummy/previous views
-            
+
             for (DocumentSnapshot doc : queryDocumentSnapshots) {
                 try {
                     Map<String, Object> data = doc.getData();
