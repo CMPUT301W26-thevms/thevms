@@ -12,16 +12,16 @@ import java.text.SimpleDateFormat;
 import java.util.Locale;
 
 /**
- * Helper class to inflate and populate event cards.
+ * Factory class responsible for inflating and binding data to event card views.
  */
-public class EventCardHelper {
+public class EventViewFactory {
 
     /**
-     * Creates and populates an event card view from an Event object.
+     * Inflates an event card layout and populates it with data from the provided Event object.
      *
-     * @param parent The parent view group.
-     * @param event  The event data.
-     * @return A populated event card view.
+     * @param parent The parent view group used for layout inflation context.
+     * @param event  The event model containing the data to display.
+     * @return A View instance representing the populated event card.
      */
     public static View createEventCard(ViewGroup parent, Event event) {
         View card = LayoutInflater.from(parent.getContext()).inflate(R.layout.event_card, parent, false);
@@ -37,19 +37,20 @@ public class EventCardHelper {
 
         if (statusView != null) {
             int count = (event.getEntrantList() != null) ? event.getEntrantList().size() : 0;
-            statusView.setText("☆ " + count + " people joined");
+            statusView.setText(String.format(Locale.getDefault(), "☆ %d people joined", count));
         }
 
         if (timeView != null) {
             if (event.getEventStartTime() != null) {
                 SimpleDateFormat sdf = new SimpleDateFormat("MMM dd", Locale.getDefault());
-                timeView.setText("Starts " + sdf.format(event.getEventStartTime()));
+                timeView.setText(String.format("Starts %s", sdf.format(event.getEventStartTime())));
             } else {
                 timeView.setText("Time TBD");
             }
         }
 
         if (locationView != null) {
+            // TODO: Replace with event.getLocation() if available in your model
             locationView.setText("📍 Nearby");
         }
 

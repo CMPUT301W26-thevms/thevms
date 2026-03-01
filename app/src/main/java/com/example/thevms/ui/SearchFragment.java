@@ -15,7 +15,7 @@ import androidx.fragment.app.Fragment;
 import com.example.thevms.R;
 import com.example.thevms.model.DatabaseHandler;
 import com.example.thevms.model.Event;
-import com.example.thevms.ui.Event.EventCardHelper;
+import com.example.thevms.ui.Event.EventViewFactory;
 import com.google.firebase.firestore.DocumentSnapshot;
 
 import java.util.Map;
@@ -52,7 +52,7 @@ public class SearchFragment extends Fragment {
                     if (data != null) {
                         Event event = Event.fromMap(data);
                         if (event != null) {
-                            View card = EventCardHelper.createEventCard(eventListContainer, event);
+                            View card = EventViewFactory.createEventCard(eventListContainer, event);
                             eventListContainer.addView(card);
                         }
                     }
