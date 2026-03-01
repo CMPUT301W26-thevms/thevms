@@ -4,7 +4,9 @@ import com.google.android.gms.tasks.Task;
 import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.EventListener;
 import com.google.firebase.firestore.FirebaseFirestore;
+import com.google.firebase.firestore.FirebaseFirestoreSettings;
 import com.google.firebase.firestore.ListenerRegistration;
+import com.google.firebase.firestore.MemoryCacheSettings;
 import com.google.firebase.firestore.Query;
 import com.google.firebase.firestore.QuerySnapshot;
 import com.google.firebase.firestore.SetOptions;
@@ -19,12 +21,40 @@ public class DatabaseHandler {
     private final FirebaseFirestore db;
 
     // Collection names
-    private static final String COLLECTION_EVENTS = "events";
-    private static final String COLLECTION_USERS = "users";
-    private static final String COLLECTION_ENTRANTS = "entrants";
+    public static final String COLLECTION_EVENTS = "events";
+    public static final String COLLECTION_USERS = "users";
+    public static final String COLLECTION_ENTRANTS = "entrants";
 
     public DatabaseHandler() {
         this.db = FirebaseFirestore.getInstance();
+    }
+
+    /**
+     * Constructor for testing purposes, allowing injection of a mock or emulator instance.
+     *
+     * @param db The FirebaseFirestore instance to use.
+     */
+    public DatabaseHandler(FirebaseFirestore db) {
+        this.db = db;
+    }
+
+    /**
+     * Configures the handler to use the Firestore emulator.
+     * Use this ONLY for local testing.
+     *
+     * @param host The emulator host (e.g., "10.0.2.2")
+     * @param port The emulator port (e.g., 8080)
+     */
+    public void useEmulator(String host, int port) {
+        try {
+            db.useEmulator(host, port);
+            FirebaseFirestoreSettings settings = new FirebaseFirestoreSettings.Builder()
+                    .setLocalCacheSettings(MemoryCacheSettings.newBuilder().build())
+                    .build();
+            db.setFirestoreSettings(settings);
+        } catch (IllegalStateException e) {
+            // Already initialized or emulator already set, which is fine for tests
+        }
     }
 
     /**
