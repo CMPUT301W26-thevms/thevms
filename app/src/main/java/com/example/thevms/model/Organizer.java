@@ -14,12 +14,13 @@ public class Organizer extends Entrant {
 
     /**
      * Constructor for the Organizer class.
+     * @param deviceId The organizer's device ID.
      * @param email The organizer's email.
      * @param username The organizer's username.
      * @param phoneNumber The organizer's phone number.
      */
-    public Organizer(String email, String username, String phoneNumber) {
-        super(email, username, phoneNumber);
+    public Organizer(String deviceId, String email, String username, String phoneNumber) {
+        super(deviceId, email, username, phoneNumber);
         this.currentEvents = new ArrayList<>();
     }
 

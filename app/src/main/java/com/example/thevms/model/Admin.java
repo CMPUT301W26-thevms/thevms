@@ -9,17 +9,20 @@ public class Admin extends Organizer {
 
     /**
      * Constructor for the Admin class.
-     * @param email The admin's email.
-     * @param username The admin's username.
+     *
+     * @param deviceId    The admin's device id.
+     * @param email       The admin's email.
+     * @param username    The admin's username.
      * @param phoneNumber The admin's phone number.
      */
-    public Admin(String email, String username, String phoneNumber) {
-        super(email, username, phoneNumber);
+    public Admin(String deviceId, String email, String username, String phoneNumber) {
+        super(deviceId, email, username, phoneNumber);
     }
 
     /**
      * Removes an event from the system.
-     * @param event The event to be removed.
+     *
+     * @param event     The event to be removed.
      * @param eventList The list of all events in the system.
      */
     public void removeEvent(Event event, List<Event> eventList) {

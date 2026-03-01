@@ -1,9 +1,13 @@
 package com.example.thevms.ui;
 
+import android.annotation.SuppressLint;
 import android.content.Intent;
 import android.os.Bundle;
+import android.provider.Settings;
+import android.text.TextUtils;
 import android.view.View;
 import android.widget.Button;
+import android.widget.Toast;
 
 import androidx.activity.EdgeToEdge;
 import androidx.appcompat.app.AppCompatActivity;
@@ -12,8 +16,12 @@ import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowInsetsCompat;
 
 import com.example.thevms.R;
+import com.example.thevms.model.Entrant;
+import com.google.android.material.textfield.TextInputEditText;
 
 public class SignupActivity extends AppCompatActivity {
+
+    private TextInputEditText firstNameEdit, lastNameEdit, emailEdit, phoneEdit;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -21,18 +29,63 @@ public class SignupActivity extends AppCompatActivity {
         EdgeToEdge.enable(this);
         setContentView(R.layout.activity_signup);
         
-        ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.app_name).getParent().getParent() instanceof View ? (View) findViewById(R.id.app_name).getParent().getParent() : findViewById(android.R.id.content), (v, insets) -> {
+        View root = findViewById(R.id.app_name).getParent().getParent() instanceof View ? (View) findViewById(R.id.app_name).getParent().getParent() : findViewById(android.R.id.content);
+        ViewCompat.setOnApplyWindowInsetsListener(root, (v, insets) -> {
             Insets systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars());
             v.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom);
             return insets;
         });
 
+        // Initialize UI components
+        firstNameEdit = findViewById(R.id.edit_first_name);
+        lastNameEdit = findViewById(R.id.edit_last_name);
+        emailEdit = findViewById(R.id.edit_email);
+        phoneEdit = findViewById(R.id.edit_phone);
         Button signupButton = findViewById(R.id.btn_signup);
-        signupButton.setOnClickListener(v -> {
-            // Start MainActivity after sign up
-            Intent intent = new Intent(SignupActivity.this, MainActivity.class);
-            startActivity(intent);
-            finish(); // Close signup activity
+
+        // Get Device ID
+        @SuppressLint("HardwareIds")
+        String deviceId = Settings.Secure.getString(getContentResolver(), Settings.Secure.ANDROID_ID);
+
+        // Check if user already exists
+        Entrant.getOrCreate(deviceId).addOnSuccessListener(entrant -> {
+            if (entrant.getEmail() != null) {
+                // User already has a profile, skip signup
+                navigateToMain();
+            }
         });
+
+        signupButton.setOnClickListener(v -> {
+            handleSignup(deviceId);
+        });
+    }
+
+    private void handleSignup(String deviceId) {
+        String firstName = firstNameEdit.getText().toString().trim();
+        String lastName = lastNameEdit.getText().toString().trim();
+        String email = emailEdit.getText().toString().trim();
+        String phone = phoneEdit.getText().toString().trim();
+
+        if (TextUtils.isEmpty(firstName) || TextUtils.isEmpty(lastName) || TextUtils.isEmpty(email)) {
+            Toast.makeText(this, "Please fill in all required fields", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        String fullName = firstName + " " + lastName;
+
+        // Create and save the new user
+        Entrant newEntrant = new Entrant(deviceId, email, fullName, phone);
+        newEntrant.save().addOnSuccessListener(aVoid -> {
+            Toast.makeText(SignupActivity.this, "Account created successfully!", Toast.LENGTH_SHORT).show();
+            navigateToMain();
+        }).addOnFailureListener(e -> {
+            Toast.makeText(SignupActivity.this, "Signup failed: " + e.getMessage(), Toast.LENGTH_LONG).show();
+        });
+    }
+
+    private void navigateToMain() {
+        Intent intent = new Intent(SignupActivity.this, MainActivity.class);
+        startActivity(intent);
+        finish();
     }
 }
