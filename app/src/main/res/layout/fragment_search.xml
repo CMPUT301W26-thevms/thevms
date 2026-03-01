@@ -65,59 +65,76 @@
         </com.google.android.material.card.MaterialCardView>
 
         <!-- Filters and Sort -->
-        <LinearLayout
-            android:id="@+id/filter_bar"
+        <HorizontalScrollView
+            android:id="@+id/filter_scroll_view"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginHorizontal="16dp"
             android:layout_marginTop="8dp"
-            android:gravity="center_vertical"
-            android:orientation="horizontal"
+            android:paddingHorizontal="16dp"
+            android:scrollbars="none"
             app:layout_constraintTop_toBottomOf="@id/search_card">
 
-            <Button
-                android:id="@+id/filter_date_btn"
-                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+            <LinearLayout
+                android:id="@+id/filter_bar"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:minWidth="0dp"
-                android:paddingHorizontal="16dp"
-                android:text="Select Date"
-                android:textAllCaps="false"
-                android:textColor="@android:color/black"
-                app:cornerRadius="12dp"
-                app:strokeColor="@android:color/darker_gray" />
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
 
-            <Button
-                android:id="@+id/clear_filters_btn"
-                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="8dp"
-                android:minWidth="0dp"
-                android:paddingHorizontal="16dp"
-                android:text="Clear Filters"
-                android:textAllCaps="false"
-                android:textColor="@android:color/black"
-                android:visibility="gone"
-                app:cornerRadius="12dp"
-                app:strokeColor="@android:color/darker_gray" />
+                <Button
+                    android:id="@+id/filter_date_range_btn"
+                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:minWidth="0dp"
+                    android:paddingHorizontal="16dp"
+                    android:text="Date Range"
+                    android:textAllCaps="false"
+                    android:textColor="@android:color/black"
+                    app:cornerRadius="12dp"
+                    app:strokeColor="@android:color/darker_gray" />
 
-            <View
-                android:layout_width="0dp"
-                android:layout_height="0dp"
-                android:layout_weight="1" />
+                <Button
+                    android:id="@+id/filter_time_range_btn"
+                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="8dp"
+                    android:minWidth="0dp"
+                    android:paddingHorizontal="16dp"
+                    android:text="Time Range"
+                    android:textAllCaps="false"
+                    android:textColor="@android:color/black"
+                    app:cornerRadius="12dp"
+                    app:strokeColor="@android:color/darker_gray" />
 
-            <TextView
-                android:id="@+id/results_count_text"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="0 results"
-                android:textColor="@android:color/black"
-                android:textSize="14sp" />
-        </LinearLayout>
+                <Button
+                    android:id="@+id/clear_filters_btn"
+                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="8dp"
+                    android:minWidth="0dp"
+                    android:paddingHorizontal="16dp"
+                    android:text="Clear"
+                    android:textAllCaps="false"
+                    android:textColor="@android:color/black"
+                    android:visibility="gone"
+                    app:cornerRadius="12dp"
+                    app:strokeColor="@android:color/darker_gray" />
 
-        <!-- Map Placeholder (retained as requested by layout structure) -->
+                <TextView
+                    android:id="@+id/results_count_text"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="16dp"
+                    android:text="0 results"
+                    android:textColor="@android:color/black"
+                    android:textSize="14sp" />
+            </LinearLayout>
+        </HorizontalScrollView>
+
+        <!-- Map Placeholder -->
         <FrameLayout
             android:id="@+id/map_placeholder"
             android:layout_width="match_parent"
@@ -125,7 +142,7 @@
             android:layout_marginTop="12dp"
             android:background="#F5F5F5"
             app:layout_constraintBottom_toBottomOf="parent"
-            app:layout_constraintTop_toBottomOf="@id/filter_bar">
+            app:layout_constraintTop_toBottomOf="@id/filter_scroll_view">
         </FrameLayout>
 
     </androidx.constraintlayout.widget.ConstraintLayout>
