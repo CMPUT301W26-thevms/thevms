@@ -144,11 +144,10 @@
         android:layout_height="wrap_content"
         android:background="@drawable/bottom_sheet_background"
         android:elevation="12dp"
-        app:behavior_peekHeight="200dp"
+        app:behavior_peekHeight="0dp"
         app:layout_behavior="com.google.android.material.bottomsheet.BottomSheetBehavior">
 
         <LinearLayout
-            android:id="@+id/event_list_container"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
@@ -162,7 +161,12 @@
                 android:layout_marginBottom="16dp"
                 android:background="#DDDDDD" />
 
-            <!-- Event Cards will be dynamically added here -->
+            <!-- Sub-container for dynamic content -->
+            <LinearLayout
+                android:id="@+id/event_list_container"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical" />
 
             <!-- Spacer for scroll -->
             <View
