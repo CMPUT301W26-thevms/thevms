@@ -1,5 +1,7 @@
 package com.example.thevms.model;
 
+import androidx.annotation.Nullable;
+
 import java.util.List;
 
 /**
@@ -12,11 +14,12 @@ public class Admin extends Organizer {
      *
      * @param deviceId    The admin's device id.
      * @param email       The admin's email.
-     * @param username    The admin's username.
+     * @param firstName   The admin's first name.
+     * @param lastName    The admin's last name.
      * @param phoneNumber The admin's phone number.
      */
-    public Admin(String deviceId, String email, String username, String phoneNumber) {
-        super(deviceId, email, username, phoneNumber);
+    public Admin(String deviceId, String email, String firstName, String lastName, @Nullable String phoneNumber) {
+        super(deviceId, email, firstName, lastName, phoneNumber);
     }
 
     /**

@@ -2,6 +2,8 @@ package com.example.thevms.model;
 
 import android.location.Location;
 
+import androidx.annotation.Nullable;
+
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
@@ -16,11 +18,12 @@ public class Organizer extends Entrant {
      * Constructor for the Organizer class.
      * @param deviceId The organizer's device ID.
      * @param email The organizer's email.
-     * @param username The organizer's username.
+     * @param firstName The organizer's first name.
+     * @param lastName The organizer's last name.
      * @param phoneNumber The organizer's phone number.
      */
-    public Organizer(String deviceId, String email, String username, String phoneNumber) {
-        super(deviceId, email, username, phoneNumber);
+    public Organizer(String deviceId, String email, String firstName, String lastName, @Nullable String phoneNumber) {
+        super(deviceId, email, firstName, lastName, phoneNumber);
         this.currentEvents = new ArrayList<>();
     }
 

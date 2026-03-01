@@ -1,5 +1,7 @@
 package com.example.thevms.model;
 
+import androidx.annotation.Nullable;
+
 import com.google.android.gms.tasks.Task;
 import com.google.firebase.firestore.DocumentSnapshot;
 
@@ -13,14 +15,17 @@ public class Entrant {
     protected final DatabaseHandler dbHandler;
     private String deviceId;
     private String email;
-    private String username;
+    private String firstName;
+    private String lastName;
+    @Nullable
     private String phoneNumber;
 
-    public Entrant(String deviceId, String email, String username, String phoneNumber) {
+    public Entrant(String deviceId, String email, String firstName, String lastName, @Nullable String phoneNumber) {
         this.dbHandler = new DatabaseHandler();
         this.deviceId = deviceId;
         this.email = email;
-        this.username = username;
+        this.firstName = firstName;
+        this.lastName = lastName;
         this.phoneNumber = phoneNumber;
     }
 
@@ -31,7 +36,8 @@ public class Entrant {
     public Task<Void> save() {
         Map<String, Object> data = new HashMap<>();
         data.put("email", email);
-        data.put("username", username);
+        data.put("firstName", firstName);
+        data.put("lastName", lastName);
         data.put("phoneNumber", phoneNumber);
         return dbHandler.saveUser(deviceId, data);
     }
@@ -45,9 +51,10 @@ public class Entrant {
     public static Entrant fromMap(String deviceId, Map<String, Object> data) {
         if (data == null) return null;
         String email = (String) data.get("email");
-        String username = (String) data.get("username");
+        String firstName = (String) data.get("firstName");
+        String lastName = (String) data.get("lastName");
         String phoneNumber = (String) data.get("phoneNumber");
-        return new Entrant(deviceId, email, username, phoneNumber);
+        return new Entrant(deviceId, email, firstName, lastName, phoneNumber);
     }
 
     /**
@@ -64,7 +71,7 @@ public class Entrant {
                     return Entrant.fromMap(deviceId, doc.getData());
                 } else {
                     // Return a new entrant instance that hasn't been saved yet
-                    return new Entrant(deviceId, null, null, null);
+                    return new Entrant(deviceId, null, null, null, null);
                 }
             } else {
                 throw task.getException();
@@ -80,20 +87,29 @@ public class Entrant {
         this.deviceId = deviceId;
     }
 
+    @Nullable
     public String getPhoneNumber() {
         return phoneNumber;
     }
 
-    public void setPhoneNumber(String phoneNumber) {
+    public void setPhoneNumber(@Nullable String phoneNumber) {
         this.phoneNumber = phoneNumber;
     }
 
-    public String getUsername() {
-        return username;
+    public String getFirstName() {
+        return firstName;
     }
 
-    public void setUsername(String username) {
-        this.username = username;
+    public void setFirstName(String firstName) {
+        this.firstName = firstName;
+    }
+
+    public String getLastName() {
+        return lastName;
+    }
+
+    public void setLastName(String lastName) {
+        this.lastName = lastName;
     }
 
     public String getEmail() {

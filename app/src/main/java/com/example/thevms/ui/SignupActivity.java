@@ -19,6 +19,8 @@ import com.example.thevms.R;
 import com.example.thevms.model.Entrant;
 import com.google.android.material.textfield.TextInputEditText;
 
+import java.util.Objects;
+
 public class SignupActivity extends AppCompatActivity {
 
     private TextInputEditText firstNameEdit, lastNameEdit, emailEdit, phoneEdit;
@@ -28,7 +30,7 @@ public class SignupActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         EdgeToEdge.enable(this);
         setContentView(R.layout.activity_signup);
-        
+
         View root = findViewById(R.id.app_name).getParent().getParent() instanceof View ? (View) findViewById(R.id.app_name).getParent().getParent() : findViewById(android.R.id.content);
         ViewCompat.setOnApplyWindowInsetsListener(root, (v, insets) -> {
             Insets systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars());
@@ -61,9 +63,9 @@ public class SignupActivity extends AppCompatActivity {
     }
 
     private void handleSignup(String deviceId) {
-        String firstName = firstNameEdit.getText().toString().trim();
-        String lastName = lastNameEdit.getText().toString().trim();
-        String email = emailEdit.getText().toString().trim();
+        String firstName = Objects.requireNonNull(firstNameEdit.getText()).toString().trim();
+        String lastName = Objects.requireNonNull(lastNameEdit.getText()).toString().trim();
+        String email = Objects.requireNonNull(emailEdit.getText()).toString().trim();
         String phone = phoneEdit.getText().toString().trim();
 
         if (TextUtils.isEmpty(firstName) || TextUtils.isEmpty(lastName) || TextUtils.isEmpty(email)) {
@@ -71,10 +73,8 @@ public class SignupActivity extends AppCompatActivity {
             return;
         }
 
-        String fullName = firstName + " " + lastName;
-
         // Create and save the new user
-        Entrant newEntrant = new Entrant(deviceId, email, fullName, phone);
+        Entrant newEntrant = new Entrant(deviceId, email, firstName, lastName, phone);
         newEntrant.save().addOnSuccessListener(aVoid -> {
             Toast.makeText(SignupActivity.this, "Account created successfully!", Toast.LENGTH_SHORT).show();
             navigateToMain();
