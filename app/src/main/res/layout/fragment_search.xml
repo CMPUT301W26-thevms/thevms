@@ -35,36 +35,27 @@
                     app:layout_constraintTop_toTopOf="parent"
                     app:tint="@android:color/black" />
 
-                <TextView
-                    android:id="@+id/event_title"
+                <EditText
+                    android:id="@+id/search_edit_text"
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_marginStart="16dp"
-                    android:text="Event"
+                    android:background="@null"
+                    android:hint="Search events by name"
                     android:textColor="@android:color/black"
                     android:textSize="18sp"
-                    android:textStyle="bold"
-                    app:layout_constraintEnd_toStartOf="@+id/edit_icon"
+                    app:layout_constraintBottom_toBottomOf="parent"
+                    app:layout_constraintEnd_toStartOf="@+id/clear_search"
                     app:layout_constraintStart_toEndOf="@id/search_icon"
                     app:layout_constraintTop_toTopOf="parent" />
 
-                <TextView
-                    android:id="@+id/event_subtitle"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:text="Sep 12 - 15 • 2 people"
-                    android:textColor="#3366BB"
-                    android:textSize="14sp"
-                    app:layout_constraintEnd_toStartOf="@+id/edit_icon"
-                    app:layout_constraintStart_toStartOf="@id/event_title"
-                    app:layout_constraintTop_toBottomOf="@id/event_title" />
-
                 <ImageView
-                    android:id="@+id/edit_icon"
+                    android:id="@+id/clear_search"
                     android:layout_width="24dp"
                     android:layout_height="24dp"
                     android:layout_marginEnd="8dp"
-                    android:src="@android:drawable/ic_menu_edit"
+                    android:src="@android:drawable/ic_menu_close_clear_cancel"
+                    android:visibility="gone"
                     app:layout_constraintBottom_toBottomOf="parent"
                     app:layout_constraintEnd_toEndOf="parent"
                     app:layout_constraintTop_toTopOf="parent"
@@ -85,27 +76,30 @@
             app:layout_constraintTop_toBottomOf="@id/search_card">
 
             <Button
+                android:id="@+id/filter_date_btn"
                 style="@style/Widget.MaterialComponents.Button.OutlinedButton"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:minWidth="0dp"
                 android:paddingHorizontal="16dp"
-                android:text="Filter"
+                android:text="Select Date"
                 android:textAllCaps="false"
                 android:textColor="@android:color/black"
                 app:cornerRadius="12dp"
                 app:strokeColor="@android:color/darker_gray" />
 
             <Button
+                android:id="@+id/clear_filters_btn"
                 style="@style/Widget.MaterialComponents.Button.OutlinedButton"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginStart="8dp"
                 android:minWidth="0dp"
                 android:paddingHorizontal="16dp"
-                android:text="Sort"
+                android:text="Clear Filters"
                 android:textAllCaps="false"
                 android:textColor="@android:color/black"
+                android:visibility="gone"
                 app:cornerRadius="12dp"
                 app:strokeColor="@android:color/darker_gray" />
 
@@ -115,14 +109,15 @@
                 android:layout_weight="1" />
 
             <TextView
+                android:id="@+id/results_count_text"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="99 results"
+                android:text="0 results"
                 android:textColor="@android:color/black"
                 android:textSize="14sp" />
         </LinearLayout>
 
-        <!-- Map Placeholder -->
+        <!-- Map Placeholder (retained as requested by layout structure) -->
         <FrameLayout
             android:id="@+id/map_placeholder"
             android:layout_width="match_parent"
@@ -131,7 +126,6 @@
             android:background="#F5F5F5"
             app:layout_constraintBottom_toBottomOf="parent"
             app:layout_constraintTop_toBottomOf="@id/filter_bar">
-            <!-- Map content blank -->
         </FrameLayout>
 
     </androidx.constraintlayout.widget.ConstraintLayout>
@@ -141,9 +135,9 @@
         android:id="@+id/bottom_sheet"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:background="@drawable/bottom_sheet_background"
+        android:background="@android:color/white"
         android:elevation="12dp"
-        app:behavior_peekHeight="50dp"
+        app:behavior_peekHeight="200dp"
         app:layout_behavior="com.google.android.material.bottomsheet.BottomSheetBehavior">
 
         <LinearLayout
@@ -160,12 +154,11 @@
                 android:layout_marginBottom="16dp"
                 android:background="#DDDDDD" />
 
-            <!-- Dummy Event Cards -->
-            <include layout="@layout/event_card" />
-
-            <include layout="@layout/event_card" />
-
-            <include layout="@layout/event_card" />
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/events_recycler_view"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                app:layoutManager="androidx.recyclerview.widget.LinearLayoutManager" />
 
             <!-- Spacer for scroll -->
             <View

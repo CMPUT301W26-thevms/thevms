@@ -3,6 +3,7 @@ package com.example.thevms.model;
 import android.location.Location;
 
 import com.google.android.gms.tasks.Task;
+import com.google.firebase.firestore.DocumentSnapshot;
 
 import java.util.Date;
 import java.util.HashMap;
@@ -124,6 +125,26 @@ public class Event {
                 throw task.getException();
             }
         });
+    }
+
+    /**
+     * Creates an Event object from a Firestore DocumentSnapshot.
+     *
+     * @param doc The DocumentSnapshot to parse.
+     * @return An Event object populated with data from the document.
+     */
+    public static Event fromDoc(DocumentSnapshot doc) {
+        Long eventId = doc.getLong("eventId");
+        String name = doc.getString("name");
+        String description = doc.getString("description");
+        String imageUrl = doc.getString("imageUrl");
+        Date regStart = doc.getDate("registrationStartTime");
+        Date regEnd = doc.getDate("registrationEndTime");
+        Date eventStart = doc.getDate("eventStartTime");
+        Date eventEnd = doc.getDate("eventEndTime");
+
+        // Note: Organizer and Location are simplified here as they require more complex mapping.
+        return new Event(eventId, name, description, null, null, imageUrl, regStart, regEnd, eventStart, eventEnd);
     }
 
     /**
