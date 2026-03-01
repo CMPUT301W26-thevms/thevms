@@ -29,7 +29,7 @@
         </com.google.android.material.card.MaterialCardView>
 
         <TextView
-            android:id="@+id/event_name_text"
+            android:id="@+id/event_name"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="12dp"
@@ -46,7 +46,7 @@
             android:orientation="horizontal">
 
             <TextView
-                android:id="@+id/event_entrants_text"
+                android:id="@+id/event_status_info"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="☆ 0 people joined"
@@ -54,7 +54,7 @@
                 android:textSize="16sp" />
 
             <TextView
-                android:id="@+id/event_location_text"
+                android:id="@+id/event_location_info"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginStart="16dp"
@@ -70,7 +70,7 @@
             android:layout_marginBottom="8dp">
 
             <TextView
-                android:id="@+id/event_date_text"
+                android:id="@+id/event_time_info"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="Date"

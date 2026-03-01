@@ -52,11 +52,8 @@ public class EventAdapter extends RecyclerView.Adapter<EventAdapter.EventViewHol
 
         public EventViewHolder(@NonNull View itemView) {
             super(itemView);
-            // Based on event_card.xml, I need to find the correct IDs.
-            // Looking at event_card.xml again... it doesn't have IDs for the text views!
-            // I should update event_card.xml to have IDs.
-            nameTextView = itemView.findViewById(R.id.event_name_text);
-            dateTextView = itemView.findViewById(R.id.event_date_text);
+            nameTextView = itemView.findViewById(R.id.event_name);
+            dateTextView = itemView.findViewById(R.id.event_time_info);
         }
     }
 }
