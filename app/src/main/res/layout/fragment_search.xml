@@ -52,7 +52,7 @@
                     android:id="@+id/event_subtitle"
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
-                    android:text="Sep 12 - 15 • 2 people"
+                    android:text="Anytime • Any people"
                     android:textColor="#3366BB"
                     android:textSize="14sp"
                     app:layout_constraintEnd_toStartOf="@+id/edit_icon"
@@ -115,9 +115,10 @@
                 android:layout_weight="1" />
 
             <TextView
+                android:id="@+id/results_count"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="99 results"
+                android:text="0 results"
                 android:textColor="@android:color/black"
                 android:textSize="14sp" />
         </LinearLayout>
@@ -143,10 +144,11 @@
         android:layout_height="wrap_content"
         android:background="@drawable/bottom_sheet_background"
         android:elevation="12dp"
-        app:behavior_peekHeight="50dp"
+        app:behavior_peekHeight="200dp"
         app:layout_behavior="com.google.android.material.bottomsheet.BottomSheetBehavior">
 
         <LinearLayout
+            android:id="@+id/event_list_container"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
@@ -160,12 +162,7 @@
                 android:layout_marginBottom="16dp"
                 android:background="#DDDDDD" />
 
-            <!-- Dummy Event Cards -->
-            <include layout="@layout/event_card" />
-
-            <include layout="@layout/event_card" />
-
-            <include layout="@layout/event_card" />
+            <!-- Event Cards will be dynamically added here -->
 
             <!-- Spacer for scroll -->
             <View

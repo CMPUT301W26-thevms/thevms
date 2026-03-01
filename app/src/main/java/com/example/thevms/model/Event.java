@@ -3,6 +3,7 @@ package com.example.thevms.model;
 import android.location.Location;
 
 import com.google.android.gms.tasks.Task;
+import com.google.firebase.Timestamp;
 
 import java.util.Date;
 import java.util.HashMap;
@@ -50,10 +51,8 @@ public class Event {
     private String description;
     private Organizer organizer;
     private Location location;
-
     private String qrCode;
     private String imageUrl;
-
     private Date registrationStartTime;
     private Date registrationEndTime;
     private Date eventStartTime;
@@ -87,7 +86,6 @@ public class Event {
         this.eventStartTime = eventStartTime;
         this.eventEndTime = eventEndTime;
         this.entrantList = new HashMap<>();
-
         this.qrCode = "NULL FOR NOW";
     }
 
@@ -127,6 +125,40 @@ public class Event {
     }
 
     /**
+     * Helper method to safely convert a Firestore object to a Date.
+     */
+    private static Date toDate(Object obj) {
+        if (obj instanceof Timestamp) {
+            return ((Timestamp) obj).toDate();
+        } else if (obj instanceof Date) {
+            return (Date) obj;
+        }
+        return null;
+    }
+
+    /**
+     * Creates an Event object from a Map of data (typically from Firestore).
+     */
+    public static Event fromMap(Map<String, Object> data) {
+        if (data == null) return null;
+
+        Long id = (Long) data.get("eventId");
+        String name = (String) data.get("name");
+        String desc = (String) data.get("description");
+        String img = (String) data.get("imageUrl");
+
+        Date regStart = toDate(data.get("registrationStartTime"));
+        Date regEnd = toDate(data.get("registrationEndTime"));
+        Date eventStart = toDate(data.get("eventStartTime"));
+        Date eventEnd = toDate(data.get("eventEndTime"));
+
+        // Location and Organizer might need specialized mapping depending on how they are stored
+        // For now, we'll initialize them as null or use placeholders if necessary for the UI task.
+
+        return new Event(id, name, desc, null, null, img, regStart, regEnd, eventStart, eventEnd);
+    }
+
+    /**
      * Saves the current state of this Event object to the database.
      * <p>
      * This method takes all the properties of the current object, converts them into a format
@@ -135,6 +167,7 @@ public class Event {
      *
      * @return A {@code Task<Void>} that represents the asynchronous save operation. You can add listeners
      * to this task to be notified of success or failure.
+     * Helper method to safely convert a Firestore object to a Date.
      */
     public Task<Void> save() {
         return dbHandler.saveEvent(this.eventId, this.toMap());
@@ -161,6 +194,7 @@ public class Event {
         return map;
     }
 
+    // Getters and Setters
     public Long getEventId() {
         return eventId;
     }
