@@ -5,6 +5,7 @@ import android.content.Intent;
 import android.os.Bundle;
 import android.provider.Settings;
 import android.text.TextUtils;
+import android.util.Patterns;
 import android.view.View;
 import android.widget.Button;
 import android.widget.Toast;
@@ -66,11 +67,36 @@ public class SignupActivity extends AppCompatActivity {
         String firstName = Objects.requireNonNull(firstNameEdit.getText()).toString().trim();
         String lastName = Objects.requireNonNull(lastNameEdit.getText()).toString().trim();
         String email = Objects.requireNonNull(emailEdit.getText()).toString().trim();
-        String phone = phoneEdit.getText().toString().trim();
+        String phone = Objects.requireNonNull(phoneEdit.getText()).toString().trim();
 
-        if (TextUtils.isEmpty(firstName) || TextUtils.isEmpty(lastName) || TextUtils.isEmpty(email)) {
-            Toast.makeText(this, "Please fill in all required fields", Toast.LENGTH_SHORT).show();
+        // Basic presence validation
+        if (TextUtils.isEmpty(firstName)) {
+            firstNameEdit.setError("First name is required");
             return;
+        }
+        if (TextUtils.isEmpty(lastName)) {
+            lastNameEdit.setError("Last name is required");
+            return;
+        }
+        if (TextUtils.isEmpty(email)) {
+            emailEdit.setError("Email is required");
+            return;
+        }
+
+        // Email regex validation
+        if (!Patterns.EMAIL_ADDRESS.matcher(email).matches()) {
+            emailEdit.setError("Invalid email address");
+            return;
+        }
+
+        // Phone validation (optional)
+        if (!TextUtils.isEmpty(phone)) {
+            if (!Patterns.PHONE.matcher(phone).matches()) {
+                phoneEdit.setError("Invalid phone number");
+                return;
+            }
+        } else {
+            phone = null; // Ensure blank phone is stored as null
         }
 
         // Create and save the new user
