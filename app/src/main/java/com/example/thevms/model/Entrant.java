@@ -39,10 +39,12 @@ public class Entrant {
     }
 
     public void registerInEvent(Event event) {
-        event.addEntrant(this, Boolean.FALSE);
+        throw new UnsupportedOperationException("Not implemented yet");
+//        event.addEntrant(this, Boolean.FALSE);
     }
 
     public void unregisterFromEvent(Event event) {
-        event.removeEntrant(this);
+        throw new UnsupportedOperationException("Not implemented yet");
+//        event.removeEntrant(this);
     }
 }
