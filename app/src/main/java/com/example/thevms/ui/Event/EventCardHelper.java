@@ -1,4 +1,4 @@
-package com.example.thevms.ui;
+package com.example.thevms.ui.Event;
 
 import android.view.LayoutInflater;
 import android.view.View;
