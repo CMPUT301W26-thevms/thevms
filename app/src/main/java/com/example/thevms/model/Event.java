@@ -126,6 +126,13 @@ public class Event {
 
     /**
      * Helper method to safely convert a Firestore object to a Date.
+     * <p>
+     * Firestore often returns dates as {@link Timestamp} objects. This method
+     * handles the conversion from {@link Timestamp} to {@link Date}, or returns
+     * the object if it is already a {@link Date}.
+     *
+     * @param obj The object to convert (typically from a Firestore document).
+     * @return The converted {@link Date} object, or {@code null} if the object is null or of an unsupported type.
      */
     private static Date toDate(Object obj) {
         if (obj instanceof Timestamp) {
@@ -138,6 +145,13 @@ public class Event {
 
     /**
      * Creates an Event object from a Map of data (typically from Firestore).
+     * <p>
+     * This method extracts event properties from a Map, handling date conversions
+     * using the {@link #toDate(Object)} helper. It constructs a new Event instance
+     * using the extracted values.
+     *
+     * @param data A Map containing the key-value pairs of the event data.
+     * @return A new {@link Event} object populated with the data from the Map, or {@code null} if the data is null.
      */
     public static Event fromMap(Map<String, Object> data) {
         if (data == null) return null;
@@ -167,7 +181,6 @@ public class Event {
      *
      * @return A {@code Task<Void>} that represents the asynchronous save operation. You can add listeners
      * to this task to be notified of success or failure.
-     * Helper method to safely convert a Firestore object to a Date.
      */
     public Task<Void> save() {
         return dbHandler.saveEvent(this.eventId, this.toMap());
