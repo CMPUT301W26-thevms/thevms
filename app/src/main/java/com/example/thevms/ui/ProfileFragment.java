@@ -43,9 +43,14 @@ public class ProfileFragment extends Fragment {
             startActivity(intent);
         });
 
-        loadUserProfile();
-
         return view;
+    }
+
+    @Override
+    public void onResume() {
+        super.onResume();
+        // Refresh profile data whenever the fragment becomes visible
+        loadUserProfile();
     }
 
     /**
