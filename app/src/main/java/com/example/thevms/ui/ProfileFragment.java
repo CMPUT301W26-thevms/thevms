@@ -1,11 +1,13 @@
 package com.example.thevms.ui;
 
 import android.annotation.SuppressLint;
+import android.content.Intent;
 import android.os.Bundle;
 import android.provider.Settings;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -22,6 +24,7 @@ import com.example.thevms.model.Entrant;
 public class ProfileFragment extends Fragment {
 
     private TextView nameText, emailText, phoneText;
+    private LinearLayout settingsButton;
 
     @Nullable
     @Override
@@ -32,6 +35,13 @@ public class ProfileFragment extends Fragment {
         nameText = view.findViewById(R.id.profile_name);
         emailText = view.findViewById(R.id.profile_email);
         phoneText = view.findViewById(R.id.profile_phone);
+        settingsButton = view.findViewById(R.id.btn_settings);
+
+        // Navigation to Settings
+        settingsButton.setOnClickListener(v -> {
+            Intent intent = new Intent(getActivity(), SettingsActivity.class);
+            startActivity(intent);
+        });
 
         loadUserProfile();
 
