@@ -78,7 +78,7 @@
                         android:id="@+id/edit_first_name"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:hint="Value"
+                        android:hint="John"
                         android:inputType="textPersonName"
                         android:textColorHint="#CCCCCC" />
                 </com.google.android.material.textfield.TextInputLayout>
@@ -107,7 +107,7 @@
                         android:id="@+id/edit_last_name"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:hint="Value"
+                        android:hint="Doe"
                         android:inputType="textPersonName"
                         android:textColorHint="#CCCCCC" />
                 </com.google.android.material.textfield.TextInputLayout>
@@ -136,7 +136,7 @@
                         android:id="@+id/edit_phone"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:hint="Value"
+                        android:hint="XXX-XXX-XXXX"
                         android:inputType="phone"
                         android:textColorHint="#CCCCCC" />
                 </com.google.android.material.textfield.TextInputLayout>
@@ -165,7 +165,7 @@
                         android:id="@+id/edit_email"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:hint="Value"
+                        android:hint="johndoe@example.com"
                         android:inputType="textEmailAddress"
                         android:textColorHint="#CCCCCC" />
                 </com.google.android.material.textfield.TextInputLayout>
