@@ -19,6 +19,7 @@ import androidx.core.view.WindowInsetsCompat;
 
 import com.example.thevms.R;
 import com.example.thevms.model.Entrant;
+import com.google.android.material.materialswitch.MaterialSwitch;
 import com.google.android.material.textfield.TextInputEditText;
 
 import java.util.Objects;
@@ -26,6 +27,7 @@ import java.util.Objects;
 public class SettingsActivity extends AppCompatActivity {
 
     private TextInputEditText firstNameEdit, lastNameEdit, emailEdit, phoneEdit;
+    private MaterialSwitch notificationSwitch;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -45,6 +47,7 @@ public class SettingsActivity extends AppCompatActivity {
         lastNameEdit = findViewById(R.id.edit_last_name);
         emailEdit = findViewById(R.id.edit_email);
         phoneEdit = findViewById(R.id.edit_phone);
+        notificationSwitch = findViewById(R.id.switch_notifications);
 
         ImageView backButton = findViewById(R.id.btn_back);
         backButton.setOnClickListener(v -> finish());
@@ -113,6 +116,7 @@ public class SettingsActivity extends AppCompatActivity {
         String lastName = Objects.requireNonNull(lastNameEdit.getText()).toString().trim();
         String email = Objects.requireNonNull(emailEdit.getText()).toString().trim();
         String phone = Objects.requireNonNull(phoneEdit.getText()).toString().trim();
+        boolean notificationsEnabled = notificationSwitch.isChecked();
 
         // Handle optional phone field
         if (TextUtils.isEmpty(phone)) {
@@ -120,7 +124,7 @@ public class SettingsActivity extends AppCompatActivity {
         }
 
         // Update and save the user
-        Entrant updatedEntrant = new Entrant(deviceId, email, firstName, lastName, phone);
+        Entrant updatedEntrant = new Entrant(deviceId, email, firstName, lastName, phone, notificationsEnabled);
         updatedEntrant.save().addOnSuccessListener(aVoid -> {
             Toast.makeText(SettingsActivity.this, "Profile updated successfully!", Toast.LENGTH_SHORT).show();
             finish();
@@ -135,6 +139,7 @@ public class SettingsActivity extends AppCompatActivity {
             lastNameEdit.setText(entrant.getLastName());
             emailEdit.setText(entrant.getEmail());
             phoneEdit.setText(entrant.getPhoneNumber());
+            notificationSwitch.setChecked(entrant.isNotificationsEnabled());
         }).addOnFailureListener(e -> {
             Toast.makeText(this, "Failed to load settings", Toast.LENGTH_SHORT).show();
         });
