@@ -19,18 +19,25 @@ public class Entrant {
     private String lastName;
     @Nullable
     private String phoneNumber;
+    private boolean notificationsEnabled;
 
     public Entrant(String deviceId, String email, String firstName, String lastName, @Nullable String phoneNumber) {
+        this(deviceId, email, firstName, lastName, phoneNumber, true);
+    }
+
+    public Entrant(String deviceId, String email, String firstName, String lastName, @Nullable String phoneNumber, boolean notificationsEnabled) {
         this.dbHandler = new DatabaseHandler();
         this.deviceId = deviceId;
         this.email = email;
         this.firstName = firstName;
         this.lastName = lastName;
         this.phoneNumber = phoneNumber;
+        this.notificationsEnabled = notificationsEnabled;
     }
 
     /**
      * Saves the current entrant's profile to the database.
+     *
      * @return A Task representing the async operation.
      */
     public Task<Void> save() {
@@ -39,13 +46,15 @@ public class Entrant {
         data.put("firstName", firstName);
         data.put("lastName", lastName);
         data.put("phoneNumber", phoneNumber);
+        data.put("notificationsEnabled", notificationsEnabled);
         return dbHandler.saveUser(deviceId, data);
     }
 
     /**
      * Creates an Entrant object from a Map of data.
+     *
      * @param deviceId The unique device ID.
-     * @param data The data map from Firestore.
+     * @param data     The data map from Firestore.
      * @return A populated Entrant object.
      */
     public static Entrant fromMap(String deviceId, Map<String, Object> data) {
@@ -54,11 +63,13 @@ public class Entrant {
         String firstName = (String) data.get("firstName");
         String lastName = (String) data.get("lastName");
         String phoneNumber = (String) data.get("phoneNumber");
-        return new Entrant(deviceId, email, firstName, lastName, phoneNumber);
+        Boolean notifications = (Boolean) data.get("notificationsEnabled");
+        return new Entrant(deviceId, email, firstName, lastName, phoneNumber, notifications);
     }
 
     /**
      * Fetches a user from the database based on the device ID, or returns a new Entrant if not found.
+     *
      * @param deviceId The Android device ID.
      * @return A Task containing the Entrant object.
      */
@@ -71,7 +82,7 @@ public class Entrant {
                     return Entrant.fromMap(deviceId, doc.getData());
                 } else {
                     // Return a new entrant instance that hasn't been saved yet
-                    return new Entrant(deviceId, null, null, null, null);
+                    return new Entrant(deviceId, null, null, null, null, true);
                 }
             } else {
                 throw task.getException();
@@ -118,6 +129,14 @@ public class Entrant {
 
     public void setEmail(String email) {
         this.email = email;
+    }
+
+    public boolean isNotificationsEnabled() {
+        return notificationsEnabled;
+    }
+
+    public void setNotificationsEnabled(boolean notificationsEnabled) {
+        this.notificationsEnabled = notificationsEnabled;
     }
 
     public void registerInEvent(Event event) {
