@@ -51,8 +51,10 @@ public class Event {
     private String description;
     private Organizer organizer;
     private Location location;
+
     private String qrCode;
     private String imageUrl;
+
     private Date registrationStartTime;
     private Date registrationEndTime;
     private Date eventStartTime;
@@ -86,6 +88,7 @@ public class Event {
         this.eventStartTime = eventStartTime;
         this.eventEndTime = eventEndTime;
         this.entrantList = new HashMap<>();
+
         this.qrCode = "NULL FOR NOW";
     }
 
@@ -197,7 +200,7 @@ public class Event {
         map.put("eventId", eventId);
         map.put("name", name);
         map.put("description", description);
-        map.put("Organizers", organizer);
+        map.put("organizerId", organizer.getDeviceId());
         map.put("location", location);
         map.put("imageUrl", imageUrl);
         map.put("registrationStartTime", registrationStartTime);
@@ -207,7 +210,6 @@ public class Event {
         return map;
     }
 
-    // Getters and Setters
     public Long getEventId() {
         return eventId;
     }
