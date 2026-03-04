@@ -37,8 +37,9 @@ import java.util.TimeZone;
 public class CreateEventFragment extends Fragment {
 
     private EditText etName, etLocation, etDescription;
-    private Button btnConfirm, btnCancel, btnStartDate, btnEndDate;
-    private Date startDate, endDate;
+    private Button btnConfirm, btnCancel;
+    private Button btnRegStartDate, btnRegEndDate, btnEventStartDate, btnEventEndDate;
+    private Date regStartDate, regEndDate, eventStartDate, eventEndDate;
     private final SimpleDateFormat dateTimeFormat = new SimpleDateFormat("MMM dd, yyyy HH:mm", Locale.getDefault());
 
     @Nullable
@@ -57,12 +58,17 @@ public class CreateEventFragment extends Fragment {
         etDescription = view.findViewById(R.id.et_event_description);
         btnConfirm = view.findViewById(R.id.btn_confirm);
         btnCancel = view.findViewById(R.id.btn_cancel);
-        btnStartDate = view.findViewById(R.id.btn_start_date);
-        btnEndDate = view.findViewById(R.id.btn_end_date);
+        
+        btnRegStartDate = view.findViewById(R.id.btn_reg_start_date);
+        btnRegEndDate = view.findViewById(R.id.btn_reg_end_date);
+        btnEventStartDate = view.findViewById(R.id.btn_event_start_date);
+        btnEventEndDate = view.findViewById(R.id.btn_event_end_date);
 
         // Setup date-time pickers
-        btnStartDate.setOnClickListener(v -> showDateTimePicker(true));
-        btnEndDate.setOnClickListener(v -> showDateTimePicker(false));
+        btnRegStartDate.setOnClickListener(v -> showDateTimePicker(1));
+        btnRegEndDate.setOnClickListener(v -> showDateTimePicker(2));
+        btnEventStartDate.setOnClickListener(v -> showDateTimePicker(3));
+        btnEventEndDate.setOnClickListener(v -> showDateTimePicker(4));
 
         // Setup cancel button to show custom confirmation dialog
         btnCancel.setOnClickListener(v -> showCancelConfirmationDialog());
@@ -73,11 +79,19 @@ public class CreateEventFragment extends Fragment {
 
     /**
      * Shows a Material Date Picker followed by a Time Picker and updates the selected date-time.
-     * @param isStartDate True if picking the start date-time, false for end date-time.
+     * @param type 1: RegStart, 2: RegEnd, 3: EventStart, 4: EventEnd
      */
-    private void showDateTimePicker(boolean isStartDate) {
+    private void showDateTimePicker(int type) {
+        String title = "";
+        switch (type) {
+            case 1: title = "Select Registration Start Date"; break;
+            case 2: title = "Select Registration End Date"; break;
+            case 3: title = "Select Event Start Date"; break;
+            case 4: title = "Select Event End Date"; break;
+        }
+
         MaterialDatePicker<Long> datePicker = MaterialDatePicker.Builder.datePicker()
-                .setTitleText(isStartDate ? "Select Start Date" : "Select End Date")
+                .setTitleText(title)
                 .setSelection(MaterialDatePicker.todayInUtcMilliseconds())
                 .build();
 
@@ -86,7 +100,6 @@ public class CreateEventFragment extends Fragment {
             Calendar utcCalendar = Calendar.getInstance(TimeZone.getTimeZone("UTC"));
             utcCalendar.setTimeInMillis(selection);
             
-            // Sync the local calendar with the date selected in UTC
             calendar.set(utcCalendar.get(Calendar.YEAR), 
                          utcCalendar.get(Calendar.MONTH), 
                          utcCalendar.get(Calendar.DAY_OF_MONTH));
@@ -95,7 +108,7 @@ public class CreateEventFragment extends Fragment {
                     .setTimeFormat(TimeFormat.CLOCK_24H)
                     .setHour(12)
                     .setMinute(0)
-                    .setTitleText(isStartDate ? "Select Start Time" : "Select End Time")
+                    .setTitleText("Select Time")
                     .build();
 
             timePicker.addOnPositiveButtonClickListener(v -> {
@@ -105,12 +118,23 @@ public class CreateEventFragment extends Fragment {
                 calendar.set(Calendar.MILLISECOND, 0);
 
                 Date selectedDateTime = calendar.getTime();
-                if (isStartDate) {
-                    startDate = selectedDateTime;
-                    btnStartDate.setText(dateTimeFormat.format(startDate));
-                } else {
-                    endDate = selectedDateTime;
-                    btnEndDate.setText(dateTimeFormat.format(endDate));
+                switch (type) {
+                    case 1:
+                        regStartDate = selectedDateTime;
+                        btnRegStartDate.setText(dateTimeFormat.format(regStartDate));
+                        break;
+                    case 2:
+                        regEndDate = selectedDateTime;
+                        btnRegEndDate.setText(dateTimeFormat.format(regEndDate));
+                        break;
+                    case 3:
+                        eventStartDate = selectedDateTime;
+                        btnEventStartDate.setText(dateTimeFormat.format(eventStartDate));
+                        break;
+                    case 4:
+                        eventEndDate = selectedDateTime;
+                        btnEventEndDate.setText(dateTimeFormat.format(eventEndDate));
+                        break;
                 }
             });
 
@@ -125,7 +149,6 @@ public class CreateEventFragment extends Fragment {
      */
     private void handleCreateEvent() {
         String name = etName.getText().toString().trim();
-        String locationStr = etLocation.getText().toString().trim();
         String description = etDescription.getText().toString().trim();
 
         if (name.isEmpty()) {
@@ -133,25 +156,28 @@ public class CreateEventFragment extends Fragment {
             return;
         }
 
-        if (startDate == null || endDate == null) {
-            Toast.makeText(requireContext(), "Please select both start and end dates/times", Toast.LENGTH_SHORT).show();
+        if (regStartDate == null || regEndDate == null || eventStartDate == null || eventEndDate == null) {
+            Toast.makeText(requireContext(), "Please select all dates and times", Toast.LENGTH_SHORT).show();
             return;
         }
 
-        if (endDate.before(startDate)) {
-            Toast.makeText(requireContext(), "End date must be after start date", Toast.LENGTH_SHORT).show();
+        if (regEndDate.before(regStartDate)) {
+            Toast.makeText(requireContext(), "Registration end must be after registration start", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        if (eventEndDate.before(eventStartDate)) {
+            Toast.makeText(requireContext(), "Event end must be after event start", Toast.LENGTH_SHORT).show();
             return;
         }
 
         @SuppressLint("HardwareIds")
         String deviceId = Settings.Secure.getString(requireContext().getContentResolver(), Settings.Secure.ANDROID_ID);
 
-        // Fetch current user to use as Organizer
         Entrant.getOrCreate(deviceId).addOnSuccessListener(user -> {
             Organizer organizer = new Organizer(user.getDeviceId(), user.getEmail(), user.getFirstName(), user.getLastName(), user.getPhoneNumber());
 
-            // Using selected date-times. For simplicity, setting registration dates same as event dates.
-            Event.create(name, description, organizer, null, null, startDate, endDate, startDate, endDate)
+            Event.create(name, description, organizer, null, null, regStartDate, regEndDate, eventStartDate, eventEndDate)
                     .addOnSuccessListener(event -> {
                         event.save().addOnSuccessListener(aVoid -> {
                             Toast.makeText(requireContext(), "Event created successfully!", Toast.LENGTH_SHORT).show();
@@ -169,9 +195,6 @@ public class CreateEventFragment extends Fragment {
         });
     }
 
-    /**
-     * Displays a custom confirmation dialog asking the user if they are sure they want to cancel.
-     */
     private void showCancelConfirmationDialog() {
         View dialogView = LayoutInflater.from(requireContext()).inflate(R.layout.dialog_cancel_confirmation, null);
 
