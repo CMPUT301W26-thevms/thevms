@@ -172,7 +172,7 @@ public class Event {
         map.put("eventId", eventId);
         map.put("name", name);
         map.put("description", description);
-        map.put("Organizers", organizer);
+        map.put("organizerId", organizer.getDeviceId());
         map.put("location", location);
         map.put("imageUrl", imageUrl);
         map.put("registrationStartTime", registrationStartTime);
