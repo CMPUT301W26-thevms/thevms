@@ -14,6 +14,7 @@ import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.annotation.VisibleForTesting;
 import androidx.appcompat.app.AlertDialog;
 import androidx.fragment.app.Fragment;
 
@@ -75,6 +76,22 @@ public class CreateEventFragment extends Fragment {
 
         // Setup confirm button to save the event
         btnConfirm.setOnClickListener(v -> handleCreateEvent());
+    }
+
+    /**
+     * Testing helper to manually set dates and bypass picker UI.
+     */
+    @VisibleForTesting
+    public void setTestingDates(Date rs, Date re, Date es, Date ee) {
+        this.regStartDate = rs;
+        this.regEndDate = re;
+        this.eventStartDate = es;
+        this.eventEndDate = ee;
+        
+        if (btnRegStartDate != null) btnRegStartDate.setText(dateTimeFormat.format(rs));
+        if (btnRegEndDate != null) btnRegEndDate.setText(dateTimeFormat.format(re));
+        if (btnEventStartDate != null) btnEventStartDate.setText(dateTimeFormat.format(es));
+        if (btnEventEndDate != null) btnEventEndDate.setText(dateTimeFormat.format(ee));
     }
 
     /**
