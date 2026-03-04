@@ -1,12 +1,16 @@
 package com.example.thevms.ui;
 
+import android.annotation.SuppressLint;
 import android.os.Bundle;
+import android.provider.Settings;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
+import android.widget.EditText;
 import android.widget.ImageView;
+import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -14,11 +18,19 @@ import androidx.appcompat.app.AlertDialog;
 import androidx.fragment.app.Fragment;
 
 import com.example.thevms.R;
+import com.example.thevms.model.Entrant;
+import com.example.thevms.model.Event;
+import com.example.thevms.model.Organizer;
+
+import java.util.Date;
 
 /**
  * Fragment for creating a new event.
  */
 public class CreateEventFragment extends Fragment {
+
+    private EditText etName, etLocation, etDescription;
+    private Button btnConfirm, btnCancel;
 
     @Nullable
     @Override
@@ -30,12 +42,56 @@ public class CreateEventFragment extends Fragment {
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
 
-        // Setup cancel button to show custom confirmation dialog
-        view.findViewById(R.id.btn_cancel).setOnClickListener(v -> showCancelConfirmationDialog());
+        // Initialize UI components
+        etName = view.findViewById(R.id.et_event_name);
+        etLocation = view.findViewById(R.id.et_event_location);
+        etDescription = view.findViewById(R.id.et_event_description);
+        btnConfirm = view.findViewById(R.id.btn_confirm);
+        btnCancel = view.findViewById(R.id.btn_cancel);
 
-        // Confirm button placeholder
-        view.findViewById(R.id.btn_confirm).setOnClickListener(v -> {
-            // Logic for saving event will go here
+        // Setup cancel button to show custom confirmation dialog
+        btnCancel.setOnClickListener(v -> showCancelConfirmationDialog());
+
+        // Setup confirm button to save the event
+        btnConfirm.setOnClickListener(v -> handleCreateEvent());
+    }
+
+    /**
+     * Records fields, creates an Event object, and saves it to the database.
+     */
+    private void handleCreateEvent() {
+        String name = etName.getText().toString().trim();
+        String locationStr = etLocation.getText().toString().trim();
+        String description = etDescription.getText().toString().trim();
+
+        if (name.isEmpty()) {
+            etName.setError("Name is required");
+            return;
+        }
+
+        @SuppressLint("HardwareIds")
+        String deviceId = Settings.Secure.getString(requireContext().getContentResolver(), Settings.Secure.ANDROID_ID);
+
+        // Fetch current user to use as Organizer
+        Entrant.getOrCreate(deviceId).addOnSuccessListener(user -> {
+            Organizer organizer = new Organizer(user.getDeviceId(), user.getEmail(), user.getFirstName(), user.getLastName(), user.getPhoneNumber());
+            
+            // For now, using dummy dates as date pickers are not yet implemented
+            Date dummyDate = new Date();
+
+            Event.create(name, description, organizer, null, null, dummyDate, dummyDate, dummyDate, dummyDate)
+                    .addOnSuccessListener(event -> {
+                        event.save().addOnSuccessListener(aVoid -> {
+                            Toast.makeText(requireContext(), "Event created successfully!", Toast.LENGTH_SHORT).show();
+                            if (getParentFragmentManager() != null) {
+                                getParentFragmentManager().popBackStack();
+                            }
+                        }).addOnFailureListener(e -> {
+                            Toast.makeText(requireContext(), "Failed to save event", Toast.LENGTH_SHORT).show();
+                        });
+                    }).addOnFailureListener(e -> {
+                        Toast.makeText(requireContext(), "Failed to create event object", Toast.LENGTH_SHORT).show();
+                    });
         });
     }
 
