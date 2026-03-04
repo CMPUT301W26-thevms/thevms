@@ -1,6 +1,7 @@
 package com.example.thevms.ui;
 
 import android.os.Bundle;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -43,7 +44,7 @@ public class CreateEventFragment extends Fragment {
      */
     private void showCancelConfirmationDialog() {
         View dialogView = LayoutInflater.from(requireContext()).inflate(R.layout.dialog_cancel_confirmation, null);
-        
+
         AlertDialog dialog = new AlertDialog.Builder(requireContext(), R.style.TransparentDialog)
                 .setView(dialogView)
                 .create();
@@ -54,11 +55,13 @@ public class CreateEventFragment extends Fragment {
 
         closeIcon.setOnClickListener(v -> dialog.dismiss());
         backButton.setOnClickListener(v -> dialog.dismiss());
-        
+
         yesButton.setOnClickListener(v -> {
             dialog.dismiss();
-            if (getParentFragmentManager() != null) {
+            try {
                 getParentFragmentManager().popBackStack();
+            } catch (IllegalStateException e) {
+                Log.e("CreateEventFragment", "Error while popping back stack", e);
             }
         });
 
