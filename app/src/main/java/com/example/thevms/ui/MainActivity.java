@@ -1,6 +1,10 @@
 package com.example.thevms.ui;
 
+import android.annotation.SuppressLint;
 import android.os.Bundle;
+import android.provider.Settings;
+import android.view.Menu;
+import android.view.MenuItem;
 
 import androidx.activity.EdgeToEdge;
 import androidx.appcompat.app.AppCompatActivity;
@@ -10,6 +14,8 @@ import androidx.core.view.WindowInsetsCompat;
 import androidx.fragment.app.Fragment;
 
 import com.example.thevms.R;
+import com.example.thevms.model.Entrant;
+import com.example.thevms.model.UserRole;
 import com.google.android.material.bottomnavigation.BottomNavigationView;
 
 /**
@@ -31,6 +37,16 @@ public class MainActivity extends AppCompatActivity {
 
         BottomNavigationView bottomNav = findViewById(R.id.bottom_navigation);
         
+        // Hide "Add" button by default until role is verified
+        Menu menu = bottomNav.getMenu();
+        MenuItem addItem = menu.findItem(R.id.nav_add);
+        if (addItem != null) {
+            addItem.setVisible(false);
+        }
+
+        // Check user role and update UI
+        checkUserRoleAndAdjustUI(bottomNav);
+
         // Set default fragment
         if (savedInstanceState == null) {
             getSupportFragmentManager().beginTransaction()
@@ -56,6 +72,24 @@ public class MainActivity extends AppCompatActivity {
                 return true;
             }
             return false;
+        });
+    }
+
+    /**
+     * Checks the user's role from the database and shows/hides the "Add" button.
+     */
+    private void checkUserRoleAndAdjustUI(BottomNavigationView bottomNav) {
+        @SuppressLint("HardwareIds")
+        String deviceId = Settings.Secure.getString(getContentResolver(), Settings.Secure.ANDROID_ID);
+
+        Entrant.getOrCreate(deviceId).addOnSuccessListener(entrant -> {
+            UserRole role = entrant.getRole();
+            if (role == UserRole.ORGANIZER || role == UserRole.ADMIN) {
+                MenuItem addItem = bottomNav.getMenu().findItem(R.id.nav_add);
+                if (addItem != null) {
+                    addItem.setVisible(true);
+                }
+            }
         });
     }
 }
