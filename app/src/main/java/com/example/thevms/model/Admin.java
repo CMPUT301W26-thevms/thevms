@@ -3,6 +3,7 @@ package com.example.thevms.model;
 import androidx.annotation.Nullable;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * Represents an administrator user.
@@ -19,7 +20,29 @@ public class Admin extends Organizer {
      * @param phoneNumber The admin's phone number.
      */
     public Admin(String deviceId, String email, String firstName, String lastName, @Nullable String phoneNumber) {
-        super(deviceId, email, firstName, lastName, phoneNumber);
+        this(deviceId, email, firstName, lastName, phoneNumber, true);
+    }
+
+    public Admin(String deviceId, String email, String firstName, String lastName, @Nullable String phoneNumber, boolean notificationsEnabled) {
+        super(deviceId, email, firstName, lastName, phoneNumber, notificationsEnabled);
+        this.setRole(UserRole.ADMIN);
+    }
+
+    /**
+     * Creates an Admin object from a Map of data.
+     *
+     * @param deviceId The unique device ID.
+     * @param data     The data map from Firestore.
+     * @return A populated Admin object.
+     */
+    public static Admin fromMap(String deviceId, Map<String, Object> data) {
+        if (data == null) return null;
+        String email = (String) data.get("email");
+        String firstName = (String) data.get("firstName");
+        String lastName = (String) data.get("lastName");
+        String phoneNumber = (String) data.get("phoneNumber");
+        Boolean notifications = (Boolean) data.get("notificationsEnabled");
+        return new Admin(deviceId, email, firstName, lastName, phoneNumber, notifications);
     }
 
     /**

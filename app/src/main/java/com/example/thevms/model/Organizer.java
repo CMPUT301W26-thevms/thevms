@@ -7,6 +7,7 @@ import androidx.annotation.Nullable;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Represents an event organizer.
@@ -16,27 +17,50 @@ public class Organizer extends Entrant {
 
     /**
      * Constructor for the Organizer class.
-     * @param deviceId The organizer's device ID.
-     * @param email The organizer's email.
-     * @param firstName The organizer's first name.
-     * @param lastName The organizer's last name.
+     *
+     * @param deviceId    The organizer's device ID.
+     * @param email       The organizer's email.
+     * @param firstName   The organizer's first name.
+     * @param lastName    The organizer's last name.
      * @param phoneNumber The organizer's phone number.
      */
     public Organizer(String deviceId, String email, String firstName, String lastName, @Nullable String phoneNumber) {
-        super(deviceId, email, firstName, lastName, phoneNumber);
+        this(deviceId, email, firstName, lastName, phoneNumber, true);
+    }
+
+    public Organizer(String deviceId, String email, String firstName, String lastName, @Nullable String phoneNumber, boolean notificationsEnabled) {
+        super(deviceId, email, firstName, lastName, phoneNumber, notificationsEnabled, UserRole.ORGANIZER);
         this.currentEvents = new ArrayList<>();
     }
 
     /**
+     * Creates an Organizer object from a Map of data.
+     *
+     * @param deviceId The unique device ID.
+     * @param data     The data map from Firestore.
+     * @return A populated Organizer object.
+     */
+    public static Organizer fromMap(String deviceId, Map<String, Object> data) {
+        if (data == null) return null;
+        String email = (String) data.get("email");
+        String firstName = (String) data.get("firstName");
+        String lastName = (String) data.get("lastName");
+        String phoneNumber = (String) data.get("phoneNumber");
+        Boolean notifications = (Boolean) data.get("notificationsEnabled");
+        return new Organizer(deviceId, email, firstName, lastName, phoneNumber, notifications);
+    }
+
+    /**
      * Creates a new event.
-     * @param startReg The start date for registration.
-     * @param endReg The end date for registration.
-     * @param startEvent The start date of the event.
-     * @param endEvent The end date of the event.
-     * @param name The name of the event.
+     *
+     * @param startReg    The start date for registration.
+     * @param endReg      The end date for registration.
+     * @param startEvent  The start date of the event.
+     * @param endEvent    The end date of the event.
+     * @param name        The name of the event.
      * @param description A description of the event.
-     * @param location The location of the event.
-     * @param radius The radius of the event's location.
+     * @param location    The location of the event.
+     * @param radius      The radius of the event's location.
      * @param maxEntrants The maximum number of entrants for the event.
      */
     public void createEvent(Date startReg, Date endReg, Date startEvent, Date endEvent, String name, String description, Location location, Integer radius, Integer maxEntrants) {
@@ -45,8 +69,9 @@ public class Organizer extends Entrant {
 
     /**
      * Sends a notification to a list of entrants for a specific event.
+     *
      * @param entrants The list of entrants to notify.
-     * @param event The event for which to send a notification.
+     * @param event    The event for which to send a notification.
      */
     public void sendNotification(List<Entrant> entrants, Event event) {
         throw new UnsupportedOperationException("Not supported yet.");

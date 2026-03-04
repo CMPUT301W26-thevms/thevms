@@ -20,9 +20,10 @@ public class Entrant {
     @Nullable
     private String phoneNumber;
     private boolean notificationsEnabled;
+    private UserRole role;
 
     public Entrant(String deviceId, String email, String firstName, String lastName, @Nullable String phoneNumber) {
-        this(deviceId, email, firstName, lastName, phoneNumber, true);
+        this(deviceId, email, firstName, lastName, phoneNumber, true, UserRole.ENTRANT);
     }
 
     public Entrant(String deviceId, String email, String firstName, String lastName, @Nullable String phoneNumber, boolean notificationsEnabled) {
@@ -33,6 +34,18 @@ public class Entrant {
         this.lastName = lastName;
         this.phoneNumber = phoneNumber;
         this.notificationsEnabled = notificationsEnabled;
+        this.role = UserRole.ENTRANT;
+    }
+
+    public Entrant(String deviceId, String email, String firstName, String lastName, @Nullable String phoneNumber, boolean notificationsEnabled, UserRole role) {
+        this.dbHandler = new DatabaseHandler();
+        this.deviceId = deviceId;
+        this.email = email;
+        this.firstName = firstName;
+        this.lastName = lastName;
+        this.phoneNumber = phoneNumber;
+        this.notificationsEnabled = notificationsEnabled;
+        this.role = role;
     }
 
     /**
@@ -41,13 +54,24 @@ public class Entrant {
      * @return A Task representing the async operation.
      */
     public Task<Void> save() {
+        Map<String, Object> data = toMap();
+        return dbHandler.saveUser(deviceId, data);
+    }
+
+    /**
+     * Converts the Entrant object into a Map format suitable for Firestore.
+     *
+     * @return A Map containing the key-value pairs of the entrant data.
+     */
+    protected Map<String, Object> toMap() {
         Map<String, Object> data = new HashMap<>();
         data.put("email", email);
         data.put("firstName", firstName);
         data.put("lastName", lastName);
         data.put("phoneNumber", phoneNumber);
         data.put("notificationsEnabled", notificationsEnabled);
-        return dbHandler.saveUser(deviceId, data);
+        data.put("role", role.name());
+        return data;
     }
 
     /**
@@ -64,7 +88,9 @@ public class Entrant {
         String lastName = (String) data.get("lastName");
         String phoneNumber = (String) data.get("phoneNumber");
         Boolean notifications = (Boolean) data.get("notificationsEnabled");
-        return new Entrant(deviceId, email, firstName, lastName, phoneNumber, notifications);
+        String roleStr = (String) data.get("role");
+        UserRole role = roleStr != null ? UserRole.valueOf(roleStr) : UserRole.ENTRANT;
+        return new Entrant(deviceId, email, firstName, lastName, phoneNumber, notifications != null ? notifications : true, role);
     }
 
     /**
@@ -82,7 +108,7 @@ public class Entrant {
                     return Entrant.fromMap(deviceId, doc.getData());
                 } else {
                     // Return a new entrant instance that hasn't been saved yet
-                    return new Entrant(deviceId, null, null, null, null, true);
+                    return new Entrant(deviceId, null, null, null, null, true, UserRole.ENTRANT);
                 }
             } else {
                 throw task.getException();
@@ -137,6 +163,14 @@ public class Entrant {
 
     public void setNotificationsEnabled(boolean notificationsEnabled) {
         this.notificationsEnabled = notificationsEnabled;
+    }
+
+    public UserRole getRole() {
+        return role;
+    }
+
+    public void setRole(UserRole role) {
+        this.role = role;
     }
 
     public void registerInEvent(Event event) {
