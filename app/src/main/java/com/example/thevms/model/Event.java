@@ -210,6 +210,38 @@ public class Event {
         return map;
     }
 
+    /**
+     * Adds an entrant to the event's entrant list in the database.
+     *
+     * @param entrant The entrant to add.
+     * @return A Task representing the async operation.
+     */
+    public Task<Void> addEntrant(Entrant entrant) {
+        this.entrantList.put(entrant, Boolean.FALSE); // Update local list
+
+        Map<String, Object> registrationData = new HashMap<>();
+        registrationData.put("status", "waiting"); // Default status
+        registrationData.put("registrationTime", new Date());
+
+        return dbHandler.updateEntrantStatus(String.valueOf(this.eventId), entrant.getDeviceId(), registrationData);
+    }
+
+    /**
+     * Removes an entrant from the event's entrant list in the database.
+     *
+     * @param entrant The entrant to remove.
+     * @return A Task representing the async operation.
+     */
+    public Task<Void> removeEntrant(Entrant entrant) {
+        this.entrantList.remove(entrant); // Update local list
+
+        return dbHandler.getDb().collection(DatabaseHandler.COLLECTION_EVENTS)
+                .document(String.valueOf(this.eventId))
+                .collection(DatabaseHandler.COLLECTION_ENTRANTS)
+                .document(entrant.getDeviceId())
+                .delete();
+    }
+
     public Long getEventId() {
         return eventId;
     }
@@ -385,25 +417,6 @@ public class Event {
      */
     public HashMap<Entrant, Boolean> getEntrantList() {
         return entrantList;
-    }
-
-    /**
-     * Adds an entrant to the event's entrant list.
-     *
-     * @param entrant    The entrant to add.
-     * @param isSelected The selection status of the entrant.
-     */
-    public void addEntrant(Entrant entrant, Boolean isSelected) {
-        this.entrantList.put(entrant, isSelected);
-    }
-
-    /**
-     * Removes an entrant from the event's entrant list.
-     *
-     * @param entrant The entrant to remove.
-     */
-    public void removeEntrant(Entrant entrant) {
-        this.entrantList.remove(entrant);
     }
 
     /**

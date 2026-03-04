@@ -174,7 +174,7 @@ public class Entrant {
     }
 
     public void registerInEvent(Event event) {
-        event.addEntrant(this, Boolean.FALSE);
+        event.addEntrant(this);
     }
 
     public void unregisterFromEvent(Event event) {
