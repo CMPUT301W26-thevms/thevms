@@ -62,12 +62,15 @@ public class MainActivity extends AppCompatActivity {
                 selectedFragment = new SearchFragment();
             } else if (id == R.id.nav_profile) {
                 selectedFragment = new ProfileFragment();
+            } else if (id == R.id.nav_add) {
+                selectedFragment = new CreateEventFragment();
             }
             // Add other fragment cases here as they are implemented
 
             if (selectedFragment != null) {
                 getSupportFragmentManager().beginTransaction()
                         .replace(R.id.fragment_container, selectedFragment)
+                        .addToBackStack(null) // Allow returning to previous screens
                         .commit();
                 return true;
             }
