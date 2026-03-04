@@ -149,10 +149,21 @@ public class CreateEventFragment extends Fragment {
      */
     private void handleCreateEvent() {
         String name = etName.getText().toString().trim();
+        String locationStr = etLocation.getText().toString().trim();
         String description = etDescription.getText().toString().trim();
 
         if (name.isEmpty()) {
             etName.setError("Name is required");
+            return;
+        }
+
+        if (locationStr.isEmpty()) {
+            etLocation.setError("Location is required");
+            return;
+        }
+
+        if (description.isEmpty()) {
+            etDescription.setError("Description is required");
             return;
         }
 
@@ -161,12 +172,18 @@ public class CreateEventFragment extends Fragment {
             return;
         }
 
-        if (regEndDate.before(regStartDate)) {
+        // Chronological validation: regStart < regEnd < eventStart < eventEnd
+        if (!regEndDate.after(regStartDate)) {
             Toast.makeText(requireContext(), "Registration end must be after registration start", Toast.LENGTH_SHORT).show();
             return;
         }
 
-        if (eventEndDate.before(eventStartDate)) {
+        if (!eventStartDate.after(regEndDate)) {
+            Toast.makeText(requireContext(), "Event start must be after registration end", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        if (!eventEndDate.after(eventStartDate)) {
             Toast.makeText(requireContext(), "Event end must be after event start", Toast.LENGTH_SHORT).show();
             return;
         }
@@ -177,6 +194,8 @@ public class CreateEventFragment extends Fragment {
         Entrant.getOrCreate(deviceId).addOnSuccessListener(user -> {
             Organizer organizer = new Organizer(user.getDeviceId(), user.getEmail(), user.getFirstName(), user.getLastName(), user.getPhoneNumber());
 
+            // Note: Currently locationStr is a String, but Event model expects android.location.Location.
+            // For now, passing null for Location as in previous implementation, but validating the text field.
             Event.create(name, description, organizer, null, null, regStartDate, regEndDate, eventStartDate, eventEndDate)
                     .addOnSuccessListener(event -> {
                         event.save().addOnSuccessListener(aVoid -> {
