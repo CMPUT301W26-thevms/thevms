@@ -75,7 +75,7 @@ public class CreateEventFragment extends Fragment {
         // Fetch current user to use as Organizer
         Entrant.getOrCreate(deviceId).addOnSuccessListener(user -> {
             Organizer organizer = new Organizer(user.getDeviceId(), user.getEmail(), user.getFirstName(), user.getLastName(), user.getPhoneNumber());
-            
+
             // For now, using dummy dates as date pickers are not yet implemented
             Date dummyDate = new Date();
 
@@ -83,8 +83,10 @@ public class CreateEventFragment extends Fragment {
                     .addOnSuccessListener(event -> {
                         event.save().addOnSuccessListener(aVoid -> {
                             Toast.makeText(requireContext(), "Event created successfully!", Toast.LENGTH_SHORT).show();
-                            if (getParentFragmentManager() != null) {
+                            try {
                                 getParentFragmentManager().popBackStack();
+                            } catch (IllegalStateException e) {
+                                Log.e("CreateEventFragment", "Error while popping back stack", e);
                             }
                         }).addOnFailureListener(e -> {
                             Toast.makeText(requireContext(), "Failed to save event", Toast.LENGTH_SHORT).show();
