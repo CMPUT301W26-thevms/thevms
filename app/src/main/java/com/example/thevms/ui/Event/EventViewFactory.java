@@ -5,7 +5,6 @@ import android.text.Html;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
-import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.ImageView;
 import android.widget.TextView;
@@ -23,26 +22,21 @@ import java.util.Locale;
  */
 public class EventViewFactory {
 
-    /**
-     * Inflates an event card layout and populates it with data from the provided Event object.
-     *
-     * @param parent  The parent view group used for layout inflation context.
-     * @param event   The event model containing the data to display.
-     * @param isAdmin Whether the current user has administrative privileges.
-     * @return A View instance representing the populated event card.
-     */
-    public static View createEventCard(ViewGroup parent, Event event, boolean isAdmin) {
-        View card = LayoutInflater.from(parent.getContext()).inflate(R.layout.event_card, parent, false);
+    public interface OnEventDeletedListener {
+        void onEventDeleted();
+    }
 
+    /**
+     * Binds event data to an existing view.
+     */
+    public static void bindEventCard(View card, Event event, boolean isAdmin, OnEventDeletedListener deleteListener) {
         TextView nameView = card.findViewById(R.id.event_name);
         TextView statusView = card.findViewById(R.id.event_status_info);
         TextView timeView = card.findViewById(R.id.event_time_info);
         TextView locationView = card.findViewById(R.id.event_location_info);
         Button removeBtn = card.findViewById(R.id.btn_remove_event);
 
-        if (nameView != null) {
-            nameView.setText(event.getName());
-        }
+        if (nameView != null) nameView.setText(event.getName());
 
         if (statusView != null) {
             int count = (event.getEntrantList() != null) ? event.getEntrantList().size() : 0;
@@ -63,15 +57,13 @@ public class EventViewFactory {
             locationView.setText("📍 Nearby");
         }
 
-        if (isAdmin && removeBtn != null) {
-            removeBtn.setVisibility(View.VISIBLE);
-            removeBtn.setOnClickListener(v -> showDeleteConfirmation(card, event, parent));
+        if (removeBtn != null) {
+            removeBtn.setVisibility(isAdmin ? View.VISIBLE : View.GONE);
+            removeBtn.setOnClickListener(v -> showDeleteConfirmation(card, event, deleteListener));
         }
-
-        return card;
     }
 
-    private static void showDeleteConfirmation(View cardView, Event event, ViewGroup parent) {
+    private static void showDeleteConfirmation(View cardView, Event event, OnEventDeletedListener deleteListener) {
         AlertDialog.Builder builder = new AlertDialog.Builder(cardView.getContext());
         View dialogView = LayoutInflater.from(cardView.getContext()).inflate(R.layout.dialog_delete_event, null);
         builder.setView(dialogView);
@@ -89,26 +81,27 @@ public class EventViewFactory {
 
         String formattedTitle = cardView.getContext().getString(R.string.delete_event_question_formatted, event.getName());
         title.setText(Html.fromHtml(formattedTitle, Html.FROM_HTML_MODE_LEGACY));
-
         message.setText(R.string.delete_event_consequence);
 
         btnCancel.setOnClickListener(v -> dialog.dismiss());
         ivClose.setOnClickListener(v -> dialog.dismiss());
 
         btnDelete.setOnClickListener(v -> {
-            deleteEventFromDb(cardView, event, parent);
+            deleteEventFromDb(cardView, event, deleteListener);
             dialog.dismiss();
         });
 
         dialog.show();
     }
 
-    private static void deleteEventFromDb(View cardView, Event event, ViewGroup parent) {
+    private static void deleteEventFromDb(View cardView, Event event, OnEventDeletedListener deleteListener) {
         DatabaseHandler dbHandler = new DatabaseHandler();
         dbHandler.deleteEvent(String.valueOf(event.getEventId()))
                 .addOnSuccessListener(aVoid -> {
                     Toast.makeText(cardView.getContext(), "Event removed", Toast.LENGTH_SHORT).show();
-                    parent.removeView(cardView);
+                    if (deleteListener != null) {
+                        deleteListener.onEventDeleted();
+                    }
                 })
                 .addOnFailureListener(e -> {
                     Log.e("EventViewFactory", "Error deleting event", e);
