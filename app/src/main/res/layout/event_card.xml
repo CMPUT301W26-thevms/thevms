@@ -91,12 +91,15 @@
 
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/btn_remove_event"
-                    style="@style/Widget.MaterialComponents.Button.TextButton"
+                    style="@style/Widget.MaterialComponents.Button.UnelevatedButton"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginEnd="8dp"
-                    android:text="Remove"
-                    android:textColor="@android:color/holo_red_dark"
+                    android:backgroundTint="#E53935"
+                    android:text="Delete"
+                    android:textAllCaps="false"
+                    android:textColor="@android:color/white"
+                    app:cornerRadius="8dp"
                     android:visibility="gone" />
 
                 <Button
