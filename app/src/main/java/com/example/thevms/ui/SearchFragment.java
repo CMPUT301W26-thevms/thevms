@@ -13,6 +13,7 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.ImageButton;
 import android.widget.ImageView;
 import android.widget.TextView;
 import androidx.annotation.NonNull;
@@ -50,6 +51,7 @@ public class SearchFragment extends Fragment {
     private TextView resultsCountText;
     private RecyclerView eventsRecyclerView;
     private EventAdapter eventAdapter;
+    private ImageButton btnAdminBurger;
 
     private List<Event> allEvents = new ArrayList<>();
     private List<Event> filteredEvents = new ArrayList<>();
@@ -78,6 +80,7 @@ public class SearchFragment extends Fragment {
         clearFiltersBtn = view.findViewById(R.id.clear_filters_btn);
         resultsCountText = view.findViewById(R.id.results_count_text);
         eventsRecyclerView = view.findViewById(R.id.events_recycler_view);
+        btnAdminBurger = view.findViewById(R.id.btn_admin_burger);
 
         eventAdapter = new EventAdapter();
         eventsRecyclerView.setAdapter(eventAdapter);
@@ -165,6 +168,16 @@ public class SearchFragment extends Fragment {
         Entrant.getOrCreate(deviceId).addOnSuccessListener(user -> {
             this.isAdmin = (user.getRole() == UserRole.ADMIN);
             eventAdapter.setAdmin(isAdmin);
+
+            if (isAdmin) {
+                btnAdminBurger.setVisibility(View.VISIBLE);
+                btnAdminBurger.setOnClickListener(v -> {
+                    if (getActivity() instanceof MainActivity) {
+                        ((MainActivity) getActivity()).openAdminDrawer();
+                    }
+                });
+            }
+
             fetchEvents();
         }).addOnFailureListener(e -> {
             Log.e("SearchFragment", "Error verifying user role", e);

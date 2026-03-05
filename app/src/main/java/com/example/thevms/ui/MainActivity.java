@@ -9,8 +9,10 @@ import android.view.MenuItem;
 import androidx.activity.EdgeToEdge;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.graphics.Insets;
+import androidx.core.view.GravityCompat;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowInsetsCompat;
+import androidx.drawerlayout.widget.DrawerLayout;
 import androidx.fragment.app.Fragment;
 
 import com.example.thevms.R;
@@ -19,9 +21,11 @@ import com.example.thevms.model.UserRole;
 import com.google.android.material.bottomnavigation.BottomNavigationView;
 
 /**
- * The main activity of the application that manages fragment navigation.
+ * The main activity of the application that manages fragment navigation and the admin drawer.
  */
 public class MainActivity extends AppCompatActivity {
+
+    private DrawerLayout drawerLayout;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -29,9 +33,13 @@ public class MainActivity extends AppCompatActivity {
         EdgeToEdge.enable(this);
         setContentView(R.layout.activity_main);
         
+        drawerLayout = findViewById(R.id.drawer_layout);
+        
+        // Apply insets to the content container instead of the root DrawerLayout
+        // This prevents the search bar/burger from being cut off by the status bar
         ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.main), (v, insets) -> {
             Insets systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars());
-            v.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom);
+            v.setPadding(systemBars.left, systemBars.top, systemBars.right, 0); // Bottom is handled by Nav
             return insets;
         });
 
@@ -65,17 +73,25 @@ public class MainActivity extends AppCompatActivity {
             } else if (id == R.id.nav_add) {
                 selectedFragment = new CreateEventFragment();
             }
-            // Add other fragment cases here as they are implemented
 
             if (selectedFragment != null) {
                 getSupportFragmentManager().beginTransaction()
                         .replace(R.id.fragment_container, selectedFragment)
-                        .addToBackStack(null) // Allow returning to previous screens
+                        .addToBackStack(null)
                         .commit();
                 return true;
             }
             return false;
         });
+    }
+
+    /**
+     * Opens the administrative side navigation drawer.
+     */
+    public void openAdminDrawer() {
+        if (drawerLayout != null) {
+            drawerLayout.openDrawer(GravityCompat.START);
+        }
     }
 
     /**
