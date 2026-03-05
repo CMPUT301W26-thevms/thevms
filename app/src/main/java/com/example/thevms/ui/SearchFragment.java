@@ -1,6 +1,8 @@
 package com.example.thevms.ui;
 
+import android.annotation.SuppressLint;
 import android.os.Bundle;
+import android.provider.Settings;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -14,7 +16,9 @@ import androidx.fragment.app.Fragment;
 
 import com.example.thevms.R;
 import com.example.thevms.model.DatabaseHandler;
+import com.example.thevms.model.Entrant;
 import com.example.thevms.model.Event;
+import com.example.thevms.model.UserRole;
 import com.example.thevms.ui.Event.EventViewFactory;
 import com.google.firebase.firestore.DocumentSnapshot;
 
@@ -29,6 +33,8 @@ public class SearchFragment extends Fragment {
     private TextView resultsCountText;
     private DatabaseHandler dbHandler;
 
+    private boolean isAdmin = false;
+
     @Nullable
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
@@ -37,14 +43,35 @@ public class SearchFragment extends Fragment {
         resultsCountText = view.findViewById(R.id.results_count);
         dbHandler = new DatabaseHandler();
 
-        loadEvents();
+        checkUserRoleAndLoadEvents();
 
         return view;
     }
 
+    /**
+     * Checks the current user's role from the database and then loads the events.
+     */
+    private void checkUserRoleAndLoadEvents() {
+        @SuppressLint("HardwareIds")
+        String deviceId = Settings.Secure.getString(requireContext().getContentResolver(), Settings.Secure.ANDROID_ID);
+
+        Entrant.getOrCreate(deviceId).addOnSuccessListener(user -> {
+            this.isAdmin = (user.getRole() == UserRole.ADMIN);
+            Log.d("SearchFragment", "User role verified. Is Admin: " + isAdmin);
+
+            // Now that we know the role, load the events
+            loadEvents();
+        }).addOnFailureListener(e -> {
+            Log.e("SearchFragment", "Error verifying user role", e);
+            // Default to non-admin and try to load events anyway
+            this.isAdmin = false;
+            loadEvents();
+        });
+    }
+
     private void loadEvents() {
         dbHandler.getAllEvents().addOnSuccessListener(queryDocumentSnapshots -> {
-            eventListContainer.removeAllViews(); // Clear dummy/previous views
+            eventListContainer.removeAllViews();
 
             for (DocumentSnapshot doc : queryDocumentSnapshots) {
                 try {
@@ -52,7 +79,8 @@ public class SearchFragment extends Fragment {
                     if (data != null) {
                         Event event = Event.fromMap(data);
                         if (event != null) {
-                            View card = EventViewFactory.createEventCard(eventListContainer, event);
+                            // Pass the verified isAdmin status to the factory
+                            View card = EventViewFactory.createEventCard(eventListContainer, event, isAdmin);
                             eventListContainer.addView(card);
                         }
                     }
