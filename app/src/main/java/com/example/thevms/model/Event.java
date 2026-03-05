@@ -3,6 +3,7 @@ package com.example.thevms.model;
 import android.location.Location;
 
 import com.google.android.gms.tasks.Task;
+import com.google.firebase.Timestamp;
 import com.google.firebase.firestore.DocumentSnapshot;
 
 import java.util.Date;
@@ -125,6 +126,55 @@ public class Event {
                 throw task.getException();
             }
         });
+    }
+
+    /**
+     * Helper method to safely convert a Firestore object to a Date.
+     * <p>
+     * Firestore often returns dates as {@link Timestamp} objects. This method
+     * handles the conversion from {@link Timestamp} to {@link Date}, or returns
+     * the object if it is already a {@link Date}.
+     * Creates an Event object from a Firestore DocumentSnapshot.
+     *
+     * @param obj The object to convert (typically from a Firestore document).
+     * @return The converted {@link Date} object, or {@code null} if the object is null or of an unsupported type
+     */
+    private static Date toDate(Object obj) {
+        if (obj instanceof Timestamp) {
+            return ((Timestamp) obj).toDate();
+        } else if (obj instanceof Date) {
+            return (Date) obj;
+        }
+        return null;
+    }
+
+    /**
+     * Creates an Event object from a Map of data (typically from Firestore).
+     * <p>
+     * This method extracts event properties from a Map, handling date conversions
+     * using the {@link #toDate(Object)} helper. It constructs a new Event instance
+     * using the extracted values.
+     *
+     * @param data A Map containing the key-value pairs of the event data.
+     * @return A new {@link Event} object populated with the data from the Map, or {@code null} if the data is null.
+     */
+    public static Event fromMap(Map<String, Object> data) {
+        if (data == null) return null;
+
+        Long id = (Long) data.get("eventId");
+        String name = (String) data.get("name");
+        String desc = (String) data.get("description");
+        String img = (String) data.get("imageUrl");
+
+        Date regStart = toDate(data.get("registrationStartTime"));
+        Date regEnd = toDate(data.get("registrationEndTime"));
+        Date eventStart = toDate(data.get("eventStartTime"));
+        Date eventEnd = toDate(data.get("eventEndTime"));
+
+        // Location and Organizer might need specialized mapping depending on how they are stored
+        // For now, we'll initialize them as null or use placeholders if necessary for the UI task.
+
+        return new Event(id, name, desc, null, null, img, regStart, regEnd, eventStart, eventEnd);
     }
 
     /**
