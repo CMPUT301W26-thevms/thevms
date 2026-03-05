@@ -11,8 +11,8 @@ import static androidx.test.espresso.matcher.ViewMatchers.withText;
 import static org.hamcrest.CoreMatchers.allOf;
 import static org.hamcrest.CoreMatchers.containsString;
 
+import androidx.test.core.app.ActivityScenario;
 import androidx.test.espresso.intent.Intents;
-import androidx.test.ext.junit.rules.ActivityScenarioRule;
 import androidx.test.ext.junit.runners.AndroidJUnit4;
 import androidx.test.filters.LargeTest;
 
@@ -21,7 +21,6 @@ import com.example.thevms.ui.SearchFragment;
 
 import org.junit.After;
 import org.junit.Before;
-import org.junit.Rule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
@@ -35,25 +34,30 @@ import org.junit.runner.RunWith;
 @LargeTest
 public class MainActivityTest {
 
-    @Rule
-    public ActivityScenarioRule<MainActivity> scenarioRule =
-            new ActivityScenarioRule<>(MainActivity.class);
-
     private FirestoreTestHelper testHelper;
+    private ActivityScenario<MainActivity> scenario;
 
     @Before
     public void setUp() throws Exception {
         Intents.init();
+
+        // 1. Initialize the test helper. Its constructor calls dbHandler.useEmulator().
+        // We do this BEFORE launching the activity to ensure the activity uses the emulator.
         testHelper = new FirestoreTestHelper();
         testHelper.clearDatabase();
-        // Seed dummy events: "Test Event 1" and "Test Event 2"
+
+        // 2. Seed dummy events: "Test Event 1" and "Test Event 2"
         testHelper.seedDummyEvents(2);
-        // Wait for Firestore to populate and UI to update
-        Thread.sleep(2000);
+
+        // 3. Launch the activity manually after the environment is ready.
+        scenario = ActivityScenario.launch(MainActivity.class);
     }
 
     @After
     public void tearDown() {
+        if (scenario != null) {
+            scenario.close();
+        }
         Intents.release();
     }
 
@@ -70,7 +74,7 @@ public class MainActivityTest {
         onView(withId(R.id.search_edit_text)).perform(typeText("Test Event 1"), closeSoftKeyboard());
 
         // Use the helper to expand the bottom sheet programmatically
-        scenarioRule.getScenario().onActivity(activity -> {
+        scenario.onActivity(activity -> {
             SearchFragment fragment = (SearchFragment) activity.getSupportFragmentManager()
                     .findFragmentById(R.id.fragment_container);
             if (fragment != null) {
@@ -95,7 +99,7 @@ public class MainActivityTest {
     @Test
     public void testFilterByTimeRangeHelper() throws InterruptedException {
         // Set a broad time range that includes the current time (when seeded events are scheduled)
-        scenarioRule.getScenario().onActivity(activity -> {
+        scenario.onActivity(activity -> {
             SearchFragment fragment = (SearchFragment) activity.getSupportFragmentManager()
                     .findFragmentById(R.id.fragment_container);
             if (fragment != null) {
@@ -109,7 +113,7 @@ public class MainActivityTest {
 
         // Verify we still see both results as they fall within the range
         onView(withId(R.id.results_count_text)).check(matches(withText(containsString("2 results"))));
-        
+
         // Verify the "Clear" filters button appeared
         onView(withId(R.id.clear_filters_btn)).check(matches(isDisplayed()));
     }
@@ -121,7 +125,7 @@ public class MainActivityTest {
     public void testClearSearch() throws InterruptedException {
         // Type something that matches nothing
         onView(withId(R.id.search_edit_text)).perform(typeText("NonExistentEvent"), closeSoftKeyboard());
-        
+
         Thread.sleep(1000);
         onView(withId(R.id.results_count_text)).check(matches(withText(containsString("0 results"))));
 
