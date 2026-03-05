@@ -3,23 +3,26 @@ package com.example.thevms.ui;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.TextView;
 import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
 import com.example.thevms.R;
 import com.example.thevms.model.Event;
-import java.text.SimpleDateFormat;
+import com.example.thevms.ui.Event.EventViewFactory;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Locale;
 
 public class EventAdapter extends RecyclerView.Adapter<EventAdapter.EventViewHolder> {
 
     private List<Event> events = new ArrayList<>();
-    private final SimpleDateFormat dateFormat = new SimpleDateFormat("MMM dd, yyyy", Locale.getDefault());
+    private boolean isAdmin = false;
 
     public void setEvents(List<Event> events) {
         this.events = events;
+        notifyDataSetChanged();
+    }
+
+    public void setAdmin(boolean admin) {
+        isAdmin = admin;
         notifyDataSetChanged();
     }
 
@@ -33,12 +36,14 @@ public class EventAdapter extends RecyclerView.Adapter<EventAdapter.EventViewHol
     @Override
     public void onBindViewHolder(@NonNull EventViewHolder holder, int position) {
         Event event = events.get(position);
-        holder.nameTextView.setText(event.getName());
-        if (event.getEventStartTime() != null) {
-            holder.dateTextView.setText("Starts: " + dateFormat.format(event.getEventStartTime()));
-        } else {
-            holder.dateTextView.setText("Date TBD");
-        }
+        // Use the factory to bind data and provide a callback for deletion
+        EventViewFactory.bindEventCard(holder.itemView, event, isAdmin, () -> {
+            int currentPos = holder.getAdapterPosition();
+            if (currentPos != RecyclerView.NO_POSITION) {
+                events.remove(currentPos);
+                notifyItemRemoved(currentPos);
+            }
+        });
     }
 
     @Override
@@ -47,13 +52,8 @@ public class EventAdapter extends RecyclerView.Adapter<EventAdapter.EventViewHol
     }
 
     static class EventViewHolder extends RecyclerView.ViewHolder {
-        TextView nameTextView;
-        TextView dateTextView;
-
         public EventViewHolder(@NonNull View itemView) {
             super(itemView);
-            nameTextView = itemView.findViewById(R.id.event_name);
-            dateTextView = itemView.findViewById(R.id.event_time_info);
         }
     }
 }
