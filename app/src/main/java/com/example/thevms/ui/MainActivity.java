@@ -26,6 +26,7 @@ import com.google.android.material.bottomnavigation.BottomNavigationView;
 public class MainActivity extends AppCompatActivity {
 
     private DrawerLayout drawerLayout;
+    private BottomNavigationView bottomNav;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -34,17 +35,15 @@ public class MainActivity extends AppCompatActivity {
         setContentView(R.layout.activity_main);
         
         drawerLayout = findViewById(R.id.drawer_layout);
+        bottomNav = findViewById(R.id.bottom_navigation);
         
         // Apply insets to the content container instead of the root DrawerLayout
-        // This prevents the search bar/burger from being cut off by the status bar
         ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.main), (v, insets) -> {
             Insets systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars());
-            v.setPadding(systemBars.left, systemBars.top, systemBars.right, 0); // Bottom is handled by Nav
+            v.setPadding(systemBars.left, systemBars.top, systemBars.right, 0);
             return insets;
         });
 
-        BottomNavigationView bottomNav = findViewById(R.id.bottom_navigation);
-        
         // Hide "Add" button by default until role is verified
         Menu menu = bottomNav.getMenu();
         MenuItem addItem = menu.findItem(R.id.nav_add);
@@ -55,11 +54,12 @@ public class MainActivity extends AppCompatActivity {
         // Check user role and update UI
         checkUserRoleAndAdjustUI(bottomNav);
 
+        // Initialize Admin Panel
+        AdminActivity.init(this);
+
         // Set default fragment
         if (savedInstanceState == null) {
-            getSupportFragmentManager().beginTransaction()
-                    .replace(R.id.fragment_container, new SearchFragment())
-                    .commit();
+            navigateToFragment(new SearchFragment(), R.id.nav_home);
         }
 
         bottomNav.setOnItemSelectedListener(item -> {
@@ -75,14 +75,28 @@ public class MainActivity extends AppCompatActivity {
             }
 
             if (selectedFragment != null) {
-                getSupportFragmentManager().beginTransaction()
-                        .replace(R.id.fragment_container, selectedFragment)
-                        .addToBackStack(null)
-                        .commit();
+                navigateToFragment(selectedFragment, id);
                 return true;
             }
             return false;
         });
+    }
+
+    /**
+     * Navigates to the specified fragment and updates the bottom navigation selection.
+     *
+     * @param fragment The fragment to display.
+     * @param menuItemId The ID of the bottom navigation menu item to select.
+     */
+    public void navigateToFragment(Fragment fragment, int menuItemId) {
+        getSupportFragmentManager().beginTransaction()
+                .replace(R.id.fragment_container, fragment)
+                .addToBackStack(null)
+                .commit();
+        
+        if (bottomNav != null) {
+            bottomNav.getMenu().findItem(menuItemId).setChecked(true);
+        }
     }
 
     /**

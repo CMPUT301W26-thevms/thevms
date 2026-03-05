@@ -46,12 +46,20 @@ public class AdminActivity {
 
     private void handleAction(String actionName) {
         Log.d("AdminActivity", "Action clicked: " + actionName);
-        Toast.makeText(activity, actionName + " coming soon", Toast.LENGTH_SHORT).show();
         
         if (drawerLayout != null) {
             drawerLayout.closeDrawer(GravityCompat.START);
         }
-        
-        // TODO: Implement actual navigation/fragment replacement logic here
+
+        if (activity instanceof MainActivity) {
+            MainActivity mainActivity = (MainActivity) activity;
+            
+            if ("Manage Event".equals(actionName)) {
+                // Navigate to the Search/Home screen
+                mainActivity.navigateToFragment(new SearchFragment(), R.id.nav_home);
+            } else {
+                Toast.makeText(activity, actionName + " coming soon", Toast.LENGTH_SHORT).show();
+            }
+        }
     }
 }
