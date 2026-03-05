@@ -18,6 +18,7 @@ import androidx.fragment.app.Fragment;
 import com.example.thevms.R;
 import com.example.thevms.model.Entrant;
 import com.example.thevms.model.UserRole;
+import com.example.thevms.ui.Admin.AdminActivity;
 import com.google.android.material.bottomnavigation.BottomNavigationView;
 
 /**
@@ -33,10 +34,10 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         EdgeToEdge.enable(this);
         setContentView(R.layout.activity_main);
-        
+
         drawerLayout = findViewById(R.id.drawer_layout);
         bottomNav = findViewById(R.id.bottom_navigation);
-        
+
         // Apply insets to the content container instead of the root DrawerLayout
         ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.main), (v, insets) -> {
             Insets systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars());
@@ -44,11 +45,15 @@ public class MainActivity extends AppCompatActivity {
             return insets;
         });
 
-        // Hide "Add" button by default until role is verified
+        // Hide "Add" and "Admin" buttons by default until role is verified
         Menu menu = bottomNav.getMenu();
         MenuItem addItem = menu.findItem(R.id.nav_add);
         if (addItem != null) {
             addItem.setVisible(false);
+        }
+        MenuItem adminItem = menu.findItem(R.id.nav_admin_settings);
+        if (adminItem != null) {
+            adminItem.setVisible(false);
         }
 
         // Check user role and update UI
@@ -72,6 +77,9 @@ public class MainActivity extends AppCompatActivity {
                 selectedFragment = new ProfileFragment();
             } else if (id == R.id.nav_add) {
                 selectedFragment = new CreateEventFragment();
+            } else if (id == R.id.nav_admin_settings) {
+                openAdminDrawer();
+                return false; // Gear only opens the drawer, doesn't change selection by itself
             }
 
             if (selectedFragment != null) {
@@ -85,7 +93,7 @@ public class MainActivity extends AppCompatActivity {
     /**
      * Navigates to the specified fragment and updates the bottom navigation selection.
      *
-     * @param fragment The fragment to display.
+     * @param fragment   The fragment to display.
      * @param menuItemId The ID of the bottom navigation menu item to select.
      */
     public void navigateToFragment(Fragment fragment, int menuItemId) {
@@ -93,9 +101,12 @@ public class MainActivity extends AppCompatActivity {
                 .replace(R.id.fragment_container, fragment)
                 .addToBackStack(null)
                 .commit();
-        
+
         if (bottomNav != null) {
-            bottomNav.getMenu().findItem(menuItemId).setChecked(true);
+            MenuItem item = bottomNav.getMenu().findItem(menuItemId);
+            if (item != null) {
+                item.setChecked(true);
+            }
         }
     }
 
@@ -109,7 +120,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     /**
-     * Checks the user's role from the database and shows/hides the "Add" button.
+     * Checks the user's role from the database and shows/hides role-specific buttons.
      */
     private void checkUserRoleAndAdjustUI(BottomNavigationView bottomNav) {
         @SuppressLint("HardwareIds")
@@ -121,6 +132,12 @@ public class MainActivity extends AppCompatActivity {
                 MenuItem addItem = bottomNav.getMenu().findItem(R.id.nav_add);
                 if (addItem != null) {
                     addItem.setVisible(true);
+                }
+            }
+            if (role == UserRole.ADMIN) {
+                MenuItem adminItem = bottomNav.getMenu().findItem(R.id.nav_admin_settings);
+                if (adminItem != null) {
+                    adminItem.setVisible(true);
                 }
             }
         });

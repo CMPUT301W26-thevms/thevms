@@ -1,4 +1,4 @@
-package com.example.thevms.ui;
+package com.example.thevms.ui.Admin;
 
 import android.app.Activity;
 import android.util.Log;
@@ -9,6 +9,8 @@ import androidx.core.view.GravityCompat;
 import androidx.drawerlayout.widget.DrawerLayout;
 
 import com.example.thevms.R;
+import com.example.thevms.ui.MainActivity;
+import com.example.thevms.ui.SearchFragment;
 
 /**
  * Controller class for handling Admin Panel logic and navigation.
@@ -46,17 +48,18 @@ public class AdminActivity {
 
     private void handleAction(String actionName) {
         Log.d("AdminActivity", "Action clicked: " + actionName);
-        
+
         if (drawerLayout != null) {
             drawerLayout.closeDrawer(GravityCompat.START);
         }
 
         if (activity instanceof MainActivity) {
             MainActivity mainActivity = (MainActivity) activity;
-            
+
             if ("Manage Event".equals(actionName)) {
-                // Navigate to the Search/Home screen
                 mainActivity.navigateToFragment(new SearchFragment(), R.id.nav_home);
+            } else if ("Manage Profiles".equals(actionName)) {
+                mainActivity.navigateToFragment(new AdminProfilesFragment(), R.id.nav_admin_settings);
             } else {
                 Toast.makeText(activity, actionName + " coming soon", Toast.LENGTH_SHORT).show();
             }

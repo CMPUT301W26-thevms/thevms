@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/admin_panel_root"
+    android:layout_width="300dp"
+    android:layout_height="match_parent"
+    android:layout_gravity="start"
+    android:background="@android:color/white"
+    android:orientation="vertical"
+    android:padding="24dp"
+    android:clickable="true"
+    android:focusable="true">
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="32dp"
+        android:text="Admin Panel"
+        android:textColor="@android:color/black"
+        android:textSize="32sp"
+        android:textStyle="bold" />
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:layout_marginTop="16dp"
+        android:layout_marginBottom="16dp"
+        android:background="#EEEEEE" />
+
+    <!-- Manage Event -->
+    <TextView
+        android:id="@+id/admin_manage_event"
+        style="@style/AdminDrawerItem"
+        android:text="Manage Event"
+        android:drawableStart="@drawable/ic_star_outline"
+        android:clickable="true"
+        android:focusable="true" />
+
+    <!-- Manage Profiles -->
+    <TextView
+        android:id="@+id/admin_manage_profiles"
+        style="@style/AdminDrawerItem"
+        android:text="Manage Profiles"
+        android:drawableStart="@drawable/ic_star_outline"
+        android:clickable="true"
+        android:focusable="true" />
+
+    <!-- Manage Images -->
+    <TextView
+        android:id="@+id/admin_manage_images"
+        style="@style/AdminDrawerItem"
+        android:text="Manage Images"
+        android:drawableStart="@drawable/ic_star_outline"
+        android:clickable="true"
+        android:focusable="true" />
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:layout_marginTop="16dp"
+        android:layout_marginBottom="16dp"
+        android:background="#EEEEEE" />
+
+    <!-- View Logs -->
+    <TextView
+        android:id="@+id/admin_view_logs"
+        style="@style/AdminDrawerItem"
+        android:text="View Logs"
+        android:drawableStart="@drawable/ic_star_outline"
+        android:clickable="true"
+        android:focusable="true" />
+
+    <!-- Manage Organizers -->
+    <TextView
+        android:id="@+id/admin_manage_organizers"
+        style="@style/AdminDrawerItem"
+        android:text="Manage Organizers"
+        android:drawableStart="@drawable/ic_star_outline"
+        android:clickable="true"
+        android:focusable="true" />
+
+</LinearLayout>
