@@ -42,8 +42,12 @@ public class EventViewFactory {
         }
 
         if (statusView != null) {
-            int count = (event.getEntrantList() != null) ? event.getEntrantList().size() : 0;
-            statusView.setText(String.format(Locale.getDefault(), "☆ %d people joined", count));
+            // Asynchronously fetch the entrant count from the sub-collection
+            event.fetchEntrantCount().addOnSuccessListener(count -> {
+                statusView.setText(String.format(Locale.getDefault(), "☆ %d people joined", count));
+            }).addOnFailureListener(e -> {
+                statusView.setText("☆ -- people joined");
+            });
         }
 
         if (timeView != null) {
@@ -68,10 +72,11 @@ public class EventViewFactory {
                 Entrant.getOrCreate(deviceId).addOnSuccessListener(entrant -> {
                     event.addEntrant(entrant).addOnSuccessListener(aVoid -> {
                         Toast.makeText(parent.getContext(), "Successfully joined " + event.getName(), Toast.LENGTH_SHORT).show();
-                        // Update UI to show new count if needed
+                        // Update UI to show new count
                         if (statusView != null) {
-                            int count = (event.getEntrantList() != null) ? event.getEntrantList().size() : 0;
-                            statusView.setText(String.format(Locale.getDefault(), "☆ %d people joined", count));
+                            event.fetchEntrantCount().addOnSuccessListener(count -> {
+                                statusView.setText(String.format(Locale.getDefault(), "☆ %d people joined", count));
+                            });
                         }
                     }).addOnFailureListener(e -> {
                         Toast.makeText(parent.getContext(), "Failed to join event: " + e.getMessage(), Toast.LENGTH_SHORT).show();

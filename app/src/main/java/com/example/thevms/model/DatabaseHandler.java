@@ -1,6 +1,7 @@
 package com.example.thevms.model;
 
 import com.google.android.gms.tasks.Task;
+import com.google.firebase.firestore.AggregateSource;
 import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.EventListener;
 import com.google.firebase.firestore.FirebaseFirestore;
@@ -135,6 +136,29 @@ public class DatabaseHandler {
     }
 
     /**
+     * Retrieves a specific event's details.
+     *
+     * @param eventId The event ID.
+     * @return Task containing DocumentSnapshot of the event.
+     */
+    public Task<DocumentSnapshot> getEvent(String eventId) {
+        return db.collection(COLLECTION_EVENTS).document(eventId).get();
+    }
+
+    /**
+     * Retrieves all event registrations for a specific entrant across all events.
+     * Note: This uses a collectionGroup query and may require a Firestore index.
+     *
+     * @param entrantId The device ID of the entrant.
+     * @return A Task containing the QuerySnapshot of registrations.
+     */
+    public Task<QuerySnapshot> getRegistrationsForEntrant(String entrantId) {
+        return db.collectionGroup(COLLECTION_ENTRANTS)
+                .whereEqualTo("entrantId", entrantId)
+                .get();
+    }
+
+    /**
      * Updates an entrant's status within an event.
      * Entrants are stored as a sub-collection of an event for scalability.
      *
@@ -179,6 +203,27 @@ public class DatabaseHandler {
                 .document(eventId)
                 .collection(COLLECTION_ENTRANTS)
                 .get();
+    }
+
+    /**
+     * Gets the count of entrants for a specific event using an aggregation query.
+     *
+     * @param eventId The event ID.
+     * @return A Task that resolves to the count of entrants.
+     */
+    public Task<Long> getEntrantCount(String eventId) {
+        return db.collection(COLLECTION_EVENTS)
+                .document(eventId)
+                .collection(COLLECTION_ENTRANTS)
+                .count()
+                .get(AggregateSource.SERVER)
+                .continueWith(task -> {
+                    if (task.isSuccessful()) {
+                        return task.getResult().getCount();
+                    } else {
+                        throw task.getException();
+                    }
+                });
     }
 
     /**
