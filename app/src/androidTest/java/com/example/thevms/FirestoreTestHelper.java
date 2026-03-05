@@ -15,6 +15,7 @@ import java.util.concurrent.TimeoutException;
 
 /**
  * Utility class for managing a test database state.
+ * Designed for use in Instrumented (UI) and Unit tests.
  */
 public class FirestoreTestHelper {
 
@@ -22,9 +23,15 @@ public class FirestoreTestHelper {
 
     public FirestoreTestHelper() {
         this.dbHandler = new DatabaseHandler();
+        // Point to the local emulator.
+        // 10.0.2.2 is the special alias for the host machine from the Android emulator.
         this.dbHandler.useEmulator("10.0.2.2", 8080);
     }
 
+    /**
+     * Clears all data from the test collections.
+     * WARNING: This should only be called on an emulator instance.
+     */
     public void clearDatabase() throws ExecutionException, InterruptedException, TimeoutException {
         String[] collections = {
                 DatabaseHandler.COLLECTION_EVENTS,
@@ -48,7 +55,7 @@ public class FirestoreTestHelper {
      */
     public void seedTestEvents() throws ExecutionException, InterruptedException, TimeoutException {
         Organizer mockOrganizer = new Organizer("test-device-id", "test@example.com", "Test", "Organizer", null);
-        
+
         // Event 1: Today, 10:00 AM
         Calendar cal1 = Calendar.getInstance();
         cal1.set(Calendar.HOUR_OF_DAY, 10);
