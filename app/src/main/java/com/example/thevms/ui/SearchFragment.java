@@ -14,12 +14,14 @@ import android.widget.ImageView;
 import android.widget.TextView;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.annotation.VisibleForTesting;
 import androidx.core.util.Pair;
 import androidx.fragment.app.Fragment;
 import androidx.recyclerview.widget.RecyclerView;
 import com.example.thevms.R;
 import com.example.thevms.model.DatabaseHandler;
 import com.example.thevms.model.Event;
+import com.google.android.material.bottomsheet.BottomSheetBehavior;
 import com.google.android.material.datepicker.MaterialDatePicker;
 import com.google.firebase.firestore.DocumentSnapshot;
 import java.text.SimpleDateFormat;
@@ -112,6 +114,41 @@ public class SearchFragment extends Fragment {
             clearFiltersBtn.setVisibility(View.GONE);
             applyFilters();
         });
+    }
+
+    /**
+     * Testing helper to manually set filters and bypass picker UI.
+     */
+    @VisibleForTesting
+    public void setTestingFilters(Long startDate, Long endDate, Integer startHour, Integer startMin, Integer endHour, Integer endMin) {
+        this.startDateFilter = startDate;
+        this.endDateFilter = endDate;
+        this.startTimeHour = startHour;
+        this.startTimeMinute = startMin;
+        this.endTimeHour = endHour;
+        this.endTimeMinute = endMin;
+        
+        if (startDate != null && endDate != null) {
+            filterDateRangeBtn.setText(dateFormat.format(new Date(startDate)) + " - " + dateFormat.format(new Date(endDate)));
+        }
+        if (startHour != null && endHour != null) {
+            filterTimeRangeBtn.setText(String.format(Locale.getDefault(), "%02d:%02d - %02d:%02d", startHour, startMin, endHour, endMin));
+        }
+        
+        clearFiltersBtn.setVisibility(View.VISIBLE);
+        applyFilters();
+    }
+
+    /**
+     * Testing helper to programmatically expand the bottom sheet,
+     * avoiding inconsistent Espresso swipe/scroll gestures.
+     */
+    @VisibleForTesting
+    public void expandBottomSheet() {
+        View bottomSheet = getView().findViewById(R.id.bottom_sheet);
+        if (bottomSheet != null) {
+            BottomSheetBehavior.from(bottomSheet).setState(BottomSheetBehavior.STATE_EXPANDED);
+        }
     }
 
     private void fetchEvents() {
