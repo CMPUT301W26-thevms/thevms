@@ -4,6 +4,7 @@ import android.location.Location;
 
 import com.google.android.gms.tasks.Task;
 import com.google.firebase.Timestamp;
+import com.google.firebase.firestore.DocumentSnapshot;
 
 import java.util.Date;
 import java.util.HashMap;
@@ -134,9 +135,10 @@ public class Event {
      * Firestore often returns dates as {@link Timestamp} objects. This method
      * handles the conversion from {@link Timestamp} to {@link Date}, or returns
      * the object if it is already a {@link Date}.
+     * Creates an Event object from a Firestore DocumentSnapshot.
      *
      * @param obj The object to convert (typically from a Firestore document).
-     * @return The converted {@link Date} object, or {@code null} if the object is null or of an unsupported type.
+     * @return The converted {@link Date} object, or {@code null} if the object is null or of an unsupported type
      */
     private static Date toDate(Object obj) {
         if (obj instanceof Timestamp) {
@@ -174,6 +176,26 @@ public class Event {
         // For now, we'll initialize them as null or use placeholders if necessary for the UI task.
 
         return new Event(id, name, desc, null, null, img, regStart, regEnd, eventStart, eventEnd);
+    }
+
+    /**
+     * Creates an Event object from a Firestore DocumentSnapshot.
+     *
+     * @param doc The DocumentSnapshot to parse.
+     * @return An Event object populated with data from the document.
+     */
+    public static Event fromDoc(DocumentSnapshot doc) {
+        Long eventId = doc.getLong("eventId");
+        String name = doc.getString("name");
+        String description = doc.getString("description");
+        String imageUrl = doc.getString("imageUrl");
+        Date regStart = doc.getDate("registrationStartTime");
+        Date regEnd = doc.getDate("registrationEndTime");
+        Date eventStart = doc.getDate("eventStartTime");
+        Date eventEnd = doc.getDate("eventEndTime");
+
+        // Note: Organizer and Location are simplified here as they require more complex mapping.
+        return new Event(eventId, name, description, null, null, imageUrl, regStart, regEnd, eventStart, eventEnd);
     }
 
     /**
