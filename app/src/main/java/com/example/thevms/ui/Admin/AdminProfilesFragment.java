@@ -1,9 +1,13 @@
 package com.example.thevms.ui.Admin;
 
+import android.app.AlertDialog;
 import android.os.Bundle;
+import android.text.Html;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.ImageView;
+import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -29,6 +33,7 @@ public class AdminProfilesFragment extends Fragment {
 
     private RecyclerView recyclerView;
     private TextView emptyStateText;
+    private ProgressBar loadingSpinner;
     private ProfileAdapter adapter;
     private final List<Entrant> profiles = new ArrayList<>();
     private DatabaseHandler dbHandler;
@@ -63,6 +68,7 @@ public class AdminProfilesFragment extends Fragment {
 
         recyclerView = view.findViewById(R.id.profiles_recycler_view);
         emptyStateText = view.findViewById(R.id.empty_state_text);
+        loadingSpinner = view.findViewById(R.id.loading_spinner);
 
         if (emptyStateText != null) {
             emptyStateText.setText(filterOrganizersOnly ?
@@ -70,7 +76,16 @@ public class AdminProfilesFragment extends Fragment {
         }
 
         recyclerView.setLayoutManager(new LinearLayoutManager(getContext()));
-        adapter = new ProfileAdapter(profiles);
+        // Adapter handles deletion and communicates loading state back to fragment
+        adapter = new ProfileAdapter(
+                profiles, 
+                () -> setLoading(true), 
+                () -> {
+                    setLoading(false);
+                    loadProfiles();
+                },
+                () -> setLoading(false)
+        );
         recyclerView.setAdapter(adapter);
 
         dbHandler = new DatabaseHandler();
@@ -79,7 +94,20 @@ public class AdminProfilesFragment extends Fragment {
         return view;
     }
 
+    private void setLoading(boolean isLoading) {
+        if (loadingSpinner != null) {
+            loadingSpinner.setVisibility(isLoading ? View.VISIBLE : View.GONE);
+        }
+        if (isLoading) {
+            recyclerView.setVisibility(View.GONE);
+            emptyStateText.setVisibility(View.GONE);
+        } else {
+            updateUI();
+        }
+    }
+
     private void loadProfiles() {
+        setLoading(true);
         dbHandler.getAllUsers().addOnSuccessListener(queryDocumentSnapshots -> {
             profiles.clear();
             for (DocumentSnapshot doc : queryDocumentSnapshots.getDocuments()) {
@@ -95,8 +123,9 @@ public class AdminProfilesFragment extends Fragment {
                     }
                 }
             }
-            updateUI();
+            setLoading(false);
         }).addOnFailureListener(e -> {
+            setLoading(false);
             if (isAdded()) {
                 Toast.makeText(getContext(), getString(R.string.admin_profiles_load_failed), Toast.LENGTH_SHORT).show();
             }
@@ -116,9 +145,15 @@ public class AdminProfilesFragment extends Fragment {
 
     private static class ProfileAdapter extends RecyclerView.Adapter<ProfileAdapter.ViewHolder> {
         private final List<Entrant> profiles;
+        private final Runnable onActionStarted;
+        private final Runnable onActionSuccess;
+        private final Runnable onActionFailure;
 
-        public ProfileAdapter(List<Entrant> profiles) {
+        public ProfileAdapter(List<Entrant> profiles, Runnable onActionStarted, Runnable onActionSuccess, Runnable onActionFailure) {
             this.profiles = profiles;
+            this.onActionStarted = onActionStarted;
+            this.onActionSuccess = onActionSuccess;
+            this.onActionFailure = onActionFailure;
         }
 
         @NonNull
@@ -144,10 +179,60 @@ public class AdminProfilesFragment extends Fragment {
             holder.phoneText.setText(entrant.getPhoneNumber() != null ?
                     entrant.getPhoneNumber() : holder.itemView.getContext().getString(R.string.admin_profiles_no_phone));
 
-            // Delete button functionality - placeholder
-            holder.deleteButton.setOnClickListener(v -> {
-                // To be implemented: Delete user profile logic
+            holder.deleteButton.setOnClickListener(v -> showDeleteConfirmation(holder.itemView, entrant));
+        }
+
+        private void showDeleteConfirmation(View view, Entrant entrant) {
+            AlertDialog.Builder builder = new AlertDialog.Builder(view.getContext());
+            View dialogView = LayoutInflater.from(view.getContext()).inflate(R.layout.dialog_delete_profile, null);
+            builder.setView(dialogView);
+
+            AlertDialog dialog = builder.create();
+            if (dialog.getWindow() != null) {
+                dialog.getWindow().setBackgroundDrawableResource(android.R.color.transparent);
+            }
+
+            TextView title = dialogView.findViewById(R.id.tv_dialog_title);
+            TextView message = dialogView.findViewById(R.id.tv_dialog_message);
+            MaterialButton btnCancel = dialogView.findViewById(R.id.btn_dialog_cancel);
+            MaterialButton btnDelete = dialogView.findViewById(R.id.btn_dialog_delete);
+            ImageView ivClose = dialogView.findViewById(R.id.iv_close);
+
+            String roleName = entrant.getRole().name().toLowerCase();
+            String fullName = entrant.getFirstName() + " " + entrant.getLastName();
+            
+            String messageText;
+            if (entrant.getRole() == UserRole.ORGANIZER) {
+                messageText = view.getContext().getString(R.string.delete_profile_message_organizer, roleName, fullName);
+            } else {
+                messageText = view.getContext().getString(R.string.delete_profile_message_user, roleName, fullName);
+            }
+            
+            message.setText(Html.fromHtml(messageText, Html.FROM_HTML_MODE_LEGACY));
+
+            btnCancel.setOnClickListener(v -> dialog.dismiss());
+            ivClose.setOnClickListener(v -> dialog.dismiss());
+
+            btnDelete.setOnClickListener(v -> {
+                dialog.dismiss();
+                performDeletion(view, entrant);
             });
+
+            dialog.show();
+        }
+
+        private void performDeletion(View view, Entrant entrant) {
+            onActionStarted.run();
+            DatabaseHandler dbHandler = new DatabaseHandler();
+            dbHandler.deleteUserAccountCompletely(entrant.getDeviceId())
+                    .addOnSuccessListener(aVoid -> {
+                        Toast.makeText(view.getContext(), "User data and organized events deleted", Toast.LENGTH_SHORT).show();
+                        onActionSuccess.run();
+                    })
+                    .addOnFailureListener(e -> {
+                        Toast.makeText(view.getContext(), "Failed to delete user data", Toast.LENGTH_SHORT).show();
+                        onActionFailure.run();
+                    });
         }
 
         @Override
