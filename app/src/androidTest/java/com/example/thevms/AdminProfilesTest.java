@@ -8,7 +8,12 @@ import static androidx.test.espresso.matcher.ViewMatchers.hasDescendant;
 import static androidx.test.espresso.matcher.ViewMatchers.isDisplayed;
 import static androidx.test.espresso.matcher.ViewMatchers.withId;
 import static androidx.test.espresso.matcher.ViewMatchers.withText;
+import static org.hamcrest.CoreMatchers.allOf;
+import static org.hamcrest.CoreMatchers.anyOf;
+import static org.hamcrest.CoreMatchers.containsString;
 import static org.hamcrest.CoreMatchers.not;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNull;
 
 import android.content.Context;
 import android.provider.Settings;
@@ -23,16 +28,22 @@ import androidx.test.espresso.ViewAssertion;
 import androidx.test.espresso.contrib.RecyclerViewActions;
 import androidx.test.ext.junit.runners.AndroidJUnit4;
 
+import com.example.thevms.model.DatabaseHandler;
 import com.example.thevms.model.Entrant;
+import com.example.thevms.model.Event;
+import com.example.thevms.model.Organizer;
 import com.example.thevms.model.UserRole;
 import com.example.thevms.ui.MainActivity;
 import com.google.android.gms.tasks.Tasks;
+import com.google.firebase.firestore.DocumentSnapshot;
+import com.google.firebase.firestore.QuerySnapshot;
 
 import org.hamcrest.Matcher;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
+import java.util.Date;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -263,5 +274,116 @@ public class AdminProfilesTest {
             onView(withId(R.id.empty_state_text)).check(matches(isDisplayed()));
             onView(withText("No organizers found.")).check(matches(isDisplayed()));
         }
+    }
+
+    @Test
+    public void testDeleteOrganizerCascadesEventDeletion() throws Exception {
+        DatabaseHandler dbHandler = testHelper.getDbHandler();
+        
+        // 1. Setup Data: Create an organizer and an event organized by them.
+        String orgId = "org_to_delete";
+        Organizer targetOrg = new Organizer(orgId, "target@org.com", "Target", "Organizer", null);
+        Tasks.await(targetOrg.save(), 5, TimeUnit.SECONDS);
+        
+        Event event = Tasks.await(Event.create("Target Event", "Description", targetOrg, null, null, new Date(), new Date(), new Date(), new Date()), 5, TimeUnit.SECONDS);
+        Tasks.await(event.save(), 5, TimeUnit.SECONDS);
+
+        // Verify initial state in DB
+        DocumentSnapshot userDoc = Tasks.await(dbHandler.getUser(orgId), 5, TimeUnit.SECONDS);
+        assertEquals("Target", userDoc.getString("firstName"));
+        
+        QuerySnapshot eventSnap = Tasks.await(dbHandler.getDb().collection(DatabaseHandler.COLLECTION_EVENTS).whereEqualTo("organizerId", orgId).get(), 5, TimeUnit.SECONDS);
+        assertEquals(1, eventSnap.size());
+
+        // 2. UI Action: Delete the Organizer
+        try (ActivityScenario<MainActivity> scenario = ActivityScenario.launch(MainActivity.class)) {
+            waitForView(withId(R.id.nav_admin_settings), 5000);
+            onView(withId(R.id.nav_admin_settings)).perform(click());
+            
+            waitForView(withText("Manage Organizers"), 2000);
+            onView(withText("Manage Organizers")).perform(click());
+            
+            waitForViewToDisappear(withId(R.id.loading_spinner), 5000);
+
+            // Click delete on the target organizer
+            onView(withId(R.id.profiles_recycler_view))
+                    .perform(RecyclerViewActions.actionOnItem(hasDescendant(withText("Target Organizer")), clickChildViewWithId(R.id.btn_delete_profile)));
+
+            waitForView(withText("Delete Profile?"), 2000);
+            onView(withId(R.id.btn_dialog_delete)).perform(click());
+
+            // Wait for cascaded deletion to complete
+            waitForViewToDisappear(withId(R.id.loading_spinner), 10000);
+        }
+
+        // 3. Final Verification: Check DB to confirm the event is gone
+        userDoc = Tasks.await(dbHandler.getUser(orgId), 5, TimeUnit.SECONDS);
+        assertNull(userDoc.getData());
+        
+        eventSnap = Tasks.await(dbHandler.getDb().collection(DatabaseHandler.COLLECTION_EVENTS).whereEqualTo("organizerId", orgId).get(), 5, TimeUnit.SECONDS);
+        assertEquals(0, eventSnap.size());
+    }
+
+    @Test
+    public void testDeleteUserAccountWaitlistAndAcceptedCleanup() throws Exception {
+        DatabaseHandler dbHandler = testHelper.getDbHandler();
+
+        // 1. Setup: Create an event and two entrants.
+        Organizer organizer = new Organizer("org_stays", "org@stays.com", "Bob", "Organizer", null);
+        Tasks.await(organizer.save(), 5, TimeUnit.SECONDS);
+        Event event = Tasks.await(Event.create("Persistent Event", "Desc", organizer, null, null, new Date(), new Date(), new Date(), new Date()), 5, TimeUnit.SECONDS);
+        Tasks.await(event.save(), 5, TimeUnit.SECONDS);
+
+        // User A (on waitlist)
+        String userIdA = "user_waiting";
+        Entrant userA = new Entrant(userIdA, "waiting@test.com", "Waiting", "User", null);
+        Tasks.await(userA.save(), 5, TimeUnit.SECONDS);
+        Tasks.await(event.addEntrant(userA), 5, TimeUnit.SECONDS);
+
+        // User B (accepted/selected)
+        String userIdB = "user_accepted";
+        Entrant userB = new Entrant(userIdB, "accepted@test.com", "Accepted", "User", null);
+        Tasks.await(userB.save(), 5, TimeUnit.SECONDS);
+        Tasks.await(event.addEntrant(userB), 5, TimeUnit.SECONDS);
+        // Explicitly set status to 'selected' for User B
+        java.util.Map<String, Object> selectedStatus = new java.util.HashMap<>();
+        selectedStatus.put("status", "selected");
+        Tasks.await(dbHandler.updateEntrantStatus(String.valueOf(event.getEventId()), userIdB, selectedStatus), 5, TimeUnit.SECONDS);
+
+        // Verify initial DB state
+        assertEquals(2, Tasks.await(dbHandler.getEntrantsForEvent(String.valueOf(event.getEventId())), 5, TimeUnit.SECONDS).size());
+        assertEquals(1, Tasks.await(dbHandler.getRegistrationsForEntrant(userIdA), 5, TimeUnit.SECONDS).size());
+        assertEquals(1, Tasks.await(dbHandler.getRegistrationsForEntrant(userIdB), 5, TimeUnit.SECONDS).size());
+
+        // 2. UI Action: Delete both users
+        try (ActivityScenario<MainActivity> scenario = ActivityScenario.launch(MainActivity.class)) {
+            waitForView(withId(R.id.nav_admin_settings), 5000);
+            onView(withId(R.id.nav_admin_settings)).perform(click());
+            waitForView(withText("Manage Profiles"), 2000);
+            onView(withText("Manage Profiles")).perform(click());
+            waitForViewToDisappear(withId(R.id.loading_spinner), 5000);
+
+            // Delete User A (Waiting)
+            onView(withId(R.id.profiles_recycler_view))
+                    .perform(RecyclerViewActions.actionOnItem(hasDescendant(withText("Waiting User")), clickChildViewWithId(R.id.btn_delete_profile)));
+            waitForView(withText("Delete Profile?"), 2000);
+            onView(withId(R.id.btn_dialog_delete)).perform(click());
+            waitForViewToDisappear(withId(R.id.loading_spinner), 10000);
+
+            // Delete User B (Accepted)
+            onView(withId(R.id.profiles_recycler_view))
+                    .perform(RecyclerViewActions.actionOnItem(hasDescendant(withText("Accepted User")), clickChildViewWithId(R.id.btn_delete_profile)));
+            waitForView(withText("Delete Profile?"), 2000);
+            onView(withId(R.id.btn_dialog_delete)).perform(click());
+            waitForViewToDisappear(withId(R.id.loading_spinner), 10000);
+        }
+
+        // 3. Final Verification: Confirm registrations are scrubbed from the Event collection
+        QuerySnapshot entrantsSnap = Tasks.await(dbHandler.getEntrantsForEvent(String.valueOf(event.getEventId())), 5, TimeUnit.SECONDS);
+        assertEquals(0, entrantsSnap.size());
+        
+        // Also confirm profiles are gone
+        assertNull(Tasks.await(dbHandler.getUser(userIdA), 5, TimeUnit.SECONDS).getData());
+        assertNull(Tasks.await(dbHandler.getUser(userIdB), 5, TimeUnit.SECONDS).getData());
     }
 }
