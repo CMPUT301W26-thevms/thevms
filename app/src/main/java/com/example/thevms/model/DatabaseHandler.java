@@ -159,6 +159,15 @@ public class DatabaseHandler {
     }
 
     /**
+     * Retrieves all user profiles.
+     *
+     * @return Task containing QuerySnapshot of all users.
+     */
+    public Task<QuerySnapshot> getAllUsers() {
+        return db.collection(COLLECTION_USERS).get();
+    }
+
+    /**
      * Updates an entrant's status within an event.
      * Entrants are stored as a sub-collection of an event for scalability.
      *

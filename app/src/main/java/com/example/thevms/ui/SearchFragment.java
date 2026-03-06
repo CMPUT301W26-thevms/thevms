@@ -1,14 +1,18 @@
 package com.example.thevms.ui;
 
+import android.annotation.SuppressLint;
 import android.app.TimePickerDialog;
 import android.os.Bundle;
+import android.provider.Settings;
 import android.text.Editable;
 import android.text.TextWatcher;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.ImageButton;
 import android.widget.ImageView;
 import android.widget.TextView;
 
@@ -21,7 +25,9 @@ import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.thevms.R;
 import com.example.thevms.model.DatabaseHandler;
+import com.example.thevms.model.Entrant;
 import com.example.thevms.model.Event;
+import com.example.thevms.model.UserRole;
 import com.example.thevms.ui.Event.EventAdapter;
 import com.google.android.material.bottomsheet.BottomSheetBehavior;
 import com.google.android.material.datepicker.MaterialDatePicker;
@@ -48,6 +54,7 @@ public class SearchFragment extends Fragment {
     private TextView resultsCountText;
     private RecyclerView eventsRecyclerView;
     private EventAdapter eventAdapter;
+    private ImageButton btnAdminBurger;
 
     private List<Event> allEvents = new ArrayList<>();
     private List<Event> filteredEvents = new ArrayList<>();
@@ -59,6 +66,8 @@ public class SearchFragment extends Fragment {
     private Integer startTimeMinute = null;
     private Integer endTimeHour = null;
     private Integer endTimeMinute = null;
+
+    private boolean isAdmin = false;
 
     private final SimpleDateFormat dateFormat = new SimpleDateFormat("MMM dd", Locale.getDefault());
 
@@ -74,12 +83,13 @@ public class SearchFragment extends Fragment {
         clearFiltersBtn = view.findViewById(R.id.clear_filters_btn);
         resultsCountText = view.findViewById(R.id.results_count_text);
         eventsRecyclerView = view.findViewById(R.id.events_recycler_view);
+        btnAdminBurger = view.findViewById(R.id.btn_admin_burger);
 
         eventAdapter = new EventAdapter();
         eventsRecyclerView.setAdapter(eventAdapter);
 
         setupListeners();
-        fetchEvents();
+        checkUserRoleAndFetchEvents();
 
         return view;
     }
@@ -154,6 +164,30 @@ public class SearchFragment extends Fragment {
         if (bottomSheet != null) {
             BottomSheetBehavior.from(bottomSheet).setState(BottomSheetBehavior.STATE_EXPANDED);
         }
+    }
+
+    private void checkUserRoleAndFetchEvents() {
+        @SuppressLint("HardwareIds")
+        String deviceId = Settings.Secure.getString(requireContext().getContentResolver(), Settings.Secure.ANDROID_ID);
+
+        Entrant.getOrCreate(deviceId).addOnSuccessListener(user -> {
+            this.isAdmin = (user.getRole() == UserRole.ADMIN);
+            eventAdapter.setAdmin(isAdmin);
+
+            if (isAdmin) {
+                btnAdminBurger.setVisibility(View.VISIBLE);
+                btnAdminBurger.setOnClickListener(v -> {
+                    if (getActivity() instanceof MainActivity) {
+                        ((MainActivity) getActivity()).openAdminDrawer();
+                    }
+                });
+            }
+
+            fetchEvents();
+        }).addOnFailureListener(e -> {
+            Log.e("SearchFragment", "Error verifying user role", e);
+            fetchEvents();
+        });
     }
 
     private void fetchEvents() {

@@ -1,3 +1,21 @@
 <resources>
     <string name="app_name">Event Lottery</string>
+    <string name="delete_event_title">Delete Event?</string>
+    <string name="delete_event_question_formatted">Are you sure you want to delete <b>%1$s</b>?</string>
+    <string name="delete_event_consequence">This action cannot be undone.</string>
+    <string name="delete_event_confirm">Delete</string>
+    <string name="delete_event_cancel">Cancel</string>
+
+    <!-- Admin Profiles Strings -->
+    <string name="admin_profiles_title">User Profiles</string>
+    <string name="admin_profiles_delete">Delete</string>
+    <string name="admin_profiles_load_failed">Failed to load profiles</string>
+    <string name="admin_profiles_no_name">No Name</string>
+    <string name="admin_profiles_no_email">No email</string>
+    <string name="admin_profiles_no_phone">No phone</string>
+
+    <!-- Placeholders -->
+    <string name="placeholder_user_name">User Name</string>
+    <string name="placeholder_email">email@example.com</string>
+    <string name="placeholder_phone">123-456-7890</string>
 </resources>
