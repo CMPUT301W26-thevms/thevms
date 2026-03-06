@@ -1,7 +1,9 @@
 package com.example.thevms.ui.Admin;
 
+import android.annotation.SuppressLint;
 import android.app.AlertDialog;
 import android.os.Bundle;
+import android.provider.Settings;
 import android.text.Html;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -38,6 +40,7 @@ public class AdminProfilesFragment extends Fragment {
     private final List<Entrant> profiles = new ArrayList<>();
     private DatabaseHandler dbHandler;
     private boolean filterOrganizersOnly = false;
+    private String currentDeviceId;
 
     public static AdminProfilesFragment newInstance(boolean filterOrganizersOnly) {
         AdminProfilesFragment fragment = new AdminProfilesFragment();
@@ -52,6 +55,12 @@ public class AdminProfilesFragment extends Fragment {
         super.onCreate(savedInstanceState);
         if (getArguments() != null) {
             filterOrganizersOnly = getArguments().getBoolean(ARG_FILTER_ORGANIZERS);
+        }
+        
+        if (getContext() != null) {
+            @SuppressLint("HardwareIds")
+            String id = Settings.Secure.getString(getContext().getContentResolver(), Settings.Secure.ANDROID_ID);
+            this.currentDeviceId = id;
         }
     }
 
@@ -79,6 +88,7 @@ public class AdminProfilesFragment extends Fragment {
         // Adapter handles deletion and communicates loading state back to fragment
         adapter = new ProfileAdapter(
                 profiles, 
+                currentDeviceId,
                 () -> setLoading(true), 
                 () -> {
                     setLoading(false);
@@ -145,12 +155,14 @@ public class AdminProfilesFragment extends Fragment {
 
     private static class ProfileAdapter extends RecyclerView.Adapter<ProfileAdapter.ViewHolder> {
         private final List<Entrant> profiles;
+        private final String currentDeviceId;
         private final Runnable onActionStarted;
         private final Runnable onActionSuccess;
         private final Runnable onActionFailure;
 
-        public ProfileAdapter(List<Entrant> profiles, Runnable onActionStarted, Runnable onActionSuccess, Runnable onActionFailure) {
+        public ProfileAdapter(List<Entrant> profiles, String currentDeviceId, Runnable onActionStarted, Runnable onActionSuccess, Runnable onActionFailure) {
             this.profiles = profiles;
+            this.currentDeviceId = currentDeviceId;
             this.onActionStarted = onActionStarted;
             this.onActionSuccess = onActionSuccess;
             this.onActionFailure = onActionFailure;
@@ -179,7 +191,14 @@ public class AdminProfilesFragment extends Fragment {
             holder.phoneText.setText(entrant.getPhoneNumber() != null ?
                     entrant.getPhoneNumber() : holder.itemView.getContext().getString(R.string.admin_profiles_no_phone));
 
-            holder.deleteButton.setOnClickListener(v -> showDeleteConfirmation(holder.itemView, entrant));
+            holder.deleteButton.setOnClickListener(v -> {
+                // Prevent admins from deleting themselves
+                if (entrant.getDeviceId().equals(currentDeviceId)) {
+                    Toast.makeText(holder.itemView.getContext(), "You cannot delete your own profile", Toast.LENGTH_SHORT).show();
+                } else {
+                    showDeleteConfirmation(holder.itemView, entrant);
+                }
+            });
         }
 
         private void showDeleteConfirmation(View view, Entrant entrant) {
