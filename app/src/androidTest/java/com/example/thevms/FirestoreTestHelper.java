@@ -3,12 +3,18 @@ package com.example.thevms;
 import com.example.thevms.model.DatabaseHandler;
 import com.example.thevms.model.Event;
 import com.example.thevms.model.Organizer;
+import com.google.android.gms.tasks.Task;
 import com.google.android.gms.tasks.Tasks;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.QueryDocumentSnapshot;
+import com.google.firebase.firestore.QuerySnapshot;
 
+import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Date;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -33,20 +39,33 @@ public class FirestoreTestHelper {
      * WARNING: This should only be called on an emulator instance.
      */
     public void clearDatabase() throws ExecutionException, InterruptedException, TimeoutException {
+        FirebaseFirestore db = dbHandler.getDb();
+
+        // 1. Clear top-level collections
         String[] collections = {
                 DatabaseHandler.COLLECTION_EVENTS,
-                DatabaseHandler.COLLECTION_USERS,
-                DatabaseHandler.COLLECTION_ENTRANTS
+                DatabaseHandler.COLLECTION_USERS
         };
 
-        FirebaseFirestore db = dbHandler.getDb();
         for (String collection : collections) {
-            Tasks.await(db.collection(collection).get().continueWith(task -> {
-                for (QueryDocumentSnapshot doc : task.getResult()) {
-                    doc.getReference().delete();
-                }
-                return null;
-            }), 10, TimeUnit.SECONDS);
+            QuerySnapshot snapshot = Tasks.await(db.collection(collection).get(), 10, TimeUnit.SECONDS);
+            List<Task<Void>> deleteTasks = new ArrayList<>();
+            for (QueryDocumentSnapshot doc : snapshot) {
+                deleteTasks.add(doc.getReference().delete());
+            }
+            if (!deleteTasks.isEmpty()) {
+                Tasks.await(Tasks.whenAll(deleteTasks), 10, TimeUnit.SECONDS);
+            }
+        }
+
+        // 2. Clear entrants using collectionGroup (since they are sub-collections)
+        QuerySnapshot entrantSnapshot = Tasks.await(db.collectionGroup(DatabaseHandler.COLLECTION_ENTRANTS).get(), 10, TimeUnit.SECONDS);
+        List<Task<Void>> entrantDeleteTasks = new ArrayList<>();
+        for (QueryDocumentSnapshot doc : entrantSnapshot) {
+            entrantDeleteTasks.add(doc.getReference().delete());
+        }
+        if (!entrantDeleteTasks.isEmpty()) {
+            Tasks.await(Tasks.whenAll(entrantDeleteTasks), 10, TimeUnit.SECONDS);
         }
     }
 
@@ -89,6 +108,28 @@ public class FirestoreTestHelper {
         Organizer mockOrganizer = new Organizer("test-device-id", "test@example.com", "Test", "Organizer", null);
         for (int i = 1; i <= count; i++) {
             seedEvent("Test Event " + i, new Date(), mockOrganizer);
+        }
+    }
+
+    /**
+     * Seeds dummy entrants for a specific event to simulate existing participants.
+     *
+     * @param eventId The ID of the event to seed entrants for.
+     * @param count   The number of entrants to seed.
+     */
+    public void seedEntrants(long eventId, int count) throws ExecutionException, InterruptedException, TimeoutException {
+        FirebaseFirestore db = dbHandler.getDb();
+        for (int i = 1; i <= count; i++) {
+            Map<String, Object> data = new HashMap<>();
+            data.put("entrantId", "seeded-entrant-" + i);
+            data.put("status", "waiting");
+            data.put("registrationTime", new Date());
+
+            Tasks.await(db.collection(DatabaseHandler.COLLECTION_EVENTS)
+                    .document(String.valueOf(eventId))
+                    .collection(DatabaseHandler.COLLECTION_ENTRANTS)
+                    .document("seeded-entrant-" + i)
+                    .set(data), 10, TimeUnit.SECONDS);
         }
     }
 

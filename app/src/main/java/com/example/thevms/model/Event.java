@@ -61,6 +61,7 @@ public class Event {
     private Date eventStartTime;
     private Date eventEndTime;
     private HashMap<Entrant, Boolean> entrantList;
+    private long entrantCount = 0;
 
     /**
      * Constructor for the Event class.
@@ -230,6 +231,54 @@ public class Event {
         map.put("eventStartTime", eventStartTime);
         map.put("eventEndTime", eventEndTime);
         return map;
+    }
+
+    /**
+     * Adds an entrant to the event's entrant list in the database.
+     *
+     * @param entrant The entrant to add.
+     * @return A Task representing the async operation.
+     */
+    public Task<Void> addEntrant(Entrant entrant) {
+        this.entrantList.put(entrant, Boolean.FALSE);
+
+        Map<String, Object> registrationData = new HashMap<>();
+        registrationData.put("entrantId", entrant.getDeviceId());
+        registrationData.put("status", "waiting"); // Default status
+        registrationData.put("registrationTime", new Date());
+
+        return dbHandler.updateEntrantStatus(String.valueOf(this.eventId), entrant.getDeviceId(), registrationData);
+    }
+
+    /**
+     * Removes an entrant from the event's entrant list in the database.
+     *
+     * @param entrant The entrant to remove.
+     * @return A Task representing the async operation.
+     */
+    public Task<Void> removeEntrant(Entrant entrant) {
+        this.entrantList.remove(entrant); // Update local list
+
+        return dbHandler.getDb().collection(DatabaseHandler.COLLECTION_EVENTS)
+                .document(String.valueOf(this.eventId))
+                .collection(DatabaseHandler.COLLECTION_ENTRANTS)
+                .document(entrant.getDeviceId())
+                .delete();
+    }
+
+    /**
+     * Fetches the current entrant count from the database sub-collection.
+     *
+     * @return A Task that resolves with the count.
+     */
+    public Task<Long> fetchEntrantCount() {
+        return dbHandler.getEntrantCount(String.valueOf(this.eventId))
+                .addOnSuccessListener(count -> this.entrantCount = count);
+    }
+
+
+    public long getEntrantCount() {
+        return entrantCount;
     }
 
     public Long getEventId() {
@@ -407,34 +456,5 @@ public class Event {
      */
     public HashMap<Entrant, Boolean> getEntrantList() {
         return entrantList;
-    }
-
-    /**
-     * Adds an entrant to the event's entrant list.
-     *
-     * @param entrant    The entrant to add.
-     * @param isSelected The selection status of the entrant.
-     */
-    public void addEntrant(Entrant entrant, Boolean isSelected) {
-        this.entrantList.put(entrant, isSelected);
-    }
-
-    /**
-     * Removes an entrant from the event's entrant list.
-     *
-     * @param entrant The entrant to remove.
-     */
-    public void removeEntrant(Entrant entrant) {
-        this.entrantList.remove(entrant);
-    }
-
-    /**
-     * Updates the selection status of an entrant in the event's entrant list.
-     *
-     * @param entrant
-     * @param isSelected
-     */
-    public void updateEntrant(Entrant entrant, Boolean isSelected) {
-        this.entrantList.put(entrant, isSelected);
     }
 }

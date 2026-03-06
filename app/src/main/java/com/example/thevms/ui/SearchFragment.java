@@ -1,7 +1,6 @@
 package com.example.thevms.ui;
 
 import android.annotation.SuppressLint;
-import android.app.DatePickerDialog;
 import android.app.TimePickerDialog;
 import android.os.Bundle;
 import android.provider.Settings;
@@ -16,20 +15,24 @@ import android.widget.EditText;
 import android.widget.ImageButton;
 import android.widget.ImageView;
 import android.widget.TextView;
+
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.annotation.VisibleForTesting;
 import androidx.core.util.Pair;
 import androidx.fragment.app.Fragment;
 import androidx.recyclerview.widget.RecyclerView;
+
 import com.example.thevms.R;
 import com.example.thevms.model.DatabaseHandler;
 import com.example.thevms.model.Entrant;
 import com.example.thevms.model.Event;
 import com.example.thevms.model.UserRole;
+import com.example.thevms.ui.Event.EventAdapter;
 import com.google.android.material.bottomsheet.BottomSheetBehavior;
 import com.google.android.material.datepicker.MaterialDatePicker;
 import com.google.firebase.firestore.DocumentSnapshot;
+
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
@@ -63,7 +66,7 @@ public class SearchFragment extends Fragment {
     private Integer startTimeMinute = null;
     private Integer endTimeHour = null;
     private Integer endTimeMinute = null;
-    
+
     private boolean isAdmin = false;
 
     private final SimpleDateFormat dateFormat = new SimpleDateFormat("MMM dd", Locale.getDefault());
@@ -94,7 +97,8 @@ public class SearchFragment extends Fragment {
     private void setupListeners() {
         searchEditText.addTextChangedListener(new TextWatcher() {
             @Override
-            public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+            public void beforeTextChanged(CharSequence s, int start, int count, int after) {
+            }
 
             @Override
             public void onTextChanged(CharSequence s, int start, int before, int count) {
@@ -104,7 +108,8 @@ public class SearchFragment extends Fragment {
             }
 
             @Override
-            public void afterTextChanged(Editable s) {}
+            public void afterTextChanged(Editable s) {
+            }
         });
 
         clearSearchIcon.setOnClickListener(v -> searchEditText.setText(""));
@@ -137,14 +142,14 @@ public class SearchFragment extends Fragment {
         this.startTimeMinute = startMin;
         this.endTimeHour = endHour;
         this.endTimeMinute = endMin;
-        
+
         if (startDate != null && endDate != null) {
             filterDateRangeBtn.setText(dateFormat.format(new Date(startDate)) + " - " + dateFormat.format(new Date(endDate)));
         }
         if (startHour != null && endHour != null) {
             filterTimeRangeBtn.setText(String.format(Locale.getDefault(), "%02d:%02d - %02d:%02d", startHour, startMin, endHour, endMin));
         }
-        
+
         clearFiltersBtn.setVisibility(View.VISIBLE);
         applyFilters();
     }
@@ -223,7 +228,7 @@ public class SearchFragment extends Fragment {
         new TimePickerDialog(getContext(), (view, hourOfDay, minute) -> {
             startTimeHour = hourOfDay;
             startTimeMinute = minute;
-            
+
             new TimePickerDialog(getContext(), (view1, hourOfDay1, minute1) -> {
                 endTimeHour = hourOfDay1;
                 endTimeMinute = minute1;
@@ -231,7 +236,7 @@ public class SearchFragment extends Fragment {
                 clearFiltersBtn.setVisibility(View.VISIBLE);
                 applyFilters();
             }, hourOfDay, minute, true).show();
-            
+
         }, 12, 0, true).show();
     }
 
@@ -240,7 +245,7 @@ public class SearchFragment extends Fragment {
         for (Event event : allEvents) {
             String eventName = event.getName() != null ? event.getName() : "";
             boolean matchesName = eventName.toLowerCase().contains(nameFilter);
-            
+
             boolean matchesDate = true;
             if (startDateFilter != null && endDateFilter != null && event.getEventStartTime() != null) {
                 long eventTime = event.getEventStartTime().getTime();
@@ -255,11 +260,11 @@ public class SearchFragment extends Fragment {
                 cal.setTime(event.getEventStartTime());
                 int evHour = cal.get(Calendar.HOUR_OF_DAY);
                 int evMin = cal.get(Calendar.MINUTE);
-                
+
                 int startTotal = startTimeHour * 60 + startTimeMinute;
                 int endTotal = endTimeHour * 60 + endTimeMinute;
                 int evTotal = evHour * 60 + evMin;
-                
+
                 matchesTime = evTotal >= startTotal && evTotal <= endTotal;
             }
 

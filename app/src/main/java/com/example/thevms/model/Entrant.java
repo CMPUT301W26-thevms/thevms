@@ -3,9 +3,13 @@ package com.example.thevms.model;
 import androidx.annotation.Nullable;
 
 import com.google.android.gms.tasks.Task;
+import com.google.android.gms.tasks.Tasks;
+import com.google.firebase.firestore.DocumentReference;
 import com.google.firebase.firestore.DocumentSnapshot;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -116,6 +120,41 @@ public class Entrant {
         });
     }
 
+    /**
+     * Retrieves a list of all events this entrant is registered for.
+     *
+     * @return A Task containing a List of Event objects.
+     */
+    public Task<List<Event>> getRegisteredEvents() {
+        return dbHandler.getRegistrationsForEntrant(deviceId).continueWithTask(task -> {
+            if (!task.isSuccessful()) throw task.getException();
+
+            List<Task<DocumentSnapshot>> eventTasks = new ArrayList<>();
+            for (DocumentSnapshot doc : task.getResult()) {
+                // The parent of 'entrants' collection is the event document
+                DocumentReference eventRef = doc.getReference().getParent().getParent();
+                if (eventRef != null) {
+                    eventTasks.add(eventRef.get());
+                }
+            }
+
+            if (eventTasks.isEmpty()) {
+                return Tasks.forResult(new ArrayList<Event>());
+            }
+
+            return Tasks.whenAllSuccess(eventTasks).continueWith(allDocsTask -> {
+                List<Event> events = new ArrayList<>();
+                for (Object obj : allDocsTask.getResult()) {
+                    DocumentSnapshot eventDoc = (DocumentSnapshot) obj;
+                    if (eventDoc.exists()) {
+                        events.add(Event.fromMap(eventDoc.getData()));
+                    }
+                }
+                return events;
+            });
+        });
+    }
+
     public String getDeviceId() {
         return deviceId;
     }
@@ -174,7 +213,7 @@ public class Entrant {
     }
 
     public void registerInEvent(Event event) {
-        event.addEntrant(this, Boolean.FALSE);
+        event.addEntrant(this);
     }
 
     public void unregisterFromEvent(Event event) {

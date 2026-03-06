@@ -44,7 +44,12 @@ dependencies {
     implementation("com.google.firebase:firebase-firestore")
     implementation(libs.firebase.firestore)
     implementation(libs.espresso.intents)
+    implementation(libs.espresso.contrib)
     testImplementation(libs.junit)
     androidTestImplementation(libs.ext.junit)
     androidTestImplementation(libs.espresso.core)
+}
+
+configurations.all {
+    exclude(group = "com.google.protobuf", module = "protobuf-lite")
 }

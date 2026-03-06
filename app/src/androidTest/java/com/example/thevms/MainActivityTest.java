@@ -5,24 +5,35 @@ import static androidx.test.espresso.action.ViewActions.click;
 import static androidx.test.espresso.action.ViewActions.closeSoftKeyboard;
 import static androidx.test.espresso.action.ViewActions.typeText;
 import static androidx.test.espresso.assertion.ViewAssertions.matches;
+import static androidx.test.espresso.matcher.ViewMatchers.hasDescendant;
 import static androidx.test.espresso.matcher.ViewMatchers.isDisplayed;
 import static androidx.test.espresso.matcher.ViewMatchers.withId;
 import static androidx.test.espresso.matcher.ViewMatchers.withText;
-import static org.hamcrest.CoreMatchers.allOf;
-import static org.hamcrest.CoreMatchers.containsString;
+import static org.hamcrest.Matchers.allOf;
+import static org.hamcrest.Matchers.containsString;
+import static org.junit.Assert.assertEquals;
+
+import android.view.View;
 
 import androidx.test.core.app.ActivityScenario;
+import androidx.test.espresso.UiController;
+import androidx.test.espresso.ViewAction;
+import androidx.test.espresso.contrib.RecyclerViewActions;
 import androidx.test.espresso.intent.Intents;
 import androidx.test.ext.junit.runners.AndroidJUnit4;
 import androidx.test.filters.LargeTest;
 
 import com.example.thevms.ui.MainActivity;
 import com.example.thevms.ui.SearchFragment;
+import com.google.android.gms.tasks.Tasks;
 
+import org.hamcrest.Matcher;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
+
+import java.util.concurrent.TimeUnit;
 
 /**
  * UI tests for MainActivity filtering features.
@@ -144,5 +155,108 @@ public class MainActivityTest {
     public void testFilterButtonsVisible() {
         onView(withId(R.id.filter_date_range_btn)).check(matches(isDisplayed()));
         onView(withId(R.id.filter_time_range_btn)).check(matches(isDisplayed()));
+    }
+
+    /**
+     * Test joining an event and verifying the count updates from 0 to 1.
+     */
+    @Test
+    public void testJoinEvent_UpdatesCount() throws Exception {
+        // Swipe up to ensure bottom sheet is visible
+        expandBottomSheetHelper();
+        Thread.sleep(1000);
+
+        // Verify initial state: 0 people joined
+        onView(withId(R.id.events_recycler_view))
+                .check(matches(hasDescendant(allOf(withId(R.id.event_status_info), withText(containsString("0"))))));
+
+        // Click the Join Event button on the first card
+        onView(withId(R.id.events_recycler_view))
+                .perform(RecyclerViewActions.actionOnItemAtPosition(0, clickChildViewWithId(R.id.btn_join_event)));
+
+        // Wait for Firestore update and UI refresh
+        Thread.sleep(2000);
+
+        // Verify the count updated to 1 in the DB
+        Long dbCount = Tasks.await(testHelper.getDbHandler().getEntrantCount("1"), 10, TimeUnit.SECONDS);
+        assertEquals(1L, (long) dbCount);
+
+        // Verify the count updated to 1
+        onView(withId(R.id.events_recycler_view))
+                .check(matches(hasDescendant(allOf(withId(R.id.event_status_info), withText(containsString("1"))))));
+    }
+
+    /**
+     * Test joining an event that already has waitees.
+     */
+    @Test
+    public void testJoinEvent_WithExistingWaitees() throws Exception {
+        // Seed 3 entrants for "Test Event 1" (which should have ID 1 after clearDatabase)
+        testHelper.seedEntrants(1, 3);
+
+        Thread.sleep(1000);
+
+        // Relaunch to ensure fresh adapter state
+        scenario.close();
+        scenario = ActivityScenario.launch(MainActivity.class);
+
+        // Swipe up to ensure bottom sheet is visible
+        expandBottomSheetHelper();
+        Thread.sleep(1000);
+
+        // Verify initial state: 3 people joined
+        onView(withId(R.id.events_recycler_view))
+                .check(matches(hasDescendant(allOf(withId(R.id.event_status_info), withText(containsString("3"))))));
+
+        // Click Join
+        onView(withId(R.id.events_recycler_view))
+                .perform(RecyclerViewActions.actionOnItemAtPosition(0, clickChildViewWithId(R.id.btn_join_event)));
+
+        // Wait for increment
+        Thread.sleep(2000);
+
+        // Verify the count updated to 4 in the DB
+        Long dbCount = Tasks.await(testHelper.getDbHandler().getEntrantCount("1"), 10, TimeUnit.SECONDS);
+        assertEquals(4L, (long) dbCount);
+
+        // Verify count is now 4
+        onView(withId(R.id.events_recycler_view))
+                .check(matches(hasDescendant(allOf(withId(R.id.event_status_info), withText(containsString("4"))))));
+    }
+
+    /**
+     * Helper to programmatically expand the SearchFragment's bottom sheet.
+     */
+    private void expandBottomSheetHelper() {
+        scenario.onActivity(activity -> {
+            SearchFragment fragment = (SearchFragment) activity.getSupportFragmentManager()
+                    .findFragmentById(R.id.fragment_container);
+            if (fragment != null) {
+                fragment.expandBottomSheet();
+            }
+        });
+    }
+
+    /**
+     * Helper action to click a child view with a specific ID within a RecyclerView item.
+     */
+    public static ViewAction clickChildViewWithId(final int id) {
+        return new ViewAction() {
+            @Override
+            public Matcher<View> getConstraints() {
+                return null;
+            }
+
+            @Override
+            public String getDescription() {
+                return "Click on a child view with specified id.";
+            }
+
+            @Override
+            public void perform(UiController uiController, View view) {
+                View v = view.findViewById(id);
+                v.performClick();
+            }
+        };
     }
 }
