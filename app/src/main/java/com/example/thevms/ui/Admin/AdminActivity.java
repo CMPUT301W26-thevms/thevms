@@ -59,7 +59,9 @@ public class AdminActivity {
             if ("Manage Event".equals(actionName)) {
                 mainActivity.navigateToFragment(new SearchFragment(), R.id.nav_home);
             } else if ("Manage Profiles".equals(actionName)) {
-                mainActivity.navigateToFragment(new AdminProfilesFragment(), R.id.nav_admin_settings);
+                mainActivity.navigateToFragment(AdminProfilesFragment.newInstance(false), R.id.nav_admin_settings);
+            } else if ("Manage Organizers".equals(actionName)) {
+                mainActivity.navigateToFragment(AdminProfilesFragment.newInstance(true), R.id.nav_admin_settings);
             } else {
                 Toast.makeText(activity, actionName + " coming soon", Toast.LENGTH_SHORT).show();
             }

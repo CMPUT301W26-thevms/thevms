@@ -33,6 +33,15 @@
                 android:text="@string/placeholder_user_name" />
 
             <TextView
+                android:id="@+id/profile_role"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textColor="@android:color/darker_gray"
+                android:textSize="12sp"
+                android:textStyle="italic"
+                android:text="Role" />
+
+            <TextView
                 android:id="@+id/profile_email"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"

@@ -7,12 +7,15 @@
     <string name="delete_event_cancel">Cancel</string>
 
     <!-- Admin Profiles Strings -->
-    <string name="admin_profiles_title">User Profiles</string>
+    <string name="admin_profiles_title">Manage Profiles</string>
+    <string name="admin_organizers_title">Manage Organizers</string>
     <string name="admin_profiles_delete">Delete</string>
     <string name="admin_profiles_load_failed">Failed to load profiles</string>
     <string name="admin_profiles_no_name">No Name</string>
     <string name="admin_profiles_no_email">No email</string>
     <string name="admin_profiles_no_phone">No phone</string>
+    <string name="admin_profiles_empty">No user profiles found.</string>
+    <string name="admin_organizers_empty">No organizers found.</string>
 
     <!-- Placeholders -->
     <string name="placeholder_user_name">User Name</string>
