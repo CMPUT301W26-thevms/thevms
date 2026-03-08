@@ -23,14 +23,18 @@ import com.example.thevms.model.Event;
 
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 
 public class EventAdapter extends RecyclerView.Adapter<EventAdapter.EventViewHolder> {
 
     private List<Event> events = new ArrayList<>();
     private boolean isAdmin = false;
     private final SimpleDateFormat dateFormat = new SimpleDateFormat("MMM dd", Locale.getDefault());
+    private final SimpleDateFormat fullDateFormat = new SimpleDateFormat("MMM dd, yyyy HH:mm", Locale.getDefault());
+    private final Set<Long> expandedEventIds = new HashSet<>();
 
     public void setEvents(List<Event> events) {
         this.events = events;
@@ -52,13 +56,27 @@ public class EventAdapter extends RecyclerView.Adapter<EventAdapter.EventViewHol
     @Override
     public void onBindViewHolder(@NonNull EventViewHolder holder, int position) {
         Event event = events.get(position);
-        holder.bind(event, dateFormat, isAdmin, () -> {
-            int currentPos = holder.getAdapterPosition();
-            if (currentPos != RecyclerView.NO_POSITION) {
-                events.remove(currentPos);
-                notifyItemRemoved(currentPos);
+        boolean isExpanded = expandedEventIds.contains(event.getEventId());
+        
+        holder.bind(event, dateFormat, fullDateFormat, isAdmin, isExpanded, 
+            () -> {
+                // Delete callback
+                int currentPos = holder.getAdapterPosition();
+                if (currentPos != RecyclerView.NO_POSITION) {
+                    events.remove(currentPos);
+                    notifyItemRemoved(currentPos);
+                }
+            },
+            (expand) -> {
+                // Toggle expansion callback
+                if (expand) {
+                    expandedEventIds.add(event.getEventId());
+                } else {
+                    expandedEventIds.remove(event.getEventId());
+                }
+                notifyItemChanged(holder.getAdapterPosition());
             }
-        });
+        );
     }
 
     @Override
@@ -75,6 +93,14 @@ public class EventAdapter extends RecyclerView.Adapter<EventAdapter.EventViewHol
         Button removeButton;
         ImageView eventImageView;
 
+        // Expandable views
+        View expandableDetails;
+        TextView descriptionTextView;
+        TextView regEndTextView;
+        TextView eventStartTextView;
+        TextView eventEndTextView;
+        Button expandButton;
+
         public EventViewHolder(@NonNull View itemView) {
             super(itemView);
             nameTextView = itemView.findViewById(R.id.event_name);
@@ -84,12 +110,21 @@ public class EventAdapter extends RecyclerView.Adapter<EventAdapter.EventViewHol
             joinButton = itemView.findViewById(R.id.btn_join_event);
             removeButton = itemView.findViewById(R.id.btn_remove_event);
             eventImageView = itemView.findViewById(R.id.event_image);
+
+            expandableDetails = itemView.findViewById(R.id.expandable_details);
+            descriptionTextView = itemView.findViewById(R.id.event_description);
+            regEndTextView = itemView.findViewById(R.id.event_reg_end_details);
+            eventStartTextView = itemView.findViewById(R.id.event_start_details);
+            eventEndTextView = itemView.findViewById(R.id.event_end_details);
+            expandButton = itemView.findViewById(R.id.btn_expand_details);
         }
 
-        public void bind(Event event, SimpleDateFormat dateFormat, boolean isAdmin, Runnable onDelete) {
+        public void bind(Event event, SimpleDateFormat dateFormat, SimpleDateFormat fullDateFormat, 
+                         boolean isAdmin, boolean isExpanded, Runnable onDelete, 
+                         java.util.function.Consumer<Boolean> onToggleExpand) {
+            
             if (nameTextView != null) nameTextView.setText(event.getName());
 
-            // Asynchronously fetch the entrant count from the sub-collection
             updateEntrantCount(event);
 
             if (timeTextView != null) {
@@ -104,6 +139,29 @@ public class EventAdapter extends RecyclerView.Adapter<EventAdapter.EventViewHol
                 locationTextView.setText("📍 Nearby");
             }
 
+            // Bind detailed info
+            if (descriptionTextView != null) {
+                descriptionTextView.setText(event.getDescription() != null ? event.getDescription() : "No description provided.");
+            }
+            if (regEndTextView != null) {
+                regEndTextView.setText("Registration Ends: " + (event.getRegistrationEndTime() != null ? fullDateFormat.format(event.getRegistrationEndTime()) : "TBD"));
+            }
+            if (eventStartTextView != null) {
+                eventStartTextView.setText("Event Starts: " + (event.getEventStartTime() != null ? fullDateFormat.format(event.getEventStartTime()) : "TBD"));
+            }
+            if (eventEndTextView != null) {
+                eventEndTextView.setText("Event Ends: " + (event.getEventEndTime() != null ? fullDateFormat.format(event.getEventEndTime()) : "TBD"));
+            }
+
+            // Handle Expansion state
+            if (expandableDetails != null) {
+                expandableDetails.setVisibility(isExpanded ? View.VISIBLE : View.GONE);
+            }
+            if (expandButton != null) {
+                expandButton.setText(isExpanded ? "Show Less" : "Show More Details");
+                expandButton.setOnClickListener(v -> onToggleExpand.accept(!isExpanded));
+            }
+
             // Handle Join Button
             if (joinButton != null) {
                 joinButton.setOnClickListener(v -> {
@@ -113,7 +171,6 @@ public class EventAdapter extends RecyclerView.Adapter<EventAdapter.EventViewHol
                     Entrant.getOrCreate(deviceId).addOnSuccessListener(entrant -> {
                         event.addEntrant(entrant).addOnSuccessListener(aVoid -> {
                             Toast.makeText(itemView.getContext(), "Successfully joined " + event.getName(), Toast.LENGTH_SHORT).show();
-                            // Update UI to show new count
                             updateEntrantCount(event);
                         }).addOnFailureListener(e -> {
                             Toast.makeText(itemView.getContext(), "Failed to join event: " + e.getMessage(), Toast.LENGTH_SHORT).show();

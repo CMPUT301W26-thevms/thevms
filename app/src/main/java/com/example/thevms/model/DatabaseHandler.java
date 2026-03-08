@@ -11,6 +11,7 @@ import com.google.firebase.firestore.MemoryCacheSettings;
 import com.google.firebase.firestore.Query;
 import com.google.firebase.firestore.QuerySnapshot;
 import com.google.firebase.firestore.SetOptions;
+import com.google.firebase.firestore.WriteBatch;
 
 import java.util.Map;
 
@@ -236,13 +237,35 @@ public class DatabaseHandler {
     }
 
     /**
-     * Deletes an event document.
+     * Deletes an event document along with all its nested entrants.
      *
      * @param eventId The event ID to delete.
      * @return Task representing the async operation.
      */
     public Task<Void> deleteEvent(String eventId) {
-        return db.collection(COLLECTION_EVENTS).document(eventId).delete();
+        return db.collection(COLLECTION_EVENTS)
+                .document(eventId)
+                .collection(COLLECTION_ENTRANTS)
+                .get()
+                .continueWithTask(task -> {
+                    if (!task.isSuccessful()) {
+                        throw task.getException();
+                    }
+
+                    WriteBatch batch = db.batch();
+
+                    // Delete all entrant documents in the sub-collection
+                    if (task.getResult() != null) {
+                        for (DocumentSnapshot doc : task.getResult()) {
+                            batch.delete(doc.getReference());
+                        }
+                    }
+
+                    // Delete the event document itself
+                    batch.delete(db.collection(COLLECTION_EVENTS).document(eventId));
+
+                    return batch.commit();
+                });
     }
 
     public FirebaseFirestore getDb() {
