@@ -46,6 +46,12 @@ public class ProfileFragment extends Fragment {
             startActivity(intent);
         });
 
+        // Navigation to My Events
+        myEventsButton.setOnClickListener(v -> {
+            Intent intent = new Intent(getActivity(), MyEventsActivity.class);
+            startActivity(intent);
+        });
+
         return view;
     }
 
