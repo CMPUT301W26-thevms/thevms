@@ -17,6 +17,7 @@ import androidx.fragment.app.Fragment;
 
 import com.example.thevms.R;
 import com.example.thevms.model.Entrant;
+import com.example.thevms.model.UserRole;
 
 /**
  * Fragment for displaying user profile information.
@@ -25,6 +26,7 @@ public class ProfileFragment extends Fragment {
 
     private TextView nameText, emailText, phoneText;
     private LinearLayout settingsButton;
+    private LinearLayout myEventsButton;
 
     @Nullable
     @Override
@@ -36,6 +38,7 @@ public class ProfileFragment extends Fragment {
         emailText = view.findViewById(R.id.profile_email);
         phoneText = view.findViewById(R.id.profile_phone);
         settingsButton = view.findViewById(R.id.btn_settings);
+        myEventsButton = view.findViewById(R.id.btn_my_events);
 
         // Navigation to Settings
         settingsButton.setOnClickListener(v -> {
@@ -68,6 +71,14 @@ public class ProfileFragment extends Fragment {
                 nameText.setText(fullName);
                 emailText.setText(entrant.getEmail() != null ? entrant.getEmail() : "No email provided");
                 phoneText.setText(entrant.getPhoneNumber() != null ? entrant.getPhoneNumber() : "No phone number provided");
+
+                // Show "My Events" only for Organizers and Admins
+                UserRole role = entrant.getRole();
+                if (role == UserRole.ORGANIZER || role == UserRole.ADMIN) {
+                    myEventsButton.setVisibility(View.VISIBLE);
+                } else {
+                    myEventsButton.setVisibility(View.GONE);
+                }
             }
         }).addOnFailureListener(e -> {
             if (isAdded()) {
