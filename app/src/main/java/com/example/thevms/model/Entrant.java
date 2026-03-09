@@ -6,6 +6,8 @@ import com.google.android.gms.tasks.Task;
 import com.google.android.gms.tasks.Tasks;
 import com.google.firebase.firestore.DocumentReference;
 import com.google.firebase.firestore.DocumentSnapshot;
+import com.google.firebase.firestore.QueryDocumentSnapshot;
+import com.google.firebase.firestore.QuerySnapshot;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -129,8 +131,9 @@ public class Entrant {
         return dbHandler.getRegistrationsForEntrant(deviceId).continueWithTask(task -> {
             if (!task.isSuccessful()) throw task.getException();
 
+            QuerySnapshot querySnapshot = task.getResult();
             List<Task<DocumentSnapshot>> eventTasks = new ArrayList<>();
-            for (DocumentSnapshot doc : task.getResult()) {
+            for (QueryDocumentSnapshot doc : querySnapshot) {
                 // The parent of 'entrants' collection is the event document
                 DocumentReference eventRef = doc.getReference().getParent().getParent();
                 if (eventRef != null) {

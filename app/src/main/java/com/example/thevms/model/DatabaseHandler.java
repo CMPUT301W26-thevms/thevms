@@ -2,7 +2,6 @@ package com.example.thevms.model;
 
 import com.google.android.gms.tasks.Task;
 import com.google.android.gms.tasks.Tasks;
-import com.google.firebase.firestore.AggregateSource;
 import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.EventListener;
 import com.google.firebase.firestore.FirebaseFirestore;
@@ -10,6 +9,7 @@ import com.google.firebase.firestore.FirebaseFirestoreSettings;
 import com.google.firebase.firestore.ListenerRegistration;
 import com.google.firebase.firestore.MemoryCacheSettings;
 import com.google.firebase.firestore.Query;
+import com.google.firebase.firestore.QueryDocumentSnapshot;
 import com.google.firebase.firestore.QuerySnapshot;
 import com.google.firebase.firestore.SetOptions;
 import com.google.firebase.firestore.WriteBatch;
@@ -152,35 +152,80 @@ public class DatabaseHandler {
     }
 
     /**
-     * Retrieves a specific event's details.
-     *
-     * @param eventId The event ID.
-     * @return Task containing DocumentSnapshot of the event.
-     */
-    public Task<DocumentSnapshot> getEvent(String eventId) {
-        return db.collection(COLLECTION_EVENTS).document(eventId).get();
-    }
-
-    /**
-     * Retrieves all event registrations for a specific entrant across all events.
-     * Note: This uses a collectionGroup query and may require a Firestore index.
-     *
-     * @param entrantId The device ID of the entrant.
-     * @return A Task containing the QuerySnapshot of registrations.
-     */
-    public Task<QuerySnapshot> getRegistrationsForEntrant(String entrantId) {
-        return db.collectionGroup(COLLECTION_ENTRANTS)
-                .whereEqualTo("entrantId", entrantId)
-                .get();
-    }
-
-    /**
      * Retrieves all user profiles.
      *
      * @return Task containing QuerySnapshot of all users.
      */
     public Task<QuerySnapshot> getAllUsers() {
         return db.collection(COLLECTION_USERS).get();
+    }
+
+    /**
+     * Performs a comprehensive, cascaded deletion of a user and all their associated data.
+     * note - Google Gemini was used to write the function and documentation
+     * Deleting a user profile triggers a chain reaction:
+     * 1. SCRUBBING REGISTRATIONS: It uses a 'collectionGroup' query to find the user's presence
+     * in EVERY event's 'entrants' sub-collection and removes them. This prevents "ghost"
+     * entries in event waitlists.
+     * 2. REMOVING ORGANIZED EVENTS: It identifies every event where this user is the 'organizerId'
+     * and deletes those events entirely. Note: This could potentially affect other users
+     * who were registered for those events.
+     * 3. FINAL PROFILE DELETE: Only after all dependencies are cleared is the primary
+     * user document in the 'users' collection removed.
+     * <p>
+     * This layered approach ensures database integrity and prevents orphaned data.
+     *
+     * @param userId The unique device ID of the user to be permanently removed.
+     * @return A Task that resolves only when all three stages of the deletion are complete.
+     */
+    public Task<Void> deleteUserAccountCompletely(String userId) {
+        // STAGE 1: Find and delete all event registration records for this user
+        // We use collectionGroup because 'entrants' are nested under individual 'events' documents
+        return db.collectionGroup(COLLECTION_ENTRANTS)
+                .get()
+                .continueWithTask(task -> {
+                    if (!task.isSuccessful()) throw task.getException();
+
+                    List<Task<Void>> tasks = new ArrayList<>();
+                    for (QueryDocumentSnapshot doc : task.getResult()) {
+                        // The document ID in the entrants sub-collection is the user's deviceId
+                        if (doc.getId().equals(userId)) {
+                            tasks.add(doc.getReference().delete());
+                        }
+                    }
+                    // Wait for all sub-collection deletions to finish
+                    return Tasks.whenAll(tasks);
+                })
+                .continueWithTask(task -> {
+                    // STAGE 2: Delete all events organized by this specific user
+                    return db.collection(COLLECTION_EVENTS)
+                            .whereEqualTo("organizerId", userId)
+                            .get();
+                })
+                .continueWithTask(task -> {
+                    if (!task.isSuccessful()) throw task.getException();
+
+                    List<Task<Void>> tasks = new ArrayList<>();
+                    for (QueryDocumentSnapshot doc : task.getResult()) {
+                        tasks.add(doc.getReference().delete());
+                    }
+                    // Wait for all organized events to be deleted
+                    return Tasks.whenAll(tasks);
+                })
+                .continueWithTask(task -> {
+                    // STAGE 3: Finally, delete the actual user profile document
+                    return db.collection(COLLECTION_USERS).document(userId).delete();
+                });
+    }
+
+    /**
+     * Deletes a user profile from the database.
+     *
+     * @param userId The user ID to delete.
+     * @return Task representing the async operation.
+     */
+    public Task<Void> deleteUser(String userId) {
+        return db.collection(COLLECTION_USERS).document(userId).delete();
     }
 
     /**
@@ -231,24 +276,15 @@ public class DatabaseHandler {
     }
 
     /**
-     * Gets the count of entrants for a specific event using an aggregation query.
+     * Retrieves all registration documents for a specific entrant across all events.
      *
-     * @param eventId The event ID.
-     * @return A Task that resolves to the count of entrants.
+     * @param entrantId The unique device ID of the entrant.
+     * @return A Task containing the QuerySnapshot of registrations.
      */
-    public Task<Long> getEntrantCount(String eventId) {
-        return db.collection(COLLECTION_EVENTS)
-                .document(eventId)
-                .collection(COLLECTION_ENTRANTS)
-                .count()
-                .get(AggregateSource.SERVER)
-                .continueWith(task -> {
-                    if (task.isSuccessful()) {
-                        return task.getResult().getCount();
-                    } else {
-                        throw task.getException();
-                    }
-                });
+    public Task<QuerySnapshot> getRegistrationsForEntrant(String entrantId) {
+        return db.collectionGroup(COLLECTION_ENTRANTS)
+                .whereEqualTo("entrantId", entrantId)
+                .get();
     }
 
     /**
@@ -280,6 +316,26 @@ public class DatabaseHandler {
                     batch.delete(db.collection(COLLECTION_EVENTS).document(eventId));
 
                     return batch.commit();
+                });
+    }
+
+    /**
+     * Retrieves the count of entrants for a specific event.
+     *
+     * @param eventId The event ID.
+     * @return A Task that resolves with the count of entrants.
+     */
+    public Task<Long> getEntrantCount(String eventId) {
+        return db.collection(COLLECTION_EVENTS)
+                .document(eventId)
+                .collection(COLLECTION_ENTRANTS)
+                .get()
+                .continueWith(task -> {
+                    if (task.isSuccessful()) {
+                        return (long) task.getResult().size();
+                    } else {
+                        throw task.getException();
+                    }
                 });
     }
 

@@ -7,12 +7,22 @@
     <string name="delete_event_cancel">Cancel</string>
 
     <!-- Admin Profiles Strings -->
-    <string name="admin_profiles_title">User Profiles</string>
+    <string name="admin_profiles_title">Manage Profiles</string>
+    <string name="admin_organizers_title">Manage Organizers</string>
     <string name="admin_profiles_delete">Delete</string>
     <string name="admin_profiles_load_failed">Failed to load profiles</string>
     <string name="admin_profiles_no_name">No Name</string>
     <string name="admin_profiles_no_email">No email</string>
     <string name="admin_profiles_no_phone">No phone</string>
+    <string name="admin_profiles_empty">No user profiles found.</string>
+    <string name="admin_organizers_empty">No organizers found.</string>
+
+    <!-- Profile Delete Dialog -->
+    <string name="delete_profile_title">Delete Profile?</string>
+    <string name="delete_profile_message_organizer">This will permanently delete the %1$s %2$s, including all events they have organized and their participation in all registered events. This action cannot be undone.</string>
+    <string name="delete_profile_message_user">This will permanently delete the %1$s %2$s and their participation in all registered events. This action cannot be undone.</string>
+    <string name="delete_profile_confirm">Delete</string>
+    <string name="delete_profile_cancel">Cancel</string>
 
     <!-- Placeholders -->
     <string name="placeholder_user_name">User Name</string>

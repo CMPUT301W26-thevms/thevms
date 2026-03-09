@@ -44,6 +44,15 @@
         android:clickable="true"
         android:focusable="true" />
 
+    <!-- Manage Organizers -->
+    <TextView
+        android:id="@+id/admin_manage_organizers"
+        style="@style/AdminDrawerItem"
+        android:text="Manage Organizers"
+        android:drawableStart="@drawable/ic_star_outline"
+        android:clickable="true"
+        android:focusable="true" />
+
     <!-- Manage Images -->
     <TextView
         android:id="@+id/admin_manage_images"
@@ -53,27 +62,11 @@
         android:clickable="true"
         android:focusable="true" />
 
-    <View
-        android:layout_width="match_parent"
-        android:layout_height="1dp"
-        android:layout_marginTop="16dp"
-        android:layout_marginBottom="16dp"
-        android:background="#EEEEEE" />
-
     <!-- View Logs -->
     <TextView
         android:id="@+id/admin_view_logs"
         style="@style/AdminDrawerItem"
         android:text="View Logs"
-        android:drawableStart="@drawable/ic_star_outline"
-        android:clickable="true"
-        android:focusable="true" />
-
-    <!-- Manage Organizers -->
-    <TextView
-        android:id="@+id/admin_manage_organizers"
-        style="@style/AdminDrawerItem"
-        android:text="Manage Organizers"
         android:drawableStart="@drawable/ic_star_outline"
         android:clickable="true"
         android:focusable="true" />
