@@ -1,6 +1,7 @@
 package com.example.thevms.model;
 
 import com.google.android.gms.tasks.Task;
+import com.google.android.gms.tasks.Tasks;
 import com.google.firebase.firestore.AggregateSource;
 import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.EventListener;
@@ -13,6 +14,8 @@ import com.google.firebase.firestore.QuerySnapshot;
 import com.google.firebase.firestore.SetOptions;
 import com.google.firebase.firestore.WriteBatch;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -102,6 +105,18 @@ public class DatabaseHandler {
      */
     public Task<QuerySnapshot> getAllEvents() {
         return db.collection(COLLECTION_EVENTS).get();
+    }
+
+    /**
+     * Fetches events created by a specific organizer.
+     *
+     * @param organizerId The device ID of the organizer.
+     * @return Task containing QuerySnapshot of the organizer's events.
+     */
+    public Task<QuerySnapshot> getEventsByOrganizer(String organizerId) {
+        return db.collection(COLLECTION_EVENTS)
+                .whereEqualTo("organizerId", organizerId)
+                .get();
     }
 
     /**
