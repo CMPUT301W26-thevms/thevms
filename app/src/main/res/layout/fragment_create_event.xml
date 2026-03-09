@@ -120,7 +120,9 @@
                 android:layout_marginTop="8dp"
                 android:background="@null"
                 android:hint="Event description"
-                android:inputType="text"
+                android:inputType="textMultiLine"
+                android:minLines="1"
+                android:scrollbars="vertical"
                 android:textColor="@android:color/black"
                 android:textSize="16sp"
                 app:layout_constraintTop_toBottomOf="@id/divider_location" />
