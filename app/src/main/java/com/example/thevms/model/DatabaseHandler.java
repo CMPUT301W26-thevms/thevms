@@ -108,6 +108,18 @@ public class DatabaseHandler {
     }
 
     /**
+     * Fetches events created by a specific organizer.
+     *
+     * @param organizerId The device ID of the organizer.
+     * @return Task containing QuerySnapshot of the organizer's events.
+     */
+    public Task<QuerySnapshot> getEventsByOrganizer(String organizerId) {
+        return db.collection(COLLECTION_EVENTS)
+                .whereEqualTo("organizerId", organizerId)
+                .get();
+    }
+
+    /**
      * Listens for real-time changes to a specific event document.
      *
      * @param eventId  The event ID to listen to.
