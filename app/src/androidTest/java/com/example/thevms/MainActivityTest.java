@@ -9,6 +9,7 @@ import static androidx.test.espresso.matcher.ViewMatchers.hasDescendant;
 import static androidx.test.espresso.matcher.ViewMatchers.isDisplayed;
 import static androidx.test.espresso.matcher.ViewMatchers.withId;
 import static androidx.test.espresso.matcher.ViewMatchers.withText;
+import static org.hamcrest.CoreMatchers.not;
 import static org.hamcrest.Matchers.allOf;
 import static org.hamcrest.Matchers.containsString;
 import static org.junit.Assert.assertEquals;
@@ -22,7 +23,9 @@ import androidx.test.espresso.contrib.RecyclerViewActions;
 import androidx.test.espresso.intent.Intents;
 import androidx.test.ext.junit.runners.AndroidJUnit4;
 import androidx.test.filters.LargeTest;
+import androidx.test.platform.app.InstrumentationRegistry;
 
+import com.example.thevms.model.Entrant;
 import com.example.thevms.ui.MainActivity;
 import com.example.thevms.ui.SearchFragment;
 import com.google.android.gms.tasks.Tasks;
@@ -258,5 +261,53 @@ public class MainActivityTest {
                 v.performClick();
             }
         };
+    }
+
+    /**
+     * Test leaving an event and verifying the count updates from 0 to 1 then 0.
+     */
+    @Test
+    public void testLeaveEvent_UpdatesCount() throws Exception {
+        // Get device ID
+        String realDeviceId = android.provider.Settings.Secure.getString(
+                InstrumentationRegistry.getInstrumentation().getContext().getContentResolver(),
+                android.provider.Settings.Secure.ANDROID_ID);
+
+        // Seed 1 entrants for "Test Event 1"
+        testHelper.seedSpecificEntrant(1, realDeviceId);
+        Thread.sleep(1000);
+
+        // Relaunch to ensure fresh adapter state
+        scenario.close();
+        scenario = ActivityScenario.launch(MainActivity.class);
+
+        // Swipe up to ensure bottom sheet is visible
+        expandBottomSheetHelper();
+        Thread.sleep(1000);
+
+        // Verify initial state: 1 people joined and "Leave" button is visible
+        onView(withId(R.id.events_recycler_view))
+                .check(matches(hasDescendant(allOf(withId(R.id.event_status_info), withText(containsString("1"))))));
+        onView(withId(R.id.events_recycler_view))
+                .check(matches(hasDescendant(allOf(withId(R.id.btn_leave_event), isDisplayed()))));
+
+        // Click Leave
+        onView(withId(R.id.events_recycler_view))
+                .perform(RecyclerViewActions.actionOnItemAtPosition(0, clickChildViewWithId(R.id.btn_leave_event)));
+
+        // Wait for increment
+        Thread.sleep(2000);
+
+        // Verify the count updated to 0 in the DB
+        Long dbCount = Tasks.await(testHelper.getDbHandler().getEntrantCount("1"), 10, TimeUnit.SECONDS);
+        assertEquals(0L, (long) dbCount);
+
+        // Verify count is now 0 and "Join" button is visible
+        onView(withId(R.id.events_recycler_view))
+                .check(matches(hasDescendant(allOf(withId(R.id.event_status_info), withText(containsString("0"))))));
+        onView(withId(R.id.events_recycler_view))
+                .check(matches(hasDescendant(allOf(withId(R.id.btn_join_event), isDisplayed()))));
+        onView(withId(R.id.events_recycler_view))
+                .check(matches(hasDescendant(allOf(withId(R.id.btn_leave_event), not(isDisplayed())))));
     }
 }
