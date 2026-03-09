@@ -4,7 +4,6 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
-import android.widget.ImageView;
 import android.widget.TextView;
 
 import androidx.annotation.NonNull;
@@ -12,12 +11,17 @@ import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.thevms.R;
+import com.example.thevms.model.DatabaseHandler;
+import com.example.thevms.model.Entrant;
 import com.example.thevms.model.Event;
+import com.google.firebase.firestore.DocumentSnapshot;
+import com.google.firebase.firestore.QueryDocumentSnapshot;
 
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 
 public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAdapter.ViewHolder> {
 
@@ -60,6 +64,8 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
         TextView nameText, distanceText, waitlistText, dateText, descriptionText;
         Button cancelBtn;
         RecyclerView attendeesRv;
+        AttendeeAdapter attendeeAdapter;
+        DatabaseHandler dbHandler;
 
         public ViewHolder(@NonNull View itemView) {
             super(itemView);
@@ -72,6 +78,9 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
             attendeesRv = itemView.findViewById(R.id.rv_attendees);
 
             attendeesRv.setLayoutManager(new LinearLayoutManager(itemView.getContext()));
+            attendeeAdapter = new AttendeeAdapter();
+            attendeesRv.setAdapter(attendeeAdapter);
+            dbHandler = new DatabaseHandler();
         }
 
         public void bind(Event event, SimpleDateFormat dateFormat, OnEventCancelListener cancelListener) {
@@ -93,8 +102,36 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
                 }
             });
 
-            // For now, we'll leave the attendees list empty or add a placeholder adapter
-            // A real implementation would fetch entrants and set them here.
+            // Fetch entrants and their profile details to display names
+            dbHandler.getEntrantsForEvent(String.valueOf(event.getEventId())).addOnSuccessListener(queryDocumentSnapshots -> {
+                List<Entrant> entrants = new ArrayList<>();
+                List<com.google.android.gms.tasks.Task<DocumentSnapshot>> profileTasks = new ArrayList<>();
+
+                for (QueryDocumentSnapshot doc : queryDocumentSnapshots) {
+                    String entrantId = doc.getString("entrantId");
+                    if (entrantId != null) {
+                        profileTasks.add(dbHandler.getUser(entrantId));
+                    }
+                }
+
+                if (!profileTasks.isEmpty()) {
+                    com.google.android.gms.tasks.Tasks.whenAllSuccess(profileTasks).addOnSuccessListener(profiles -> {
+                        for (Object obj : profiles) {
+                            DocumentSnapshot profileDoc = (DocumentSnapshot) obj;
+                            if (profileDoc.exists()) {
+                                Map<String, Object> data = profileDoc.getData();
+                                if (data != null) {
+                                    Entrant entrant = Entrant.fromMap(profileDoc.getId(), data);
+                                    entrants.add(entrant);
+                                }
+                            }
+                        }
+                        attendeeAdapter.setAttendees(entrants);
+                    });
+                } else {
+                    attendeeAdapter.setAttendees(new ArrayList<>());
+                }
+            });
         }
     }
 }
