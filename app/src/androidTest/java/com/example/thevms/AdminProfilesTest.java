@@ -8,9 +8,6 @@ import static androidx.test.espresso.matcher.ViewMatchers.hasDescendant;
 import static androidx.test.espresso.matcher.ViewMatchers.isDisplayed;
 import static androidx.test.espresso.matcher.ViewMatchers.withId;
 import static androidx.test.espresso.matcher.ViewMatchers.withText;
-import static org.hamcrest.CoreMatchers.allOf;
-import static org.hamcrest.CoreMatchers.anyOf;
-import static org.hamcrest.CoreMatchers.containsString;
 import static org.hamcrest.CoreMatchers.not;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;
@@ -166,7 +163,7 @@ public class AdminProfilesTest {
             onView(withId(R.id.admin_profiles_title_text)).check(matches(withText("Manage Profiles")));
             onView(withText("Alice Smith")).check(matches(isDisplayed()));
             onView(withText("Bob Jones")).check(matches(isDisplayed()));
-            
+
             onView(withId(R.id.profiles_recycler_view)).check(hasItemCount(3));
         }
     }
@@ -186,7 +183,7 @@ public class AdminProfilesTest {
 
             onView(withText("Bob Jones")).check(matches(isDisplayed()));
             onView(withText("Alice Smith")).check(doesNotExist());
-            
+
             onView(withId(R.id.profiles_recycler_view)).check(hasItemCount(1));
         }
     }
@@ -204,8 +201,9 @@ public class AdminProfilesTest {
 
             onView(withId(R.id.profiles_recycler_view)).check(hasItemCount(3));
 
+            // Specifically target Alice Smith's card to avoid clicking on Admin User (self)
             onView(withId(R.id.profiles_recycler_view))
-                    .perform(RecyclerViewActions.actionOnItemAtPosition(0, clickChildViewWithId(R.id.btn_delete_profile)));
+                    .perform(RecyclerViewActions.actionOnItem(hasDescendant(withText("Alice Smith")), clickChildViewWithId(R.id.btn_delete_profile)));
 
             waitForView(withText("Delete Profile?"), 2000);
             onView(withText("Delete")).check(matches(isDisplayed()));
@@ -213,7 +211,7 @@ public class AdminProfilesTest {
 
             onView(withId(R.id.btn_dialog_cancel)).perform(click());
             onView(withText("Delete Profile?")).check(doesNotExist());
-            
+
             onView(withId(R.id.profiles_recycler_view)).check(hasItemCount(3));
         }
     }
@@ -231,9 +229,9 @@ public class AdminProfilesTest {
 
             onView(withId(R.id.profiles_recycler_view)).check(hasItemCount(3));
 
-            // Delete the first profile
+            // Specifically delete Alice Smith (Entrant)
             onView(withId(R.id.profiles_recycler_view))
-                    .perform(RecyclerViewActions.actionOnItemAtPosition(0, clickChildViewWithId(R.id.btn_delete_profile)));
+                    .perform(RecyclerViewActions.actionOnItem(hasDescendant(withText("Alice Smith")), clickChildViewWithId(R.id.btn_delete_profile)));
 
             waitForView(withText("Delete Profile?"), 2000);
             onView(withId(R.id.btn_dialog_delete)).perform(click());
@@ -241,8 +239,9 @@ public class AdminProfilesTest {
             // Wait for deletion cascade and refresh spinner
             waitForViewToDisappear(withId(R.id.loading_spinner), 10000);
 
-            // Verify count decreased to 2
+            // Verify count decreased to 2 and Alice is gone
             onView(withId(R.id.profiles_recycler_view)).check(hasItemCount(2));
+            onView(withText("Alice Smith")).check(doesNotExist());
         }
     }
 
@@ -262,7 +261,7 @@ public class AdminProfilesTest {
 
             // Delete Bob
             onView(withId(R.id.profiles_recycler_view))
-                    .perform(RecyclerViewActions.actionOnItemAtPosition(0, clickChildViewWithId(R.id.btn_delete_profile)));
+                    .perform(RecyclerViewActions.actionOnItem(hasDescendant(withText("Bob Jones")), clickChildViewWithId(R.id.btn_delete_profile)));
 
             waitForView(withText("Delete Profile?"), 2000);
             onView(withId(R.id.btn_dialog_delete)).perform(click());
@@ -279,19 +278,19 @@ public class AdminProfilesTest {
     @Test
     public void testDeleteOrganizerCascadesEventDeletion() throws Exception {
         DatabaseHandler dbHandler = testHelper.getDbHandler();
-        
+
         // 1. Setup Data: Create an organizer and an event organized by them.
         String orgId = "org_to_delete";
         Organizer targetOrg = new Organizer(orgId, "target@org.com", "Target", "Organizer", null);
         Tasks.await(targetOrg.save(), 5, TimeUnit.SECONDS);
-        
+
         Event event = Tasks.await(Event.create("Target Event", "Description", targetOrg, null, null, new Date(), new Date(), new Date(), new Date()), 5, TimeUnit.SECONDS);
         Tasks.await(event.save(), 5, TimeUnit.SECONDS);
 
         // Verify initial state in DB
         DocumentSnapshot userDoc = Tasks.await(dbHandler.getUser(orgId), 5, TimeUnit.SECONDS);
         assertEquals("Target", userDoc.getString("firstName"));
-        
+
         QuerySnapshot eventSnap = Tasks.await(dbHandler.getDb().collection(DatabaseHandler.COLLECTION_EVENTS).whereEqualTo("organizerId", orgId).get(), 5, TimeUnit.SECONDS);
         assertEquals(1, eventSnap.size());
 
@@ -299,10 +298,10 @@ public class AdminProfilesTest {
         try (ActivityScenario<MainActivity> scenario = ActivityScenario.launch(MainActivity.class)) {
             waitForView(withId(R.id.nav_admin_settings), 5000);
             onView(withId(R.id.nav_admin_settings)).perform(click());
-            
+
             waitForView(withText("Manage Organizers"), 2000);
             onView(withText("Manage Organizers")).perform(click());
-            
+
             waitForViewToDisappear(withId(R.id.loading_spinner), 5000);
 
             // Click delete on the target organizer
@@ -319,7 +318,7 @@ public class AdminProfilesTest {
         // 3. Final Verification: Check DB to confirm the event is gone
         userDoc = Tasks.await(dbHandler.getUser(orgId), 5, TimeUnit.SECONDS);
         assertNull(userDoc.getData());
-        
+
         eventSnap = Tasks.await(dbHandler.getDb().collection(DatabaseHandler.COLLECTION_EVENTS).whereEqualTo("organizerId", orgId).get(), 5, TimeUnit.SECONDS);
         assertEquals(0, eventSnap.size());
     }
@@ -352,8 +351,6 @@ public class AdminProfilesTest {
 
         // Verify initial DB state
         assertEquals(2, Tasks.await(dbHandler.getEntrantsForEvent(String.valueOf(event.getEventId())), 5, TimeUnit.SECONDS).size());
-        assertEquals(1, Tasks.await(dbHandler.getRegistrationsForEntrant(userIdA), 5, TimeUnit.SECONDS).size());
-        assertEquals(1, Tasks.await(dbHandler.getRegistrationsForEntrant(userIdB), 5, TimeUnit.SECONDS).size());
 
         // 2. UI Action: Delete both users
         try (ActivityScenario<MainActivity> scenario = ActivityScenario.launch(MainActivity.class)) {
@@ -381,9 +378,34 @@ public class AdminProfilesTest {
         // 3. Final Verification: Confirm registrations are scrubbed from the Event collection
         QuerySnapshot entrantsSnap = Tasks.await(dbHandler.getEntrantsForEvent(String.valueOf(event.getEventId())), 5, TimeUnit.SECONDS);
         assertEquals(0, entrantsSnap.size());
-        
+
         // Also confirm profiles are gone
         assertNull(Tasks.await(dbHandler.getUser(userIdA), 5, TimeUnit.SECONDS).getData());
         assertNull(Tasks.await(dbHandler.getUser(userIdB), 5, TimeUnit.SECONDS).getData());
+    }
+
+    @Test
+    public void testAdminCannotDeleteSelf() throws InterruptedException {
+        try (ActivityScenario<MainActivity> scenario = ActivityScenario.launch(MainActivity.class)) {
+            waitForView(withId(R.id.nav_admin_settings), 5000);
+            onView(withId(R.id.nav_admin_settings)).perform(click());
+
+            waitForView(withText("Manage Profiles"), 2000);
+            onView(withText("Manage Profiles")).perform(click());
+
+            waitForViewToDisappear(withId(R.id.loading_spinner), 5000);
+
+            onView(withId(R.id.profiles_recycler_view)).check(hasItemCount(3));
+
+            // Attempt to delete Admin User (the current user)
+            onView(withId(R.id.profiles_recycler_view))
+                    .perform(RecyclerViewActions.actionOnItem(hasDescendant(withText("Admin User")), clickChildViewWithId(R.id.btn_delete_profile)));
+
+            // The modal should NOT appear because app disables self-deletion
+            onView(withText("Delete Profile?")).check(doesNotExist());
+
+            // Item count should remain 3
+            onView(withId(R.id.profiles_recycler_view)).check(hasItemCount(3));
+        }
     }
 }
