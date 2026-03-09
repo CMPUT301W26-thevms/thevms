@@ -3,11 +3,13 @@ package com.example.thevms.ui;
 import android.annotation.SuppressLint;
 import android.os.Bundle;
 import android.provider.Settings;
+import android.view.LayoutInflater;
 import android.view.View;
 import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.Toolbar;
 import androidx.recyclerview.widget.LinearLayoutManager;
@@ -17,6 +19,7 @@ import com.example.thevms.R;
 import com.example.thevms.model.DatabaseHandler;
 import com.example.thevms.model.Event;
 import com.example.thevms.ui.Event.OrganizerEventAdapter;
+import com.google.android.material.button.MaterialButton;
 import com.google.firebase.firestore.DocumentSnapshot;
 
 import java.util.ArrayList;
@@ -52,16 +55,39 @@ public class MyEventsActivity extends AppCompatActivity {
         recyclerView.setLayoutManager(new LinearLayoutManager(this));
         recyclerView.setAdapter(adapter);
 
-        adapter.setOnEventCancelListener(event -> {
-            // Re-use existing delete logic
+        adapter.setOnEventCancelListener(this::showCancelConfirmationDialog);
+
+        loadMyEvents();
+    }
+
+    private void showCancelConfirmationDialog(Event event) {
+        View dialogView = LayoutInflater.from(this).inflate(R.layout.dialog_cancel_confirmation, null);
+        AlertDialog dialog = new AlertDialog.Builder(this)
+                .setView(dialogView)
+                .create();
+
+        // Optional: Make dialog background transparent to show the card corner radius
+        if (dialog.getWindow() != null) {
+            dialog.getWindow().setBackgroundDrawableResource(android.R.color.transparent);
+        }
+
+        MaterialButton btnYes = dialogView.findViewById(R.id.btn_dialog_yes);
+        MaterialButton btnBack = dialogView.findViewById(R.id.btn_dialog_back);
+        View ivClose = dialogView.findViewById(R.id.iv_close);
+
+        btnYes.setOnClickListener(v -> {
             dbHandler.deleteEvent(String.valueOf(event.getEventId()))
                     .addOnSuccessListener(aVoid -> {
                         Toast.makeText(this, "Event cancelled", Toast.LENGTH_SHORT).show();
                         loadMyEvents(); // Refresh list
                     });
+            dialog.dismiss();
         });
 
-        loadMyEvents();
+        btnBack.setOnClickListener(v -> dialog.dismiss());
+        ivClose.setOnClickListener(v -> dialog.dismiss());
+
+        dialog.show();
     }
 
     private void loadMyEvents() {
