@@ -133,6 +133,26 @@ public class FirestoreTestHelper {
         }
     }
 
+    /**
+     * Seeds specific entrants for a specific event to simulate existing participants.
+     * @param eventId The ID of the event to seed entrants for.
+     * @param deviceId The device ID of the entrant.
+     */
+    public void seedSpecificEntrant(long eventId, String deviceId) throws ExecutionException, InterruptedException, TimeoutException {
+        FirebaseFirestore db = dbHandler.getDb();
+
+        Map<String, Object> data = new HashMap<>();
+        data.put("entrantId", deviceId);
+        data.put("status", "waiting");
+        data.put("registrationTime", new Date());
+
+        Tasks.await(db.collection(DatabaseHandler.COLLECTION_EVENTS)
+                .document(String.valueOf(eventId))
+                .collection(DatabaseHandler.COLLECTION_ENTRANTS)
+                .document(deviceId)
+                .set(data), 10, TimeUnit.SECONDS);
+    }
+
     public DatabaseHandler getDbHandler() {
         return dbHandler;
     }

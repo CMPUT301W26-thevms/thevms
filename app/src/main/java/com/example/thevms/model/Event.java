@@ -234,6 +234,22 @@ public class Event {
     }
 
     /**
+     * Check if user is in event
+     * @param entrant The entrant to check
+     * @return A Task that resolves to true if the user is in the event, false otherwise
+     */
+    public Task<Boolean> inEvent(Entrant entrant) {
+        return dbHandler.getDb().collection(DatabaseHandler.COLLECTION_EVENTS)
+                .document(String.valueOf(this.eventId))
+                .collection(DatabaseHandler.COLLECTION_ENTRANTS)
+                .document(entrant.getDeviceId())
+                .get()
+                .continueWith(task -> {
+                    return task.isSuccessful() && task.getResult().exists();
+                });
+    }
+
+    /**
      * Adds an entrant to the event's entrant list in the database.
      *
      * @param entrant The entrant to add.

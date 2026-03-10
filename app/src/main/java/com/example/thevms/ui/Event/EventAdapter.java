@@ -91,6 +91,7 @@ public class EventAdapter extends RecyclerView.Adapter<EventAdapter.EventViewHol
         TextView locationTextView;
         Button joinButton;
         Button removeButton;
+        Button leaveButton;
         ImageView eventImageView;
 
         // Expandable views
@@ -109,6 +110,7 @@ public class EventAdapter extends RecyclerView.Adapter<EventAdapter.EventViewHol
             locationTextView = itemView.findViewById(R.id.event_location_info);
             joinButton = itemView.findViewById(R.id.btn_join_event);
             removeButton = itemView.findViewById(R.id.btn_remove_event);
+            leaveButton = itemView.findViewById(R.id.btn_leave_event);
             eventImageView = itemView.findViewById(R.id.event_image);
 
             expandableDetails = itemView.findViewById(R.id.expandable_details);
@@ -162,18 +164,49 @@ public class EventAdapter extends RecyclerView.Adapter<EventAdapter.EventViewHol
                 expandButton.setOnClickListener(v -> onToggleExpand.accept(!isExpanded));
             }
 
+            @SuppressLint("HardwareIds")
+            String deviceId = Settings.Secure.getString(itemView.getContext().getContentResolver(), Settings.Secure.ANDROID_ID);
+
+            Entrant.getOrCreate(deviceId).addOnSuccessListener(entrant -> {
+                event.inEvent(entrant).addOnSuccessListener(isIn -> {
+                    if (joinButton != null) {
+                        joinButton.setVisibility(isIn ? View.GONE : View.VISIBLE);
+                    }
+                    if (leaveButton != null) {
+                        leaveButton.setVisibility(isIn ? View.VISIBLE : View.GONE);
+                    }
+                });
+            });
+
             // Handle Join Button
             if (joinButton != null) {
                 joinButton.setOnClickListener(v -> {
-                    @SuppressLint("HardwareIds")
-                    String deviceId = Settings.Secure.getString(itemView.getContext().getContentResolver(), Settings.Secure.ANDROID_ID);
-
                     Entrant.getOrCreate(deviceId).addOnSuccessListener(entrant -> {
                         event.addEntrant(entrant).addOnSuccessListener(aVoid -> {
                             Toast.makeText(itemView.getContext(), "Successfully joined " + event.getName(), Toast.LENGTH_SHORT).show();
                             updateEntrantCount(event);
+                            joinButton.setVisibility(View.GONE);
+                            leaveButton.setVisibility(View.VISIBLE);
                         }).addOnFailureListener(e -> {
                             Toast.makeText(itemView.getContext(), "Failed to join event: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+                        });
+                    }).addOnFailureListener(e -> {
+                        Toast.makeText(itemView.getContext(), "Error retrieving user profile", Toast.LENGTH_SHORT).show();
+                    });
+                });
+            }
+
+            // Handle Leave Button
+            if (leaveButton != null) {
+                leaveButton.setOnClickListener(v -> {
+                    Entrant.getOrCreate(deviceId).addOnSuccessListener(entrant -> {
+                        event.removeEntrant(entrant).addOnSuccessListener(aVoid -> {
+                            Toast.makeText(itemView.getContext(), "Successfully left " + event.getName(), Toast.LENGTH_SHORT).show();
+                            updateEntrantCount(event);
+                            leaveButton.setVisibility(View.GONE);
+                            joinButton.setVisibility(View.VISIBLE);
+                        }).addOnFailureListener(e -> {
+                            Toast.makeText(itemView.getContext(), "Failed to leave event: " + e.getMessage(), Toast.LENGTH_SHORT).show();
                         });
                     }).addOnFailureListener(e -> {
                         Toast.makeText(itemView.getContext(), "Error retrieving user profile", Toast.LENGTH_SHORT).show();
