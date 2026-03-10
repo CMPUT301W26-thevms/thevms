@@ -246,6 +246,27 @@ public class DatabaseHandler {
     }
 
     /**
+     * Retrieves an entrant's status within an event.
+     *
+     * @param eventId The event ID.
+     * @param userId  The user ID.
+     * @return A Task that resolves with the status string.
+     */
+    public Task<String> getEntrantStatus(String eventId, String userId) {
+        return getDb().collection(COLLECTION_EVENTS)
+                .document(eventId)
+                .collection(COLLECTION_ENTRANTS)
+                .document(userId)
+                .get()
+                .continueWith(task -> {
+                    if (task.isSuccessful() && task.getResult().exists()) {
+                        return task.getResult().getString("status");
+                    }
+                    return null;
+                });
+    }
+
+    /**
      * Listens for real-time updates to an entrant's status.
      * Can be used to trigger notifications when an entrant's status changes.
      *

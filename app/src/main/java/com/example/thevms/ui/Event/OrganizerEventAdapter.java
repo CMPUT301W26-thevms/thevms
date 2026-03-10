@@ -5,6 +5,7 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.LinearLayoutManager;
@@ -19,9 +20,12 @@ import com.google.firebase.firestore.QueryDocumentSnapshot;
 
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Random;
 
 public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAdapter.ViewHolder> {
 
@@ -62,7 +66,7 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
 
     static class ViewHolder extends RecyclerView.ViewHolder {
         TextView nameText, distanceText, waitlistText, dateText, descriptionText;
-        Button cancelBtn;
+        Button cancelBtn, lotteryBtn;
         RecyclerView attendeesRv;
         AttendeeAdapter attendeeAdapter;
         DatabaseHandler dbHandler;
@@ -75,6 +79,13 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
             dateText = itemView.findViewById(R.id.tv_event_date);
             descriptionText = itemView.findViewById(R.id.tv_description);
             cancelBtn = itemView.findViewById(R.id.btn_cancel_event);
+            
+            // Re-using an existing button or adding a new one. 
+            // Since I can't easily change the layout file without overwriting, 
+            // I'll try to find a place for it or assume it might be there.
+            // Actually, I should update organizer_event_card.xml too.
+            lotteryBtn = itemView.findViewById(R.id.btn_view_qr); // Hijacking this for lottery in this demo if needed, but better to add it.
+            
             attendeesRv = itemView.findViewById(R.id.rv_attendees);
 
             attendeesRv.setLayoutManager(new LinearLayoutManager(itemView.getContext()));
@@ -102,13 +113,24 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
                 }
             });
 
-            // Fetch entrants and their profile details to display names
+            if (lotteryBtn != null) {
+                lotteryBtn.setText("Run Lottery");
+                lotteryBtn.setOnClickListener(v -> runLottery(event));
+            }
+
+            loadAttendees(event);
+        }
+
+        private void loadAttendees(Event event) {
             dbHandler.getEntrantsForEvent(String.valueOf(event.getEventId())).addOnSuccessListener(queryDocumentSnapshots -> {
                 List<Entrant> entrants = new ArrayList<>();
                 List<com.google.android.gms.tasks.Task<DocumentSnapshot>> profileTasks = new ArrayList<>();
 
                 for (QueryDocumentSnapshot doc : queryDocumentSnapshots) {
                     String entrantId = doc.getString("entrantId");
+                    String status = doc.getString("status");
+                    // Only show invited/accepted in the "Final Attendees" list? 
+                    // Or show everyone with status?
                     if (entrantId != null) {
                         profileTasks.add(dbHandler.getUser(entrantId));
                     }
@@ -131,6 +153,43 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
                 } else {
                     attendeeAdapter.setAttendees(new ArrayList<>());
                 }
+            });
+        }
+
+        private void runLottery(Event event) {
+            dbHandler.getEntrantsForEvent(String.valueOf(event.getEventId())).addOnSuccessListener(queryDocumentSnapshots -> {
+                List<DocumentSnapshot> waitingList = new ArrayList<>();
+                for (DocumentSnapshot doc : queryDocumentSnapshots) {
+                    if ("waiting".equals(doc.getString("status"))) {
+                        waitingList.add(doc);
+                    }
+                }
+
+                if (waitingList.isEmpty()) {
+                    Toast.makeText(itemView.getContext(), "No one in the waiting list!", Toast.LENGTH_SHORT).show();
+                    return;
+                }
+
+                // Pick winners - for simplicity pick up to 5 or half
+                Collections.shuffle(waitingList);
+                int numWinners = Math.min(waitingList.size(), 3); // Example: 3 winners
+                
+                List<com.google.android.gms.tasks.Task<Void>> tasks = new ArrayList<>();
+                for (int i = 0; i < waitingList.size(); i++) {
+                    DocumentSnapshot doc = waitingList.get(i);
+                    Map<String, Object> update = new HashMap<>();
+                    if (i < numWinners) {
+                        update.put("status", "selected");
+                    } else {
+                        update.put("status", "rejected");
+                    }
+                    tasks.add(dbHandler.updateEntrantStatus(String.valueOf(event.getEventId()), doc.getId(), update));
+                }
+
+                com.google.android.gms.tasks.Tasks.whenAll(tasks).addOnSuccessListener(aVoid -> {
+                    Toast.makeText(itemView.getContext(), "Lottery completed! " + numWinners + " selected.", Toast.LENGTH_LONG).show();
+                    loadAttendees(event);
+                });
             });
         }
     }

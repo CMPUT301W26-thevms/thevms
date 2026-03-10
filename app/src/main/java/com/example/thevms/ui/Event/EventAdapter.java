@@ -23,9 +23,11 @@ import com.example.thevms.model.Event;
 
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 
 public class EventAdapter extends RecyclerView.Adapter<EventAdapter.EventViewHolder> {
@@ -92,6 +94,8 @@ public class EventAdapter extends RecyclerView.Adapter<EventAdapter.EventViewHol
         Button joinButton;
         Button removeButton;
         Button leaveButton;
+        Button acceptButton;
+        Button declineButton;
         ImageView eventImageView;
 
         // Expandable views
@@ -112,6 +116,8 @@ public class EventAdapter extends RecyclerView.Adapter<EventAdapter.EventViewHol
             joinButton = itemView.findViewById(R.id.btn_join_event);
             removeButton = itemView.findViewById(R.id.btn_remove_event);
             leaveButton = itemView.findViewById(R.id.btn_leave_event);
+            acceptButton = itemView.findViewById(R.id.btn_accept_event);
+            declineButton = itemView.findViewById(R.id.btn_decline_event);
             eventImageView = itemView.findViewById(R.id.event_image);
 
             expandableDetails = itemView.findViewById(R.id.expandable_details);
@@ -172,15 +178,9 @@ public class EventAdapter extends RecyclerView.Adapter<EventAdapter.EventViewHol
             @SuppressLint("HardwareIds")
             String deviceId = Settings.Secure.getString(itemView.getContext().getContentResolver(), Settings.Secure.ANDROID_ID);
 
-            Entrant.getOrCreate(deviceId).addOnSuccessListener(entrant -> {
-                event.inEvent(entrant).addOnSuccessListener(isIn -> {
-                    if (joinButton != null) {
-                        joinButton.setVisibility(isIn ? View.GONE : View.VISIBLE);
-                    }
-                    if (leaveButton != null) {
-                        leaveButton.setVisibility(isIn ? View.VISIBLE : View.GONE);
-                    }
-                });
+            DatabaseHandler dbHandler = new DatabaseHandler();
+            dbHandler.getEntrantStatus(String.valueOf(event.getEventId()), deviceId).addOnSuccessListener(status -> {
+                updateUIBasedOnStatus(status, event);
             });
 
             // Handle Join Button
@@ -190,8 +190,7 @@ public class EventAdapter extends RecyclerView.Adapter<EventAdapter.EventViewHol
                         event.addEntrant(entrant).addOnSuccessListener(aVoid -> {
                             Toast.makeText(itemView.getContext(), "Successfully joined " + event.getName(), Toast.LENGTH_SHORT).show();
                             updateEntrantCount(event);
-                            joinButton.setVisibility(View.GONE);
-                            leaveButton.setVisibility(View.VISIBLE);
+                            updateUIBasedOnStatus("waiting", event);
                         }).addOnFailureListener(e -> {
                             Toast.makeText(itemView.getContext(), "Failed to join event: " + e.getMessage(), Toast.LENGTH_SHORT).show();
                         });
@@ -208,13 +207,37 @@ public class EventAdapter extends RecyclerView.Adapter<EventAdapter.EventViewHol
                         event.removeEntrant(entrant).addOnSuccessListener(aVoid -> {
                             Toast.makeText(itemView.getContext(), "Successfully left " + event.getName(), Toast.LENGTH_SHORT).show();
                             updateEntrantCount(event);
-                            leaveButton.setVisibility(View.GONE);
-                            joinButton.setVisibility(View.VISIBLE);
+                            updateUIBasedOnStatus(null, event);
                         }).addOnFailureListener(e -> {
                             Toast.makeText(itemView.getContext(), "Failed to leave event: " + e.getMessage(), Toast.LENGTH_SHORT).show();
                         });
                     }).addOnFailureListener(e -> {
                         Toast.makeText(itemView.getContext(), "Error retrieving user profile", Toast.LENGTH_SHORT).show();
+                    });
+                });
+            }
+
+            // Handle Accept Button
+            if (acceptButton != null) {
+                acceptButton.setOnClickListener(v -> {
+                    Map<String, Object> data = new HashMap<>();
+                    data.put("status", "accepted");
+                    dbHandler.updateEntrantStatus(String.valueOf(event.getEventId()), deviceId, data).addOnSuccessListener(aVoid -> {
+                        Toast.makeText(itemView.getContext(), "Accepted invitation for " + event.getName(), Toast.LENGTH_SHORT).show();
+                        updateUIBasedOnStatus("accepted", event);
+                    });
+                });
+            }
+
+            // Handle Decline Button
+            if (declineButton != null) {
+                declineButton.setOnClickListener(v -> {
+                    Entrant.getOrCreate(deviceId).addOnSuccessListener(entrant -> {
+                        event.removeEntrant(entrant).addOnSuccessListener(aVoid -> {
+                            Toast.makeText(itemView.getContext(), "Declined invitation for " + event.getName(), Toast.LENGTH_SHORT).show();
+                            updateEntrantCount(event);
+                            updateUIBasedOnStatus(null, event);
+                        });
                     });
                 });
             }
@@ -226,12 +249,50 @@ public class EventAdapter extends RecyclerView.Adapter<EventAdapter.EventViewHol
             }
         }
 
+        private void updateUIBasedOnStatus(String status, Event event) {
+            if (status == null) {
+                joinButton.setVisibility(View.VISIBLE);
+                leaveButton.setVisibility(View.GONE);
+                acceptButton.setVisibility(View.GONE);
+                declineButton.setVisibility(View.GONE);
+                statusTextView.setText("Not joined");
+            } else {
+                joinButton.setVisibility(View.GONE);
+                if ("waiting".equals(status)) {
+                    leaveButton.setVisibility(View.VISIBLE);
+                    acceptButton.setVisibility(View.GONE);
+                    declineButton.setVisibility(View.GONE);
+                    statusTextView.setText("Status: Waiting List");
+                } else if ("selected".equals(status) || "invited".equals(status)) {
+                    leaveButton.setVisibility(View.GONE);
+                    acceptButton.setVisibility(View.VISIBLE);
+                    declineButton.setVisibility(View.VISIBLE);
+                    statusTextView.setText("Status: YOU ARE SELECTED!");
+                } else if ("accepted".equals(status)) {
+                    leaveButton.setVisibility(View.VISIBLE); // Can still leave? or just stay accepted? Requirement says "Leave" for all signed up
+                    acceptButton.setVisibility(View.GONE);
+                    declineButton.setVisibility(View.GONE);
+                    statusTextView.setText("Status: Accepted");
+                } else if ("rejected".equals(status)) {
+                    leaveButton.setVisibility(View.VISIBLE);
+                    acceptButton.setVisibility(View.GONE);
+                    declineButton.setVisibility(View.GONE);
+                    statusTextView.setText("Status: Not Selected");
+                }
+            }
+            // Optionally update entrant count if needed, but usually we want to show total joined
+            updateEntrantCount(event);
+        }
+
         private void updateEntrantCount(Event event) {
             if (statusTextView == null) return;
+            String currentStatusText = statusTextView.getText().toString();
             event.fetchEntrantCount().addOnSuccessListener(count -> {
-                statusTextView.setText(String.format(Locale.getDefault(), "☆ %d people joined", count));
-            }).addOnFailureListener(e -> {
-                statusTextView.setText("☆ -- people joined");
+                if (currentStatusText.startsWith("Status:")) {
+                     statusTextView.setText(currentStatusText + " (Total: " + count + ")");
+                } else {
+                     statusTextView.setText(String.format(Locale.getDefault(), "☆ %d people joined", count));
+                }
             });
         }
 
