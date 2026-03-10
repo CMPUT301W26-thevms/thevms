@@ -33,15 +33,13 @@ public class EntrantEventsFragment extends Fragment {
     @Nullable
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
-        View view = inflater.inflate(R.layout.activity_my_events, container, false); // Reusing layout if suitable
+        View view = inflater.inflate(R.layout.fragment_entrant_events, container, false);
 
         recyclerView = view.findViewById(R.id.rv_my_events);
         loadingBar = view.findViewById(R.id.pb_loading);
         emptyText = view.findViewById(R.id.tv_no_events);
 
-        // Hide toolbar if it exists in activity_my_events since this is a fragment
-        View toolbar = view.findViewById(R.id.toolbar);
-        if (toolbar != null) toolbar.setVisibility(View.GONE);
+
 
         adapter = new EventAdapter();
         recyclerView.setLayoutManager(new LinearLayoutManager(getContext()));
