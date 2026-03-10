@@ -29,6 +29,12 @@ public class DatabaseHandler {
     public static final String COLLECTION_EVENTS = "events";
     public static final String COLLECTION_USERS = "users";
     public static final String COLLECTION_ENTRANTS = "entrants";
+    // Entrant status constants
+    public static final String STATUS_WAITING = "waiting";
+    public static final String STATUS_SELECTED = "selected";
+    public static final String STATUS_ACCEPTED = "accepted";
+    public static final String STATUS_REJECTED = "rejected";
+    public static final String STATUS_INVITED = "invited";
 
     public DatabaseHandler() {
         // Lazy initialization to avoid crashes in unit tests where Firebase is not available

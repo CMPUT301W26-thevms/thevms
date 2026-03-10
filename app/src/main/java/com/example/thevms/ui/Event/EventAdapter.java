@@ -190,7 +190,7 @@ public class EventAdapter extends RecyclerView.Adapter<EventAdapter.EventViewHol
                         event.addEntrant(entrant).addOnSuccessListener(aVoid -> {
                             Toast.makeText(itemView.getContext(), "Successfully joined " + event.getName(), Toast.LENGTH_SHORT).show();
                             updateEntrantCount(event);
-                            updateUIBasedOnStatus("waiting", event);
+                            updateUIBasedOnStatus(DatabaseHandler.STATUS_WAITING, event);
                         }).addOnFailureListener(e -> {
                             Toast.makeText(itemView.getContext(), "Failed to join event: " + e.getMessage(), Toast.LENGTH_SHORT).show();
                         });
@@ -221,10 +221,10 @@ public class EventAdapter extends RecyclerView.Adapter<EventAdapter.EventViewHol
             if (acceptButton != null) {
                 acceptButton.setOnClickListener(v -> {
                     Map<String, Object> data = new HashMap<>();
-                    data.put("status", "accepted");
+                    data.put("status", DatabaseHandler.STATUS_ACCEPTED);
                     dbHandler.updateEntrantStatus(String.valueOf(event.getEventId()), deviceId, data).addOnSuccessListener(aVoid -> {
                         Toast.makeText(itemView.getContext(), "Accepted invitation for " + event.getName(), Toast.LENGTH_SHORT).show();
-                        updateUIBasedOnStatus("accepted", event);
+                        updateUIBasedOnStatus(DatabaseHandler.STATUS_ACCEPTED, event);
                     });
                 });
             }
@@ -258,22 +258,23 @@ public class EventAdapter extends RecyclerView.Adapter<EventAdapter.EventViewHol
                 statusTextView.setText("Not joined");
             } else {
                 joinButton.setVisibility(View.GONE);
-                if ("waiting".equals(status)) {
+                if (DatabaseHandler.STATUS_WAITING.equals(status)) {
                     leaveButton.setVisibility(View.VISIBLE);
                     acceptButton.setVisibility(View.GONE);
                     declineButton.setVisibility(View.GONE);
                     statusTextView.setText("Status: Waiting List");
-                } else if ("selected".equals(status) || "invited".equals(status)) {
+                } else if (DatabaseHandler.STATUS_SELECTED.equals(status)
+                        || DatabaseHandler.STATUS_INVITED.equals(status)) {
                     leaveButton.setVisibility(View.GONE);
                     acceptButton.setVisibility(View.VISIBLE);
                     declineButton.setVisibility(View.VISIBLE);
                     statusTextView.setText("Status: YOU ARE SELECTED!");
-                } else if ("accepted".equals(status)) {
+                } else if (DatabaseHandler.STATUS_ACCEPTED.equals(status)) {
                     leaveButton.setVisibility(View.VISIBLE); // Can still leave? or just stay accepted? Requirement says "Leave" for all signed up
                     acceptButton.setVisibility(View.GONE);
                     declineButton.setVisibility(View.GONE);
                     statusTextView.setText("Status: Accepted");
-                } else if ("rejected".equals(status)) {
+                } else if (DatabaseHandler.STATUS_REJECTED.equals(status)) {
                     leaveButton.setVisibility(View.VISIBLE);
                     acceptButton.setVisibility(View.GONE);
                     declineButton.setVisibility(View.GONE);
