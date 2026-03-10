@@ -80,7 +80,6 @@ public class MainActivity extends AppCompatActivity {
             } else if (id == R.id.nav_add) {
                 selectedFragment = new CreateEventFragment();
             } else if (id == R.id.nav_favorites) {
-                // Placeholder if Favorites is the Star icon (now "History")
                 selectedFragment = new EntrantEventsFragment();
             } else if (id == R.id.nav_admin_settings) {
                 openAdminDrawer();
