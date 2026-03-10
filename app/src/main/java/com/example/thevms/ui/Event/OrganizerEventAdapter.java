@@ -3,7 +3,10 @@ package com.example.thevms.ui.Event;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.AdapterView;
+import android.widget.ArrayAdapter;
 import android.widget.Button;
+import android.widget.Spinner;
 import android.widget.TextView;
 
 import androidx.annotation.NonNull;
@@ -11,19 +14,32 @@ import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.thevms.R;
+import com.example.thevms.model.AttendeeItem;
 import com.example.thevms.model.DatabaseHandler;
 import com.example.thevms.model.Entrant;
 import com.example.thevms.model.Event;
 import com.google.firebase.firestore.DocumentSnapshot;
+import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.QueryDocumentSnapshot;
 
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Random;
 
 public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAdapter.ViewHolder> {
+
+    // Display labels shown in the dropdown — must match Firestore status values exactly
+    private static final String[] STATUS_LABELS = {
+            "Waiting", "Selected", "Accepted", "Rejected", "Cancelled"
+    };
+
+    private static final String[] STATUS_VALUES = {
+            "waiting", "selected", "accepted", "rejected", "cancelled"
+    };
 
     private List<Event> events = new ArrayList<>();
     private final SimpleDateFormat dateFormat = new SimpleDateFormat("MMM d", Locale.getDefault());
@@ -38,14 +54,15 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
         notifyDataSetChanged();
     }
 
-    public void setOnEventCancelListener(OnEventCancelListener listener) {
-        this.cancelListener = listener;
+    public void setOnEventCancelListener(OnEventCancelListener cancelListener) {
+        this.cancelListener = cancelListener;
     }
 
     @NonNull
     @Override
     public ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
-        View view = LayoutInflater.from(parent.getContext()).inflate(R.layout.organizer_event_card, parent, false);
+        View view = LayoutInflater.from(parent.getContext())
+                .inflate(R.layout.organizer_event_card, parent, false);
         return new ViewHolder(view);
     }
 
@@ -61,11 +78,16 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
     }
 
     static class ViewHolder extends RecyclerView.ViewHolder {
-        TextView nameText, distanceText, waitlistText, dateText, descriptionText;
+        TextView nameText, distanceText, waitlistText, dateText, descriptionText, exportCsvText;
         Button cancelBtn;
         RecyclerView attendeesRv;
+        Spinner statusSpinner;
         AttendeeAdapter attendeeAdapter;
         DatabaseHandler dbHandler;
+        FirebaseFirestore db;
+
+        // Stored so the CSV export can use it for the filename
+        String currentEventName = "";
 
         public ViewHolder(@NonNull View itemView) {
             super(itemView);
@@ -76,62 +98,156 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
             descriptionText = itemView.findViewById(R.id.tv_description);
             cancelBtn = itemView.findViewById(R.id.btn_cancel_event);
             attendeesRv = itemView.findViewById(R.id.rv_attendees);
+            statusSpinner = itemView.findViewById(R.id.spinner_attendee_status);
+            exportCsvText = itemView.findViewById(R.id.tv_export_csv);
 
             attendeesRv.setLayoutManager(new LinearLayoutManager(itemView.getContext()));
             attendeeAdapter = new AttendeeAdapter();
             attendeesRv.setAdapter(attendeeAdapter);
             dbHandler = new DatabaseHandler();
+            db = FirebaseFirestore.getInstance();
+
+            // Wire cancel listener — cancels entrant and promotes next waitlisted randomly
+            attendeeAdapter.setOnCancelEntrantListener(item -> {
+                if (!item.isCancellable()) return;
+                String eventId = (String) itemView.getTag();
+                cancelEntrantAndSelectNext(eventId, item.getEntrant().getDeviceId());
+            });
+
+            // Set up spinner with status labels
+            ArrayAdapter<String> spinnerAdapter = new ArrayAdapter<>(
+                    itemView.getContext(),
+                    android.R.layout.simple_spinner_item,
+                    STATUS_LABELS
+            );
+            spinnerAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+            statusSpinner.setAdapter(spinnerAdapter);
+
+            // Filter attendee list when organizer picks a status
+            statusSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+                @Override
+                public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                    attendeeAdapter.filterByStatus(STATUS_VALUES[position]);
+                }
+                @Override
+                public void onNothingSelected(AdapterView<?> parent) {}
+            });
+
+            // Wire export CSV button — exports whatever is currently filtered in the list
+            exportCsvText.setOnClickListener(v ->
+                    attendeeAdapter.exportFilteredListAsCsv(
+                            itemView.getContext(),
+                            currentEventName
+                    )
+            );
         }
 
         public void bind(Event event, SimpleDateFormat dateFormat, OnEventCancelListener cancelListener) {
+            String eventId = String.valueOf(event.getEventId());
+            itemView.setTag(eventId);
+
+            currentEventName = event.getName() != null ? event.getName() : "Event";
+
             nameText.setText(event.getName());
             descriptionText.setText(event.getDescription());
-            
+
             if (event.getEventStartTime() != null) {
                 dateText.setText("🗓 " + dateFormat.format(event.getEventStartTime()));
             }
 
-            // Fetch and display entrant count
-            event.fetchEntrantCount().addOnSuccessListener(count -> {
-                waitlistText.setText(count + " people in waitlist");
-            });
+            event.fetchEntrantCount().addOnSuccessListener(count ->
+                    waitlistText.setText(count + " people in waitlist")
+            );
 
             cancelBtn.setOnClickListener(v -> {
-                if (cancelListener != null) {
-                    cancelListener.onCancel(event);
-                }
+                if (cancelListener != null) cancelListener.onCancel(event);
             });
 
-            // Fetch entrants and their profile details to display names
-            dbHandler.getEntrantsForEvent(String.valueOf(event.getEventId())).addOnSuccessListener(queryDocumentSnapshots -> {
-                List<Entrant> entrants = new ArrayList<>();
+            // Reset spinner to "Waiting" each time a card is bound
+            statusSpinner.setSelection(0);
+
+            // Step 1: fetch all entrant docs from events/{eventId}/entrants/
+            dbHandler.getEntrantsForEvent(eventId).addOnSuccessListener(queryDocumentSnapshots -> {
+
+                // Map entrantId → status (scoped to this event)
+                Map<String, String> statusMap = new HashMap<>();
                 List<com.google.android.gms.tasks.Task<DocumentSnapshot>> profileTasks = new ArrayList<>();
 
                 for (QueryDocumentSnapshot doc : queryDocumentSnapshots) {
                     String entrantId = doc.getString("entrantId");
+                    String status = doc.getString("status");
                     if (entrantId != null) {
+                        statusMap.put(entrantId, status);
                         profileTasks.add(dbHandler.getUser(entrantId));
                     }
                 }
 
                 if (!profileTasks.isEmpty()) {
-                    com.google.android.gms.tasks.Tasks.whenAllSuccess(profileTasks).addOnSuccessListener(profiles -> {
-                        for (Object obj : profiles) {
-                            DocumentSnapshot profileDoc = (DocumentSnapshot) obj;
-                            if (profileDoc.exists()) {
-                                Map<String, Object> data = profileDoc.getData();
-                                if (data != null) {
-                                    Entrant entrant = Entrant.fromMap(profileDoc.getId(), data);
-                                    entrants.add(entrant);
+                    // Step 2: fetch user profiles in parallel
+                    com.google.android.gms.tasks.Tasks.whenAllSuccess(profileTasks)
+                            .addOnSuccessListener(profiles -> {
+                                List<AttendeeItem> attendeeItems = new ArrayList<>();
+                                for (Object obj : profiles) {
+                                    DocumentSnapshot profileDoc = (DocumentSnapshot) obj;
+                                    if (profileDoc.exists()) {
+                                        Map<String, Object> data = profileDoc.getData();
+                                        if (data != null) {
+                                            Entrant entrant = Entrant.fromMap(profileDoc.getId(), data);
+                                            String status = statusMap.get(profileDoc.getId());
+                                            attendeeItems.add(new AttendeeItem(entrant, status));
+                                        }
+                                    }
                                 }
-                            }
-                        }
-                        attendeeAdapter.setAttendees(entrants);
-                    });
+                                attendeeAdapter.setAttendees(attendeeItems);
+                            });
                 } else {
                     attendeeAdapter.setAttendees(new ArrayList<>());
                 }
             });
+        }
+
+        /**
+         * Cancels a selected entrant and randomly promotes one waiting entrant.
+         *
+         * Flow:
+         * 1. Set cancelled entrant's status → "cancelled"
+         * 2. Query all "waiting" entrants for this event
+         * 3. Pick one at random → set their status to "selected"
+         * 4. TODO: notify newly selected entrant
+         */
+        private void cancelEntrantAndSelectNext(String eventId, String cancelledEntrantId) {
+            db.collection("events")
+                    .document(eventId)
+                    .collection("entrants")
+                    .document(cancelledEntrantId)
+                    .update("status", "cancelled")
+                    .addOnSuccessListener(unused -> {
+                        db.collection("events")
+                                .document(eventId)
+                                .collection("entrants")
+                                .whereEqualTo("status", "waiting")
+                                .get()
+                                .addOnSuccessListener(waitlistSnapshot -> {
+                                    List<QueryDocumentSnapshot> waiting = new ArrayList<>();
+                                    for (QueryDocumentSnapshot doc : waitlistSnapshot) {
+                                        waiting.add(doc);
+                                    }
+
+                                    if (waiting.isEmpty()) return;
+
+                                    // Pick randomly — fair selection, no ordering
+                                    QueryDocumentSnapshot nextDoc = waiting.get(
+                                            new Random().nextInt(waiting.size())
+                                    );
+
+                                    nextDoc.getReference()
+                                            .update("status", "selected")
+                                            .addOnSuccessListener(v -> {
+                                                // TODO: notify newly selected entrant
+                                                // e.g. NotificationHandler.notify(nextDoc.getString("entrantId"), eventId);
+                                            });
+                                });
+                    });
         }
     }
 }
