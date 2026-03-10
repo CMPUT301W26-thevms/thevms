@@ -8,17 +8,28 @@
     android:paddingVertical="8dp">
 
     <ImageView
+        android:id="@+id/iv_status_icon"
         android:layout_width="20dp"
         android:layout_height="20dp"
-        android:src="@drawable/ic_star_outline"
+        android:src="@android:drawable/btn_star"
         app:tint="@android:color/black" />
 
     <TextView
         android:id="@+id/tv_attendee_name"
-        android:layout_width="wrap_content"
+        android:layout_width="0dp"
+        android:layout_weight="1"
         android:layout_height="wrap_content"
         android:layout_marginStart="12dp"
         android:text="User Name"
         android:textColor="@android:color/black"
         android:textSize="16sp" />
+
+    <TextView
+        android:id="@+id/tv_status_text"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="8dp"
+        android:text="Status"
+        android:textColor="@android:color/darker_gray"
+        android:textSize="14sp" />
 </LinearLayout>
