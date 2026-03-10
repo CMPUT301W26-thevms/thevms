@@ -3,6 +3,7 @@ package com.example.thevms.model;
 import android.location.Location;
 
 import com.google.android.gms.tasks.Task;
+import com.google.android.gms.tasks.Tasks;
 import com.google.firebase.Timestamp;
 import com.google.firebase.firestore.DocumentSnapshot;
 
@@ -256,12 +257,20 @@ public class Event {
      * @return A Task representing the async operation.
      */
     public Task<Void> addEntrant(Entrant entrant) {
+        Date now = new Date();
+        if (registrationStartTime != null && now.before(registrationStartTime)) {
+            return Tasks.forException(new IllegalStateException("Registration has not started yet."));
+        }
+        if (registrationEndTime != null && now.after(registrationEndTime)) {
+            return Tasks.forException(new IllegalStateException("Registration has ended."));
+        }
+
         this.entrantList.put(entrant, Boolean.FALSE);
 
         Map<String, Object> registrationData = new HashMap<>();
         registrationData.put("entrantId", entrant.getDeviceId());
         registrationData.put("status", "waiting"); // Default status
-        registrationData.put("registrationTime", new Date());
+        registrationData.put("registrationTime", now);
 
         return dbHandler.updateEntrantStatus(String.valueOf(this.eventId), entrant.getDeviceId(), registrationData);
     }
