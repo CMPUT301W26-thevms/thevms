@@ -23,7 +23,7 @@ import java.util.Map;
  * It manages Events, User Profiles, and Entrant Lists.
  */
 public class DatabaseHandler {
-    private final FirebaseFirestore db;
+    private FirebaseFirestore db;
 
     // Collection names
     public static final String COLLECTION_EVENTS = "events";
@@ -31,7 +31,7 @@ public class DatabaseHandler {
     public static final String COLLECTION_ENTRANTS = "entrants";
 
     public DatabaseHandler() {
-        this.db = FirebaseFirestore.getInstance();
+        // Lazy initialization to avoid crashes in unit tests where Firebase is not available
     }
 
     /**
@@ -52,11 +52,11 @@ public class DatabaseHandler {
      */
     public void useEmulator(String host, int port) {
         try {
-            db.useEmulator(host, port);
+            getDb().useEmulator(host, port);
             FirebaseFirestoreSettings settings = new FirebaseFirestoreSettings.Builder()
                     .setLocalCacheSettings(MemoryCacheSettings.newBuilder().build())
                     .build();
-            db.setFirestoreSettings(settings);
+            getDb().setFirestoreSettings(settings);
         } catch (IllegalStateException e) {
             // Already initialized or emulator already set, which is fine for tests
         }
@@ -68,7 +68,7 @@ public class DatabaseHandler {
      * @return A Task that will resolve to the next available event ID.
      */
     public Task<Long> getNextEventId() {
-        return db.collection(COLLECTION_EVENTS)
+        return getDb().collection(COLLECTION_EVENTS)
                 .orderBy("eventId", Query.Direction.DESCENDING)
                 .limit(1)
                 .get()
@@ -95,7 +95,7 @@ public class DatabaseHandler {
      * @return Task representing the async operation.
      */
     public Task<Void> saveEvent(Long eventId, Map<String, Object> eventData) {
-        return db.collection(COLLECTION_EVENTS).document(String.valueOf(eventId)).set(eventData, SetOptions.merge());
+        return getDb().collection(COLLECTION_EVENTS).document(String.valueOf(eventId)).set(eventData, SetOptions.merge());
     }
 
     /**
@@ -104,7 +104,7 @@ public class DatabaseHandler {
      * @return Task containing QuerySnapshot of all events.
      */
     public Task<QuerySnapshot> getAllEvents() {
-        return db.collection(COLLECTION_EVENTS).get();
+        return getDb().collection(COLLECTION_EVENTS).get();
     }
 
     /**
@@ -114,7 +114,7 @@ public class DatabaseHandler {
      * @return Task containing QuerySnapshot of the organizer's events.
      */
     public Task<QuerySnapshot> getEventsByOrganizer(String organizerId) {
-        return db.collection(COLLECTION_EVENTS)
+        return getDb().collection(COLLECTION_EVENTS)
                 .whereEqualTo("organizerId", organizerId)
                 .get();
     }
@@ -127,7 +127,7 @@ public class DatabaseHandler {
      * @return ListenerRegistration to stop listening when needed.
      */
     public ListenerRegistration listenToEvent(String eventId, EventListener<DocumentSnapshot> listener) {
-        return db.collection(COLLECTION_EVENTS).document(eventId).addSnapshotListener(listener);
+        return getDb().collection(COLLECTION_EVENTS).document(eventId).addSnapshotListener(listener);
     }
 
     /**
@@ -138,7 +138,7 @@ public class DatabaseHandler {
      * @return Task representing the async operation.
      */
     public Task<Void> saveUser(String userId, Map<String, Object> userData) {
-        return db.collection(COLLECTION_USERS).document(userId).set(userData, SetOptions.merge());
+        return getDb().collection(COLLECTION_USERS).document(userId).set(userData, SetOptions.merge());
     }
 
     /**
@@ -148,7 +148,7 @@ public class DatabaseHandler {
      * @return Task containing DocumentSnapshot of the user.
      */
     public Task<DocumentSnapshot> getUser(String userId) {
-        return db.collection(COLLECTION_USERS).document(userId).get();
+        return getDb().collection(COLLECTION_USERS).document(userId).get();
     }
 
     /**
@@ -157,7 +157,7 @@ public class DatabaseHandler {
      * @return Task containing QuerySnapshot of all users.
      */
     public Task<QuerySnapshot> getAllUsers() {
-        return db.collection(COLLECTION_USERS).get();
+        return getDb().collection(COLLECTION_USERS).get();
     }
 
     /**
@@ -181,7 +181,7 @@ public class DatabaseHandler {
     public Task<Void> deleteUserAccountCompletely(String userId) {
         // STAGE 1: Find and delete all event registration records for this user
         // We use collectionGroup because 'entrants' are nested under individual 'events' documents
-        return db.collectionGroup(COLLECTION_ENTRANTS)
+        return getDb().collectionGroup(COLLECTION_ENTRANTS)
                 .get()
                 .continueWithTask(task -> {
                     if (!task.isSuccessful()) throw task.getException();
@@ -198,7 +198,7 @@ public class DatabaseHandler {
                 })
                 .continueWithTask(task -> {
                     // STAGE 2: Delete all events organized by this specific user
-                    return db.collection(COLLECTION_EVENTS)
+                    return getDb().collection(COLLECTION_EVENTS)
                             .whereEqualTo("organizerId", userId)
                             .get();
                 })
@@ -214,7 +214,7 @@ public class DatabaseHandler {
                 })
                 .continueWithTask(task -> {
                     // STAGE 3: Finally, delete the actual user profile document
-                    return db.collection(COLLECTION_USERS).document(userId).delete();
+                    return getDb().collection(COLLECTION_USERS).document(userId).delete();
                 });
     }
 
@@ -225,7 +225,7 @@ public class DatabaseHandler {
      * @return Task representing the async operation.
      */
     public Task<Void> deleteUser(String userId) {
-        return db.collection(COLLECTION_USERS).document(userId).delete();
+        return getDb().collection(COLLECTION_USERS).document(userId).delete();
     }
 
     /**
@@ -238,7 +238,7 @@ public class DatabaseHandler {
      * @return Task representing the async operation.
      */
     public Task<Void> updateEntrantStatus(String eventId, String userId, Map<String, Object> statusData) {
-        return db.collection(COLLECTION_EVENTS)
+        return getDb().collection(COLLECTION_EVENTS)
                 .document(eventId)
                 .collection(COLLECTION_ENTRANTS)
                 .document(userId)
@@ -255,7 +255,7 @@ public class DatabaseHandler {
      * @return ListenerRegistration.
      */
     public ListenerRegistration listenToEntrantStatus(String eventId, String userId, EventListener<DocumentSnapshot> listener) {
-        return db.collection(COLLECTION_EVENTS)
+        return getDb().collection(COLLECTION_EVENTS)
                 .document(eventId)
                 .collection(COLLECTION_ENTRANTS)
                 .document(userId)
@@ -269,7 +269,7 @@ public class DatabaseHandler {
      * @return Task containing QuerySnapshot of all entrants for the event.
      */
     public Task<QuerySnapshot> getEntrantsForEvent(String eventId) {
-        return db.collection(COLLECTION_EVENTS)
+        return getDb().collection(COLLECTION_EVENTS)
                 .document(eventId)
                 .collection(COLLECTION_ENTRANTS)
                 .get();
@@ -282,7 +282,7 @@ public class DatabaseHandler {
      * @return A Task containing the QuerySnapshot of registrations.
      */
     public Task<QuerySnapshot> getRegistrationsForEntrant(String entrantId) {
-        return db.collectionGroup(COLLECTION_ENTRANTS)
+        return getDb().collectionGroup(COLLECTION_ENTRANTS)
                 .whereEqualTo("entrantId", entrantId)
                 .get();
     }
@@ -294,7 +294,7 @@ public class DatabaseHandler {
      * @return Task representing the async operation.
      */
     public Task<Void> deleteEvent(String eventId) {
-        return db.collection(COLLECTION_EVENTS)
+        return getDb().collection(COLLECTION_EVENTS)
                 .document(eventId)
                 .collection(COLLECTION_ENTRANTS)
                 .get()
@@ -303,7 +303,7 @@ public class DatabaseHandler {
                         throw task.getException();
                     }
 
-                    WriteBatch batch = db.batch();
+                    WriteBatch batch = getDb().batch();
 
                     // Delete all entrant documents in the sub-collection
                     if (task.getResult() != null) {
@@ -313,7 +313,7 @@ public class DatabaseHandler {
                     }
 
                     // Delete the event document itself
-                    batch.delete(db.collection(COLLECTION_EVENTS).document(eventId));
+                    batch.delete(getDb().collection(COLLECTION_EVENTS).document(eventId));
 
                     return batch.commit();
                 });
@@ -326,7 +326,7 @@ public class DatabaseHandler {
      * @return A Task that resolves with the count of entrants.
      */
     public Task<Long> getEntrantCount(String eventId) {
-        return db.collection(COLLECTION_EVENTS)
+        return getDb().collection(COLLECTION_EVENTS)
                 .document(eventId)
                 .collection(COLLECTION_ENTRANTS)
                 .get()
@@ -340,6 +340,9 @@ public class DatabaseHandler {
     }
 
     public FirebaseFirestore getDb() {
+        if (db == null) {
+            db = FirebaseFirestore.getInstance();
+        }
         return db;
     }
 }
