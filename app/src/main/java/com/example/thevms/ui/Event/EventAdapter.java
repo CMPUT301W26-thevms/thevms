@@ -97,6 +97,7 @@ public class EventAdapter extends RecyclerView.Adapter<EventAdapter.EventViewHol
         // Expandable views
         View expandableDetails;
         TextView descriptionTextView;
+        TextView regStartTextView;
         TextView regEndTextView;
         TextView eventStartTextView;
         TextView eventEndTextView;
@@ -115,6 +116,7 @@ public class EventAdapter extends RecyclerView.Adapter<EventAdapter.EventViewHol
 
             expandableDetails = itemView.findViewById(R.id.expandable_details);
             descriptionTextView = itemView.findViewById(R.id.event_description);
+            regStartTextView = itemView.findViewById(R.id.event_reg_start_details);
             regEndTextView = itemView.findViewById(R.id.event_reg_end_details);
             eventStartTextView = itemView.findViewById(R.id.event_start_details);
             eventEndTextView = itemView.findViewById(R.id.event_end_details);
@@ -144,6 +146,9 @@ public class EventAdapter extends RecyclerView.Adapter<EventAdapter.EventViewHol
             // Bind detailed info
             if (descriptionTextView != null) {
                 descriptionTextView.setText(event.getDescription() != null ? event.getDescription() : "No description provided.");
+            }
+            if (regStartTextView != null) {
+                regStartTextView.setText("Registration Starts: " + (event.getRegistrationStartTime() != null ? fullDateFormat.format(event.getRegistrationStartTime()) : "TBD"));
             }
             if (regEndTextView != null) {
                 regEndTextView.setText("Registration Ends: " + (event.getRegistrationEndTime() != null ? fullDateFormat.format(event.getRegistrationEndTime()) : "TBD"));

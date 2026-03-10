@@ -284,7 +284,11 @@ public class AdminProfilesTest {
         Organizer targetOrg = new Organizer(orgId, "target@org.com", "Target", "Organizer", null);
         Tasks.await(targetOrg.save(), 5, TimeUnit.SECONDS);
 
-        Event event = Tasks.await(Event.create("Target Event", "Description", targetOrg, null, null, new Date(), new Date(), new Date(), new Date()), 5, TimeUnit.SECONDS);
+        // Ensure registration window is open
+        Date pastStart = new Date(System.currentTimeMillis() - 3600000);
+        Date futureEnd = new Date(System.currentTimeMillis() + 3600000);
+
+        Event event = Tasks.await(Event.create("Target Event", "Description", targetOrg, null, null, pastStart, futureEnd, new Date(), new Date()), 5, TimeUnit.SECONDS);
         Tasks.await(event.save(), 5, TimeUnit.SECONDS);
 
         // Verify initial state in DB
@@ -330,7 +334,12 @@ public class AdminProfilesTest {
         // 1. Setup: Create an event and two entrants.
         Organizer organizer = new Organizer("org_stays", "org@stays.com", "Bob", "Organizer", null);
         Tasks.await(organizer.save(), 5, TimeUnit.SECONDS);
-        Event event = Tasks.await(Event.create("Persistent Event", "Desc", organizer, null, null, new Date(), new Date(), new Date(), new Date()), 5, TimeUnit.SECONDS);
+
+        // Ensure registration window is open
+        Date pastStart = new Date(System.currentTimeMillis() - 3600000);
+        Date futureEnd = new Date(System.currentTimeMillis() + 3600000);
+
+        Event event = Tasks.await(Event.create("Persistent Event", "Desc", organizer, null, null, pastStart, futureEnd, new Date(), new Date()), 5, TimeUnit.SECONDS);
         Tasks.await(event.save(), 5, TimeUnit.SECONDS);
 
         // User A (on waitlist)
