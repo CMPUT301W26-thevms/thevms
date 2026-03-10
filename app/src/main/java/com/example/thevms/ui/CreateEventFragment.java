@@ -42,6 +42,9 @@ public class CreateEventFragment extends Fragment {
     private Button btnRegStartDate, btnRegEndDate, btnEventStartDate, btnEventEndDate;
     private Date regStartDate, regEndDate, eventStartDate, eventEndDate;
     private final SimpleDateFormat dateTimeFormat = new SimpleDateFormat("MMM dd, yyyy HH:mm", Locale.getDefault());
+    private com.google.android.material.materialswitch.MaterialSwitch switchGeo;
+    private View layoutLimitDistance;
+    private EditText etLimitDistance;
 
     @Nullable
     @Override
@@ -70,6 +73,19 @@ public class CreateEventFragment extends Fragment {
         btnRegEndDate.setOnClickListener(v -> showDateTimePicker(2));
         btnEventStartDate.setOnClickListener(v -> showDateTimePicker(3));
         btnEventEndDate.setOnClickListener(v -> showDateTimePicker(4));
+
+        switchGeo = view.findViewById(R.id.switch_geolocation);
+        layoutLimitDistance = view.findViewById(R.id.layout_limit_distance);
+        etLimitDistance = view.findViewById(R.id.et_limit_distance);
+        layoutLimitDistance.setVisibility(View.GONE);
+        // If switch is on, show limit distance field, else hide limit distance field
+        switchGeo.setOnCheckedChangeListener((buttonView, isChecked) -> {
+            if (isChecked) {
+                layoutLimitDistance.setVisibility(View.VISIBLE);
+            } else {
+                layoutLimitDistance.setVisibility(View.GONE);
+            }
+        });
 
         // Setup cancel button to show custom confirmation dialog
         btnCancel.setOnClickListener(v -> showCancelConfirmationDialog());
@@ -168,6 +184,7 @@ public class CreateEventFragment extends Fragment {
         String name = etName.getText().toString().trim();
         String locationStr = etLocation.getText().toString().trim();
         String description = etDescription.getText().toString().trim();
+        boolean isGeoRequired = switchGeo.isChecked();
 
         if (name.isEmpty()) {
             etName.setError("Name is required");
@@ -205,6 +222,24 @@ public class CreateEventFragment extends Fragment {
             return;
         }
 
+        // If geolocation is required, validate radius, radius must be greater than 0
+        double radius;
+        if (isGeoRequired) {
+            try {
+                radius = Double.parseDouble(etLimitDistance.getText().toString().trim());
+                if (radius <= 0) {
+                    Toast.makeText(requireContext(), "Please enter a valid number for distance", Toast.LENGTH_SHORT).show();
+                    return;
+                }
+            } catch (NumberFormatException e) {
+                Toast.makeText(requireContext(), "Please enter a valid number for distance", Toast.LENGTH_SHORT).show();
+                return;
+            }
+        } else {
+            radius = 0.0;
+        }
+
+
         @SuppressLint("HardwareIds")
         String deviceId = Settings.Secure.getString(requireContext().getContentResolver(), Settings.Secure.ANDROID_ID);
 
@@ -213,7 +248,7 @@ public class CreateEventFragment extends Fragment {
 
             // Note: Currently locationStr is a String, but Event model expects android.location.Location.
             // For now, passing null for Location as in previous implementation, but validating the text field.
-            Event.create(name, description, organizer, null, null, regStartDate, regEndDate, eventStartDate, eventEndDate)
+            Event.create(name, description, organizer, null, null, regStartDate, regEndDate, eventStartDate, eventEndDate, isGeoRequired, radius)
                     .addOnSuccessListener(event -> {
                         event.save().addOnSuccessListener(aVoid -> {
                             Toast.makeText(requireContext(), "Event created successfully!", Toast.LENGTH_SHORT).show();
