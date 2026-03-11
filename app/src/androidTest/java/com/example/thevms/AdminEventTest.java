@@ -240,4 +240,36 @@ public class AdminEventTest {
             onView(withText("Event Two")).check(matches(isDisplayed()));
         }
     }
+
+    @Test
+    public void testAdminCanSeeEventsWithClosedRegistration() throws Exception {
+        // Seed an event with closed registration and event dates set 3 months (90 days) in the past
+        Organizer organizer = new Organizer("org1", "bob@example.com", "Bob", "Jones", null);
+        long ninetyDaysMs = 90L * 24 * 60 * 60 * 1000;
+        long now = System.currentTimeMillis();
+
+        Date regStart = new Date(now - ninetyDaysMs);
+        Date regEnd = new Date(now - ninetyDaysMs + 3600000); // 1 hour later
+        Date eventStart = new Date(now - ninetyDaysMs + 7200000); // 2 hours later
+        Date eventEnd = new Date(now - ninetyDaysMs + 10800000); // 3 hours later
+
+        Event closedEvent = Tasks.await(Event.create("Closed Event", "Registration and Event Ended Long Ago", organizer, null, null, regStart, regEnd, eventStart, eventEnd), 5, TimeUnit.SECONDS);
+        Tasks.await(closedEvent.save(), 5, TimeUnit.SECONDS);
+
+        try (ActivityScenario<MainActivity> scenario = ActivityScenario.launch(MainActivity.class)) {
+            waitForView(withId(R.id.nav_admin_settings), 5000);
+            onView(withId(R.id.nav_admin_settings)).perform(click());
+
+            waitForView(withText("Manage Event"), 2000);
+            onView(withText("Manage Event")).perform(click());
+
+            waitForViewToDisappear(withId(R.id.loading_spinner), 5000);
+
+            // Should see the closed event (3 total: Event One, Event Two, Closed Event)
+            onView(withId(R.id.events_recycler_view)).check(hasItemCount(3));
+            onView(withId(R.id.events_recycler_view))
+                    .perform(RecyclerViewActions.scrollTo(hasDescendant(withText("Closed Event"))));
+            onView(withText("Closed Event")).check(matches(isDisplayed()));
+        }
+    }
 }
