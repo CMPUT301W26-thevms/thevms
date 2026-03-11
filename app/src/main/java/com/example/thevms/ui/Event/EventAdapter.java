@@ -2,6 +2,8 @@ package com.example.thevms.ui.Event;
 
 import android.annotation.SuppressLint;
 import android.app.AlertDialog;
+import android.content.res.ColorStateList;
+import android.graphics.Color;
 import android.provider.Settings;
 import android.text.Html;
 import android.util.Log;
@@ -23,6 +25,7 @@ import com.example.thevms.model.Event;
 
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
@@ -94,6 +97,7 @@ public class EventAdapter extends RecyclerView.Adapter<EventAdapter.EventViewHol
         Button removeButton;
         Button leaveButton;
         ImageView eventImageView;
+        TextView regStatusMessage;
 
         // Expandable views
         View expandableDetails;
@@ -114,6 +118,7 @@ public class EventAdapter extends RecyclerView.Adapter<EventAdapter.EventViewHol
             removeButton = itemView.findViewById(R.id.btn_remove_event);
             leaveButton = itemView.findViewById(R.id.btn_leave_event);
             eventImageView = itemView.findViewById(R.id.event_image);
+            regStatusMessage = itemView.findViewById(R.id.event_registration_status_message);
 
             expandableDetails = itemView.findViewById(R.id.expandable_details);
             descriptionTextView = itemView.findViewById(R.id.event_description);
@@ -175,10 +180,37 @@ public class EventAdapter extends RecyclerView.Adapter<EventAdapter.EventViewHol
             @SuppressLint("HardwareIds")
             String deviceId = Settings.Secure.getString(itemView.getContext().getContentResolver(), Settings.Secure.ANDROID_ID);
 
+            if (joinButton != null) {
+                Date now = new Date();
+                boolean isRegistrationStarted = event.getRegistrationStartTime() == null || now.after(event.getRegistrationStartTime());
+                boolean isRegistrationEnded = event.getRegistrationEndTime() != null && now.after(event.getRegistrationEndTime());
+                boolean canJoin = isRegistrationStarted && !isRegistrationEnded;
+
+                joinButton.setEnabled(canJoin);
+                if (canJoin) {
+                    joinButton.setBackgroundTintList(ColorStateList.valueOf(Color.BLACK));
+                    if (regStatusMessage != null) regStatusMessage.setVisibility(View.GONE);
+                } else {
+                    joinButton.setBackgroundTintList(ColorStateList.valueOf(Color.LTGRAY));
+                    if (regStatusMessage != null) {
+                        regStatusMessage.setVisibility(View.VISIBLE);
+                        if (!isRegistrationStarted) {
+                            regStatusMessage.setText("Registration hasn't started yet");
+                        } else {
+                            regStatusMessage.setText("Registration has ended");
+                        }
+                    }
+                }
+            }
+
             Entrant.getOrCreate(deviceId).addOnSuccessListener(entrant -> {
                 event.inEvent(entrant).addOnSuccessListener(isIn -> {
                     if (joinButton != null) {
                         joinButton.setVisibility(isIn ? View.GONE : View.VISIBLE);
+                        // If user is already in event, hide the "not started/ended" message too
+                        if (isIn && regStatusMessage != null) {
+                            regStatusMessage.setVisibility(View.GONE);
+                        }
                     }
                     if (leaveButton != null) {
                         leaveButton.setVisibility(isIn ? View.VISIBLE : View.GONE);
@@ -200,6 +232,8 @@ public class EventAdapter extends RecyclerView.Adapter<EventAdapter.EventViewHol
                             updateEntrantCount(event);
                             leaveButton.setVisibility(View.GONE);
                             joinButton.setVisibility(View.VISIBLE);
+                            // Re-check registration status when showing join button again
+                            bind(event, dateFormat, fullDateFormat, isAdmin, isExpanded, onDelete, onToggleExpand);
                         }).addOnFailureListener(e -> {
                             Toast.makeText(itemView.getContext(), "Failed to leave event: " + e.getMessage(), Toast.LENGTH_SHORT).show();
                         });
