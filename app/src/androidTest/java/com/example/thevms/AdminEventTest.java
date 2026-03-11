@@ -2,6 +2,7 @@ package com.example.thevms;
 
 import static androidx.test.espresso.Espresso.onView;
 import static androidx.test.espresso.action.ViewActions.click;
+import static androidx.test.espresso.assertion.ViewAssertions.doesNotExist;
 import static androidx.test.espresso.assertion.ViewAssertions.matches;
 import static androidx.test.espresso.matcher.ViewMatchers.hasDescendant;
 import static androidx.test.espresso.matcher.ViewMatchers.isDisplayed;
@@ -16,6 +17,8 @@ import android.view.View;
 import androidx.recyclerview.widget.RecyclerView;
 import androidx.test.core.app.ActivityScenario;
 import androidx.test.core.app.ApplicationProvider;
+import androidx.test.espresso.UiController;
+import androidx.test.espresso.ViewAction;
 import androidx.test.espresso.ViewAssertion;
 import androidx.test.espresso.contrib.RecyclerViewActions;
 import androidx.test.ext.junit.runners.AndroidJUnit4;
@@ -104,6 +107,31 @@ public class AdminEventTest {
     }
 
     /**
+     * Custom ViewAction to click a child view with a specific ID within a RecyclerView item.
+     */
+    public static ViewAction clickChildViewWithId(final int id) {
+        return new ViewAction() {
+            @Override
+            public Matcher<View> getConstraints() {
+                return isDisplayed();
+            }
+
+            @Override
+            public String getDescription() {
+                return "Click on a child view with specified id.";
+            }
+
+            @Override
+            public void perform(UiController uiController, View view) {
+                View v = view.findViewById(id);
+                if (v != null) {
+                    v.performClick();
+                }
+            }
+        };
+    }
+
+    /**
      * Custom ViewAssertion to check the item count of a RecyclerView.
      */
     public static ViewAssertion hasItemCount(int expectedCount) {
@@ -151,6 +179,65 @@ public class AdminEventTest {
 
             // Verify the item count in the RecyclerView
             onView(withId(R.id.events_recycler_view)).check(hasItemCount(2));
+        }
+    }
+
+    @Test
+    public void testDeleteEventConfirmationModal() throws InterruptedException {
+        try (ActivityScenario<MainActivity> scenario = ActivityScenario.launch(MainActivity.class)) {
+            waitForView(withId(R.id.nav_admin_settings), 5000);
+            onView(withId(R.id.nav_admin_settings)).perform(click());
+
+            waitForView(withText("Manage Event"), 2000);
+            onView(withText("Manage Event")).perform(click());
+
+            waitForViewToDisappear(withId(R.id.loading_spinner), 5000);
+
+            onView(withId(R.id.events_recycler_view)).check(hasItemCount(2));
+
+            // Click delete on "Event One"
+            onView(withId(R.id.events_recycler_view))
+                    .perform(RecyclerViewActions.actionOnItem(hasDescendant(withText("Event One")), clickChildViewWithId(R.id.btn_remove_event)));
+
+            // The dialog title is dynamically set to include the event name, so we wait for the title ID instead of exact text.
+            waitForView(withId(R.id.tv_dialog_title), 5000);
+            onView(withId(R.id.btn_dialog_delete)).check(matches(isDisplayed()));
+            onView(withId(R.id.btn_dialog_cancel)).check(matches(isDisplayed()));
+
+            onView(withId(R.id.btn_dialog_cancel)).perform(click());
+            onView(withId(R.id.tv_dialog_title)).check(doesNotExist());
+
+            onView(withId(R.id.events_recycler_view)).check(hasItemCount(2));
+        }
+    }
+
+    @Test
+    public void testAdminCanDeleteEvent() throws InterruptedException {
+        try (ActivityScenario<MainActivity> scenario = ActivityScenario.launch(MainActivity.class)) {
+            waitForView(withId(R.id.nav_admin_settings), 5000);
+            onView(withId(R.id.nav_admin_settings)).perform(click());
+
+            waitForView(withText("Manage Event"), 2000);
+            onView(withText("Manage Event")).perform(click());
+
+            waitForViewToDisappear(withId(R.id.loading_spinner), 5000);
+
+            onView(withId(R.id.events_recycler_view)).check(hasItemCount(2));
+
+            // Delete "Event One"
+            onView(withId(R.id.events_recycler_view))
+                    .perform(RecyclerViewActions.actionOnItem(hasDescendant(withText("Event One")), clickChildViewWithId(R.id.btn_remove_event)));
+
+            waitForView(withId(R.id.tv_dialog_title), 5000);
+            onView(withId(R.id.btn_dialog_delete)).perform(click());
+
+            // Wait for list update and check item count
+            // Using a slightly longer timeout for the deletion to reflect in the UI
+            Thread.sleep(2000);
+
+            onView(withId(R.id.events_recycler_view)).check(hasItemCount(1));
+            onView(withText("Event One")).check(doesNotExist());
+            onView(withText("Event Two")).check(matches(isDisplayed()));
         }
     }
 }
