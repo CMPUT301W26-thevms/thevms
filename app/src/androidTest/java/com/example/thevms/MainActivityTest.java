@@ -13,7 +13,9 @@ import static org.hamcrest.CoreMatchers.not;
 import static org.hamcrest.Matchers.allOf;
 import static org.hamcrest.Matchers.containsString;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
 
+import android.content.Context;
 import android.view.View;
 
 import androidx.test.core.app.ActivityScenario;
@@ -24,8 +26,8 @@ import androidx.test.espresso.intent.Intents;
 import androidx.test.ext.junit.runners.AndroidJUnit4;
 import androidx.test.filters.LargeTest;
 import androidx.test.platform.app.InstrumentationRegistry;
+import androidx.test.rule.GrantPermissionRule;
 
-import com.example.thevms.model.Entrant;
 import com.example.thevms.ui.MainActivity;
 import com.example.thevms.ui.SearchFragment;
 import com.google.android.gms.tasks.Tasks;
@@ -33,6 +35,7 @@ import com.google.android.gms.tasks.Tasks;
 import org.hamcrest.Matcher;
 import org.junit.After;
 import org.junit.Before;
+import org.junit.Rule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
@@ -309,5 +312,84 @@ public class MainActivityTest {
                 .check(matches(hasDescendant(allOf(withId(R.id.btn_join_event), isDisplayed()))));
         onView(withId(R.id.events_recycler_view))
                 .check(matches(hasDescendant(allOf(withId(R.id.btn_leave_event), not(isDisplayed())))));
+    }
+
+    /**
+     * Test if user is within the event's required location.
+     */
+    @Rule
+    public GrantPermissionRule permissionRule = GrantPermissionRule.grant(
+            android.Manifest.permission.ACCESS_FINE_LOCATION,
+            android.Manifest.permission.ACCESS_COARSE_LOCATION
+    );
+
+    @Before
+    public void setUpMockLocation() throws Exception {
+        Context context = InstrumentationRegistry.getInstrumentation().getTargetContext();
+
+        InstrumentationRegistry.getInstrumentation().getUiAutomation()
+                .executeShellCommand("appops set " + context.getPackageName() + " android:mock_location allow");
+
+        testHelper = new FirestoreTestHelper();
+    }
+
+    @Test
+    public void testJoinEvent_withinLocation() throws Exception {
+        // Seed an event
+        String eventId = "1";
+        testHelper.setMockLocation(53.52, -113.52);
+        Thread.sleep(2000);
+
+
+        // Relaunch to ensure fresh adapter state
+        scenario = ActivityScenario.launch(MainActivity.class);
+        expandBottomSheetHelper();
+        Thread.sleep(1000);
+
+        // Click Join button
+        onView(withId(R.id.events_recycler_view))
+                .perform(RecyclerViewActions.actionOnItemAtPosition(0,
+                        clickChildViewWithId(R.id.btn_join_event)));
+
+        Thread.sleep(5000);
+
+        // Entrant should be in the waitlist, Join button should disappear
+        onView(withId(R.id.events_recycler_view))
+                .check(matches(hasDescendant(allOf(
+                        withId(R.id.btn_leave_event),
+                        isDisplayed()
+                ))));
+
+        // Check the count in the database
+        Long count = Tasks.await(testHelper.getDbHandler().getEntrantCount(eventId), 5, TimeUnit.SECONDS);
+        assertEquals(1L, (long) count);
+    }
+
+    @Test
+    public void testJoinEvent_notWithinLocation() throws Exception {
+        // Seed an event
+        String eventId = "1";
+        testHelper.setMockLocation(55, 66);
+
+        // Relaunch to ensure fresh adapter state
+        scenario = ActivityScenario.launch(MainActivity.class);
+        expandBottomSheetHelper();
+        Thread.sleep(1000);
+
+        // Click Join button
+        onView(withId(R.id.events_recycler_view))
+                .perform(RecyclerViewActions.actionOnItemAtPosition(0,
+                        clickChildViewWithId(R.id.btn_join_event)));
+
+        // Entrant should be in the waitlist, Join button should not disappear
+        onView(withId(R.id.events_recycler_view))
+                .check(matches(hasDescendant(allOf(
+                        withId(R.id.btn_join_event),
+                        isDisplayed()
+                ))));
+
+        // Check the count in the database
+        Long count = Tasks.await(testHelper.getDbHandler().getEntrantCount(String.valueOf(eventId)), 5, TimeUnit.SECONDS);
+        assertEquals(0L, (long) count);
     }
 }

@@ -16,7 +16,7 @@ import java.util.Map;
  *
  * <p><b>Creation Workflow:</b></p>
  * <ol>
- *     <li>Call the static {@link #create(String, String, Organizer, Location, String, Date, Date, Date, Date)} method.</li>
+ *     <li>Call the static {@link #create(String, String, Organizer, String, String, Date, Date, Date, Date, boolean, Double, Location)} method.</li>
  *     <li>This method asynchronously fetches a unique ID from the database.</li>
  *     <li>It then returns a {@code Task<Event>}. You use an {@code .addOnSuccessListener} to get the in-memory Event object.</li>
  *     <li>The created object does NOT yet exist in the database.</li>
@@ -32,7 +32,7 @@ import java.util.Map;
  * <pre>
  * {@code
  * // 1. Create the event in memory (gets a unique ID async)
- * Event.create(name, desc, org, loc, imgUrl, date, date, date, date)
+ * Event.create(name, desc, org, loc, imgUrl, date, date, date, date, geolocationRequired, radius, geoLocation)
  *      .addOnSuccessListener(event -> {
  *          // 2. Save the event to the database
  *          event.save()
@@ -52,7 +52,8 @@ public class Event {
     private String name;
     private String description;
     private Organizer organizer;
-    private Location location;
+    private String location;
+    private Location geoLocation; // location coordinate
 
     private String qrCode;
     private String imageUrl;
@@ -64,7 +65,7 @@ public class Event {
     private HashMap<Entrant, Boolean> entrantList;
     private long entrantCount = 0;
     private boolean geolocationRequired = false;
-    private Double signupRadius = 0.0;
+    private Double radius = 0.0;
 
     /**
      * Constructor for the Event class.
@@ -79,8 +80,11 @@ public class Event {
      * @param registrationEndTime   The end time for registration.
      * @param eventStartTime        The start time of the event.
      * @param eventEndTime          The end time of the event.
+     * @param geolocationRequired   Whether joining requires being within a certain distance.
+     * @param radius                The allowed distance radius (in kilometers).
+     * @param geoLocation           The actual GPS coordinates (Latitude/Longitude) of the event.
      */
-    private Event(Long eventId, String name, String description, Organizer organizer, Location location, String imageUrl, Date registrationStartTime, Date registrationEndTime, Date eventStartTime, Date eventEndTime, boolean geolocationRequired, Double signupRadius) {
+    private Event(Long eventId, String name, String description, Organizer organizer, String location, String imageUrl, Date registrationStartTime, Date registrationEndTime, Date eventStartTime, Date eventEndTime, boolean geolocationRequired, Double radius, Location geoLocation) {
         this.dbHandler = new DatabaseHandler();
         this.eventId = eventId;
         this.name = name;
@@ -95,8 +99,10 @@ public class Event {
         this.entrantList = new HashMap<>();
 
         this.qrCode = "NULL FOR NOW";
+
         this.geolocationRequired = geolocationRequired;
-        this.signupRadius = signupRadius;
+        this.radius = radius;
+        this.geoLocation = geoLocation;
     }
 
     /**
@@ -119,14 +125,17 @@ public class Event {
      * @param registrationEndTime   The end time for registration.
      * @param eventStartTime        The start time of the event.
      * @param eventEndTime          The end time of the event.
+     * @param geolocationRequired   Boolean flag for geofencing.
+     * @param radius                The radius limit for joining (in km).
+     * @param geoLocation           The {@link Location} object containing coordinates.
      * @return A {@code Task<Event>} that, upon completion, will contain the fully initialized Event object.
      */
-    public static Task<Event> create(String name, String description, Organizer organizer, Location location, String imageUrl, Date registrationStartTime, Date registrationEndTime, Date eventStartTime, Date eventEndTime, boolean geolocationRequired, Double signupRadius) {
+    public static Task<Event> create(String name, String description, Organizer organizer, String location, String imageUrl, Date registrationStartTime, Date registrationEndTime, Date eventStartTime, Date eventEndTime, boolean geolocationRequired, Double radius, Location geoLocation) {
         DatabaseHandler dbHandler = new DatabaseHandler();
         return dbHandler.getNextEventId().continueWith(task -> {
             if (task.isSuccessful()) {
                 Long eventId = task.getResult();
-                return new Event(eventId, name, description, organizer, location, imageUrl, registrationStartTime, registrationEndTime, eventStartTime, eventEndTime, geolocationRequired, signupRadius);
+                return new Event(eventId, name, description, organizer, location, imageUrl, registrationStartTime, registrationEndTime, eventStartTime, eventEndTime, geolocationRequired, radius, geoLocation);
             } else {
                 // If getting the ID fails, the exception is propagated in the returned Task.
                 throw task.getException();
@@ -171,18 +180,24 @@ public class Event {
         String name = (String) data.get("name");
         String desc = (String) data.get("description");
         String img = (String) data.get("imageUrl");
-
+        String orgId = (String) data.get("organizerId");
+        String email = (String) data.get("organizerEmail");
+        String fName = (String) data.get("organizerFirstName");
+        String lName = (String) data.get("organizerLastName");
+        String phone = (String) data.get("organizerPhone");
+        Organizer organizer = new Organizer(orgId, email, fName, lName, phone);
+        String location = (String) data.get("location");
         Date regStart = toDate(data.get("registrationStartTime"));
         Date regEnd = toDate(data.get("registrationEndTime"));
         Date eventStart = toDate(data.get("eventStartTime"));
         Date eventEnd = toDate(data.get("eventEndTime"));
         Boolean geoRequired = (Boolean) data.get("geolocationRequired");
-        Double radius = (Double) data.get("signupRadius");
+        Double radius = (Double) data.get("radius");
+        Location geoLocation = new Location("event_location");
+        geoLocation.setLatitude((Double) data.get("latitude"));
+        geoLocation.setLongitude((Double) data.get("longitude"));
 
-        // Location and Organizer might need specialized mapping depending on how they are stored
-        // For now, we'll initialize them as null or use placeholders if necessary for the UI task.
-
-        return new Event(id, name, desc, null, null, img, regStart, regEnd, eventStart, eventEnd, geoRequired, radius);
+        return new Event(id, name, desc, organizer, location, img, regStart, regEnd, eventStart, eventEnd, geoRequired, radius, geoLocation);
     }
 
     /**
@@ -195,16 +210,29 @@ public class Event {
         Long eventId = doc.getLong("eventId");
         String name = doc.getString("name");
         String description = doc.getString("description");
+        String orgId = doc.getString("organizerId");
+        String email = doc.getString("organizerEmail");
+        String fName = doc.getString("organizerFirstName");
+        String lName = doc.getString("organizerLastName");
+        String phone = doc.getString("organizerPhone");
+        Organizer organizer = new Organizer(orgId, email, fName, lName, phone);
+        String location = doc.getString("location");
         String imageUrl = doc.getString("imageUrl");
         Date regStart = doc.getDate("registrationStartTime");
         Date regEnd = doc.getDate("registrationEndTime");
         Date eventStart = doc.getDate("eventStartTime");
         Date eventEnd = doc.getDate("eventEndTime");
         Boolean geoRequired = (Boolean) doc.get("geolocationRequired");
-        Double radius = (Double) doc.get("signupRadius");
+        Double radius = (Double) doc.get("radius");
+        Location geolocation = null;
+        if (doc.contains("latitude") && doc.contains("longitude")) {
+            geolocation = new Location("event_location");
+            geolocation.setLatitude(doc.getDouble("latitude"));
+            geolocation.setLongitude(doc.getDouble("longitude"));
+        }
 
-        // Note: Organizer and Location are simplified here as they require more complex mapping.
-        return new Event(eventId, name, description, null, null, imageUrl, regStart, regEnd, eventStart, eventEnd, geoRequired, radius);
+
+        return new Event(eventId, name, description, organizer, location, imageUrl, regStart, regEnd, eventStart, eventEnd, geoRequired, radius, geolocation);
     }
 
     /**
@@ -233,6 +261,10 @@ public class Event {
         map.put("name", name);
         map.put("description", description);
         map.put("organizerId", organizer.getDeviceId());
+        map.put("organizerEmail", organizer.getEmail());
+        map.put("organizerFirstName", organizer.getFirstName());
+        map.put("organizerLastName", organizer.getLastName());
+        map.put("organizerPhone", organizer.getPhoneNumber());
         map.put("location", location);
         map.put("imageUrl", imageUrl);
         map.put("registrationStartTime", registrationStartTime);
@@ -240,7 +272,11 @@ public class Event {
         map.put("eventStartTime", eventStartTime);
         map.put("eventEndTime", eventEndTime);
         map.put("geolocationRequired", geolocationRequired);
-        map.put("signupRadius", signupRadius);
+        map.put("radius", radius);
+        if (geoLocation != null) {
+            map.put("latitude", geoLocation.getLatitude());
+            map.put("longitude", geoLocation.getLongitude());
+        }
         return map;
     }
 
@@ -374,7 +410,7 @@ public class Event {
      *
      * @return The location of the event.
      */
-    public Location getLocation() {
+    public String getLocation() {
         return location;
     }
 
@@ -383,7 +419,7 @@ public class Event {
      *
      * @param location The new location of the event.
      */
-    public void setLocation(Location location) {
+    public void setLocation(String location) {
         this.location = location;
     }
 
@@ -501,11 +537,19 @@ public class Event {
         this.geolocationRequired = geolocationRequired;
     }
 
-    public Double getSignupRadius() {
-        return signupRadius;
+    public Double getRadius() {
+        return radius;
     }
 
-    public void setSignupRadius(Double signupRadius) {
-        this.signupRadius = signupRadius;
+    public void setRadius(Double radius) {
+        this.radius = radius;
+    }
+
+    public Location getGeoLocation() {
+        return geoLocation;
+    }
+
+    public void setGeoLocation(Location geoLocation) {
+        this.geoLocation = geoLocation;
     }
 }

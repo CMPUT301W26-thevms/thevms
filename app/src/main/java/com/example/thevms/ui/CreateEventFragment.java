@@ -239,6 +239,11 @@ public class CreateEventFragment extends Fragment {
             radius = 0.0;
         }
 
+        android.location.Location eventLocation = getLocationFromAddress(locationStr);
+        if (eventLocation == null) {
+            Toast.makeText(requireContext(), "Please enter a valid location", Toast.LENGTH_SHORT).show();
+            return;
+        }
 
         @SuppressLint("HardwareIds")
         String deviceId = Settings.Secure.getString(requireContext().getContentResolver(), Settings.Secure.ANDROID_ID);
@@ -247,8 +252,8 @@ public class CreateEventFragment extends Fragment {
             Organizer organizer = new Organizer(user.getDeviceId(), user.getEmail(), user.getFirstName(), user.getLastName(), user.getPhoneNumber());
 
             // Note: Currently locationStr is a String, but Event model expects android.location.Location.
-            // For now, passing null for Location as in previous implementation, but validating the text field.
-            Event.create(name, description, organizer, null, null, regStartDate, regEndDate, eventStartDate, eventEndDate, isGeoRequired, radius)
+            // Updated: location is now the coordinates of the event, not the location string.
+            Event.create(name, description, organizer, locationStr, null, regStartDate, regEndDate, eventStartDate, eventEndDate, isGeoRequired, radius, eventLocation)
                     .addOnSuccessListener(event -> {
                         event.save().addOnSuccessListener(aVoid -> {
                             Toast.makeText(requireContext(), "Event created successfully!", Toast.LENGTH_SHORT).show();
@@ -290,5 +295,22 @@ public class CreateEventFragment extends Fragment {
         });
 
         dialog.show();
+    }
+
+    private android.location.Location getLocationFromAddress(String strAddress) {
+        android.location.Geocoder geocoder = new android.location.Geocoder(requireContext(), Locale.getDefault());
+        try {
+            java.util.List<android.location.Address> addresses = geocoder.getFromLocationName(strAddress, 1);
+            if (addresses != null && !addresses.isEmpty()) {
+                android.location.Address address = addresses.get(0);
+                android.location.Location location = new android.location.Location("event_location");
+                location.setLatitude(address.getLatitude());
+                location.setLongitude(address.getLongitude());
+                return location;
+            }
+        } catch (Exception e) {
+            Log.e("CreateEventFragment", "Error while getting location", e);
+        }
+        return null;
     }
 }

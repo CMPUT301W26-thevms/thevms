@@ -42,6 +42,7 @@ dependencies {
     implementation(platform("com.google.firebase:firebase-bom:34.9.0"))
     implementation("com.google.firebase:firebase-analytics")
     implementation("com.google.firebase:firebase-firestore")
+    implementation("com.google.android.gms:play-services-location:21.0.1")
     implementation(libs.firebase.firestore)
     implementation(libs.espresso.intents)
     implementation(libs.espresso.contrib)

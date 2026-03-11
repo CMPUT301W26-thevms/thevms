@@ -1,5 +1,12 @@
 package com.example.thevms;
 
+import android.content.Context;
+import android.location.Location;
+import android.location.LocationManager;
+import android.os.SystemClock;
+
+import androidx.test.platform.app.InstrumentationRegistry;
+
 import com.example.thevms.model.DatabaseHandler;
 import com.example.thevms.model.Event;
 import com.example.thevms.model.Organizer;
@@ -99,7 +106,10 @@ public class FirestoreTestHelper {
                 new Date(), // Reg Start
                 new Date(System.currentTimeMillis() + 86400000), // Reg End
                 startDate,
-                new Date(startDate.getTime() + 3600000) // End +1h
+                new Date(startDate.getTime() + 3600000), // End +1h
+                false,
+                0.0,
+                null
         ), 10, TimeUnit.SECONDS);
         Tasks.await(event.save(), 10, TimeUnit.SECONDS);
     }
@@ -151,6 +161,24 @@ public class FirestoreTestHelper {
                 .collection(DatabaseHandler.COLLECTION_ENTRANTS)
                 .document(deviceId)
                 .set(data), 10, TimeUnit.SECONDS);
+    }
+
+    public void setMockLocation(double lat, double lng) {
+        LocationManager locationManager = (LocationManager) InstrumentationRegistry.getInstrumentation()
+                .getContext().getSystemService(Context.LOCATION_SERVICE);
+        String provider = LocationManager.GPS_PROVIDER;
+        locationManager.addTestProvider(provider, false, false, false, false, true, true, true, 1, 1);
+        locationManager.setTestProviderEnabled(provider, true);
+
+        Location mockLocation = new Location(provider);
+        mockLocation.setLatitude(lat);
+        mockLocation.setLongitude(lng);
+        mockLocation.setAltitude(0);
+        mockLocation.setTime(System.currentTimeMillis());
+        mockLocation.setAccuracy(1);
+        mockLocation.setElapsedRealtimeNanos(SystemClock.elapsedRealtimeNanos());
+
+        locationManager.setTestProviderLocation(provider, mockLocation);
     }
 
     public DatabaseHandler getDbHandler() {
