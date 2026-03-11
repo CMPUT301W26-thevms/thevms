@@ -8,17 +8,28 @@
     android:paddingVertical="8dp">
 
     <ImageView
+        android:id="@+id/iv_status_icon"
         android:layout_width="20dp"
         android:layout_height="20dp"
-        android:src="@drawable/ic_star_outline"
-        app:tint="@android:color/black" />
+        android:src="@drawable/ic_status_waitlisted"
+        app:tint="@color/status_waitlisted" />
 
     <TextView
         android:id="@+id/tv_attendee_name"
-        android:layout_width="wrap_content"
+        android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:layout_marginStart="12dp"
+        android:layout_weight="1"
         android:text="User Name"
         android:textColor="@android:color/black"
         android:textSize="16sp" />
+
+    <Button
+        android:id="@+id/btn_cancel_entrant"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Cancel"
+        android:textSize="12sp"
+        android:visibility="gone" />
+
 </LinearLayout>

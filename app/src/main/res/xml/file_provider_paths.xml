@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Save this file at: res/xml/file_provider_paths.xml -->
+<paths>
+    <!-- Allows sharing files from the app's internal cache directory -->
+    <cache-path
+        name="csv_exports"
+        path="." />
+</paths>
