@@ -17,6 +17,11 @@
     <string name="admin_profiles_empty">No user profiles found.</string>
     <string name="admin_organizers_empty">No organizers found.</string>
 
+    <!-- Admin Events Strings -->
+    <string name="admin_events_title">Manage Events</string>
+    <string name="admin_events_empty">No events found.</string>
+    <string name="admin_events_load_failed">Failed to load events</string>
+
     <!-- Profile Delete Dialog -->
     <string name="delete_profile_title">Delete Profile?</string>
     <string name="delete_profile_message_organizer">This will permanently delete the %1$s %2$s, including all events they have organized and their participation in all registered events. This action cannot be undone.</string>
