@@ -57,7 +57,7 @@ public class AdminActivity {
             MainActivity mainActivity = (MainActivity) activity;
 
             if ("Manage Event".equals(actionName)) {
-                mainActivity.navigateToFragment(new SearchFragment(), R.id.nav_home);
+                mainActivity.navigateToFragment(new AdminEventsFragment(), R.id.nav_admin_settings);
             } else if ("Manage Profiles".equals(actionName)) {
                 mainActivity.navigateToFragment(AdminProfilesFragment.newInstance(false), R.id.nav_admin_settings);
             } else if ("Manage Organizers".equals(actionName)) {
