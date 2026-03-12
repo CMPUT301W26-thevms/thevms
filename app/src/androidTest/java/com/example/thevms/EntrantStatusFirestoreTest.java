@@ -52,14 +52,7 @@ public class EntrantStatusFirestoreTest {
 
     @BeforeClass
     public static void checkEmulator() {
-        try {
-            new java.net.Socket("10.0.2.2", 8080).close();
-        } catch (Exception e) {
-            throw new RuntimeException(
-                    "Firestore emulator not running on 10.0.2.2:8080. " +
-                            "Run: firebase emulators:start --only firestore", e
-            );
-        }
+        FirestoreTestHelper.checkEmulator();
     }
 
     @Before
