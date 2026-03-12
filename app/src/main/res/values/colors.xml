@@ -2,4 +2,12 @@
 <resources>
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
+
+    <!-- Attendee status colors -->
+    <color name="status_waitlisted">#9E9E9E</color>   <!-- grey   — schedule icon    -->
+    <color name="status_selected">#6366F1</color>      <!-- indigo — star icon         -->
+    <color name="status_accepted">#10B981</color>      <!-- green  — check_circle icon -->
+    <color name="status_rejected">#EF4444</color>      <!-- red    — cancel icon       -->
+    <color name="status_cancelled">#F59E0B</color>     <!-- amber  — block icon        -->
+
 </resources>

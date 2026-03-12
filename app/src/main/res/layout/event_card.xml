@@ -3,10 +3,12 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:layout_marginBottom="16dp"
+    android:layout_marginHorizontal="4dp"
+    android:layout_marginVertical="8dp"
     app:cardCornerRadius="16dp"
-    app:cardElevation="0dp"
-    app:strokeWidth="0dp">
+    app:cardElevation="2dp"
+    app:strokeColor="#E0E0E0"
+    app:strokeWidth="1dp">
 
     <LinearLayout
         android:layout_width="match_parent"
@@ -84,80 +86,96 @@
             <LinearLayout
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:orientation="horizontal"
+                android:orientation="vertical"
+                android:gravity="end"
                 app:layout_constraintBottom_toBottomOf="parent"
                 app:layout_constraintEnd_toEndOf="parent"
                 app:layout_constraintTop_toTopOf="parent">
 
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btn_remove_event"
-                    style="@style/Widget.MaterialComponents.Button.UnelevatedButton"
+                <TextView
+                    android:id="@+id/event_registration_status_message"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_marginEnd="8dp"
-                    android:backgroundTint="#E53935"
-                    android:text="Delete"
-                    android:textAllCaps="false"
-                    android:textColor="@android:color/white"
-                    app:cornerRadius="8dp"
-                    android:visibility="gone" />
+                    android:textColor="#E53935"
+                    android:textSize="11sp"
+                    android:visibility="gone"
+                    android:layout_marginBottom="4dp" />
 
-                <Button
-                    android:id="@+id/btn_join_event"
+                <LinearLayout
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:backgroundTint="@android:color/black"
-                    android:minHeight="48dp"
-                    android:paddingHorizontal="24dp"
-                    android:text="Join"
-                    android:textAllCaps="false"
-                    android:textColor="@android:color/white"
-                    android:textSize="16sp"
-                    app:cornerRadius="12dp"
-                    android:visibility="gone" />
-                
-                <Button
-                    android:id="@+id/btn_leave_event"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:backgroundTint="@android:color/black"
-                    android:minHeight="48dp"
-                    android:paddingHorizontal="24dp"
-                    android:text="Leave"
-                    android:textAllCaps="false"
-                    android:textColor="@android:color/white"
-                    android:textSize="16sp"
-                    app:cornerRadius="12dp"
-                    android:visibility="gone" />
+                    android:orientation="horizontal">
 
-                <Button
-                    android:id="@+id/btn_accept_event"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginEnd="8dp"
-                    android:backgroundTint="#4CAF50"
-                    android:minHeight="48dp"
-                    android:paddingHorizontal="16dp"
-                    android:text="Accept"
-                    android:textAllCaps="false"
-                    android:textColor="@android:color/white"
-                    android:textSize="14sp"
-                    app:cornerRadius="12dp"
-                    android:visibility="gone" />
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btn_remove_event"
+                        style="@style/Widget.MaterialComponents.Button.UnelevatedButton"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginEnd="8dp"
+                        android:backgroundTint="#E53935"
+                        android:text="Delete"
+                        android:textAllCaps="false"
+                        android:textColor="@android:color/white"
+                        app:cornerRadius="8dp"
+                        android:visibility="gone" />
 
-                <Button
-                    android:id="@+id/btn_decline_event"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:backgroundTint="#F44336"
-                    android:minHeight="48dp"
-                    android:paddingHorizontal="16dp"
-                    android:text="Decline"
-                    android:textAllCaps="false"
-                    android:textColor="@android:color/white"
-                    android:textSize="14sp"
-                    app:cornerRadius="12dp"
-                    android:visibility="gone" />
+                    <Button
+                        android:id="@+id/btn_join_event"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:backgroundTint="@android:color/black"
+                        android:minHeight="48dp"
+                        android:paddingHorizontal="24dp"
+                        android:text="Join"
+                        android:textAllCaps="false"
+                        android:textColor="@android:color/white"
+                        android:textSize="16sp"
+                        app:cornerRadius="12dp"
+                        android:visibility="gone" />
+
+                    <Button
+                        android:id="@+id/btn_leave_event"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:backgroundTint="@android:color/black"
+                        android:minHeight="48dp"
+                        android:paddingHorizontal="24dp"
+                        android:text="Leave"
+                        android:textAllCaps="false"
+                        android:textColor="@android:color/white"
+                        android:textSize="16sp"
+                        app:cornerRadius="12dp"
+                        android:visibility="gone" />
+
+                    <Button
+                        android:id="@+id/btn_accept_event"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginEnd="8dp"
+                        android:backgroundTint="#4CAF50"
+                        android:minHeight="48dp"
+                        android:paddingHorizontal="16dp"
+                        android:text="Accept"
+                        android:textAllCaps="false"
+                        android:textColor="@android:color/white"
+                        android:textSize="14sp"
+                        app:cornerRadius="12dp"
+                        android:visibility="gone" />
+
+                    <Button
+                        android:id="@+id/btn_decline_event"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:backgroundTint="#F44336"
+                        android:minHeight="48dp"
+                        android:paddingHorizontal="16dp"
+                        android:text="Decline"
+                        android:textAllCaps="false"
+                        android:textColor="@android:color/white"
+                        android:textSize="14sp"
+                        app:cornerRadius="12dp"
+                        android:visibility="gone" />
+                </LinearLayout>
             </LinearLayout>
 
         </androidx.constraintlayout.widget.ConstraintLayout>

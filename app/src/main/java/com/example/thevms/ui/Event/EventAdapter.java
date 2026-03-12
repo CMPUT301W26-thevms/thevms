@@ -2,6 +2,8 @@ package com.example.thevms.ui.Event;
 
 import android.annotation.SuppressLint;
 import android.app.AlertDialog;
+import android.content.res.ColorStateList;
+import android.graphics.Color;
 import android.provider.Settings;
 import android.text.Html;
 import android.util.Log;
@@ -23,6 +25,7 @@ import com.example.thevms.model.Event;
 
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -34,6 +37,7 @@ public class EventAdapter extends RecyclerView.Adapter<EventAdapter.EventViewHol
 
     private List<Event> events = new ArrayList<>();
     private boolean isAdmin = false;
+    private boolean managementMode = false;
     private final SimpleDateFormat dateFormat = new SimpleDateFormat("MMM dd", Locale.getDefault());
     private final SimpleDateFormat fullDateFormat = new SimpleDateFormat("MMM dd, yyyy HH:mm", Locale.getDefault());
     private final Set<Long> expandedEventIds = new HashSet<>();
@@ -45,6 +49,11 @@ public class EventAdapter extends RecyclerView.Adapter<EventAdapter.EventViewHol
 
     public void setAdmin(boolean admin) {
         isAdmin = admin;
+        notifyDataSetChanged();
+    }
+
+    public void setManagementMode(boolean managementMode) {
+        this.managementMode = managementMode;
         notifyDataSetChanged();
     }
 
@@ -60,7 +69,7 @@ public class EventAdapter extends RecyclerView.Adapter<EventAdapter.EventViewHol
         Event event = events.get(position);
         boolean isExpanded = expandedEventIds.contains(event.getEventId());
         
-        holder.bind(event, dateFormat, fullDateFormat, isAdmin, isExpanded, 
+        holder.bind(event, dateFormat, fullDateFormat, isAdmin, managementMode, isExpanded,
             () -> {
                 // Delete callback
                 int currentPos = holder.getAdapterPosition();
@@ -97,6 +106,7 @@ public class EventAdapter extends RecyclerView.Adapter<EventAdapter.EventViewHol
         Button acceptButton;
         Button declineButton;
         ImageView eventImageView;
+        TextView regStatusMessage;
 
         // Expandable views
         View expandableDetails;
@@ -119,6 +129,7 @@ public class EventAdapter extends RecyclerView.Adapter<EventAdapter.EventViewHol
             acceptButton = itemView.findViewById(R.id.btn_accept_event);
             declineButton = itemView.findViewById(R.id.btn_decline_event);
             eventImageView = itemView.findViewById(R.id.event_image);
+            regStatusMessage = itemView.findViewById(R.id.event_registration_status_message);
 
             expandableDetails = itemView.findViewById(R.id.expandable_details);
             descriptionTextView = itemView.findViewById(R.id.event_description);
@@ -130,7 +141,7 @@ public class EventAdapter extends RecyclerView.Adapter<EventAdapter.EventViewHol
         }
 
         public void bind(Event event, SimpleDateFormat dateFormat, SimpleDateFormat fullDateFormat, 
-                         boolean isAdmin, boolean isExpanded, Runnable onDelete, 
+                         boolean isAdmin, boolean managementMode, boolean isExpanded, Runnable onDelete,
                          java.util.function.Consumer<Boolean> onToggleExpand) {
             
             if (nameTextView != null) nameTextView.setText(event.getName());
@@ -182,39 +193,91 @@ public class EventAdapter extends RecyclerView.Adapter<EventAdapter.EventViewHol
             dbHandler.getEntrantStatus(String.valueOf(event.getEventId()), deviceId).addOnSuccessListener(status -> {
                 updateUIBasedOnStatus(status, event);
             });
+//           //PROBLEM HERE
+            if (managementMode) {
+                // In management mode, we don't show join/leave or status messages
+                if (joinButton != null) joinButton.setVisibility(View.GONE);
+                if (leaveButton != null) leaveButton.setVisibility(View.GONE);
+                if (regStatusMessage != null) regStatusMessage.setVisibility(View.GONE);
+            } else {
+                if (joinButton != null) {
+                    Date now = new Date();
+                    boolean isRegistrationStarted = event.getRegistrationStartTime() == null || now.after(event.getRegistrationStartTime());
+                    boolean isRegistrationEnded = event.getRegistrationEndTime() != null && now.after(event.getRegistrationEndTime());
+                    boolean canJoin = isRegistrationStarted && !isRegistrationEnded;
 
-            // Handle Join Button
-            if (joinButton != null) {
-                joinButton.setOnClickListener(v -> {
-                    Entrant.getOrCreate(deviceId).addOnSuccessListener(entrant -> {
-                        event.addEntrant(entrant).addOnSuccessListener(aVoid -> {
-                            Toast.makeText(itemView.getContext(), "Successfully joined " + event.getName(), Toast.LENGTH_SHORT).show();
-                            updateEntrantCount(event);
-                            updateUIBasedOnStatus(DatabaseHandler.STATUS_WAITING, event);
-                        }).addOnFailureListener(e -> {
-                            Toast.makeText(itemView.getContext(), "Failed to join event: " + e.getMessage(), Toast.LENGTH_SHORT).show();
-                        });
-                    }).addOnFailureListener(e -> {
-                        Toast.makeText(itemView.getContext(), "Error retrieving user profile", Toast.LENGTH_SHORT).show();
+                    joinButton.setEnabled(canJoin);
+                    if (canJoin) {
+                        joinButton.setBackgroundTintList(ColorStateList.valueOf(Color.BLACK));
+                        if (regStatusMessage != null) regStatusMessage.setVisibility(View.GONE);
+                    } else {
+                        joinButton.setBackgroundTintList(ColorStateList.valueOf(Color.LTGRAY));
+                        if (regStatusMessage != null) {
+                            regStatusMessage.setVisibility(View.VISIBLE);
+                            if (!isRegistrationStarted) {
+                                regStatusMessage.setText("Registration hasn't started yet");
+                            } else {
+                                regStatusMessage.setText("Registration has ended");
+                            }
+                        }
+                    }
+                }
+
+                Entrant.getOrCreate(deviceId).addOnSuccessListener(entrant -> {
+                    event.inEvent(entrant).addOnSuccessListener(isIn -> {
+                        if (joinButton != null) {
+                            joinButton.setVisibility(isIn ? View.GONE : View.VISIBLE);
+                            // If user is already in event, hide the "not started/ended" message too
+                            if (isIn && regStatusMessage != null) {
+                                regStatusMessage.setVisibility(View.GONE);
+                            }
+                        }
+                        if (leaveButton != null) {
+                            leaveButton.setVisibility(isIn ? View.VISIBLE : View.GONE);
+                        }
                     });
                 });
-            }
 
-            // Handle Leave Button
-            if (leaveButton != null) {
-                leaveButton.setOnClickListener(v -> {
-                    Entrant.getOrCreate(deviceId).addOnSuccessListener(entrant -> {
-                        event.removeEntrant(entrant).addOnSuccessListener(aVoid -> {
-                            Toast.makeText(itemView.getContext(), "Successfully left " + event.getName(), Toast.LENGTH_SHORT).show();
-                            updateEntrantCount(event);
-                            updateUIBasedOnStatus(null, event);
+                // Handle Join Button
+                if (joinButton != null) {
+                    joinButton.setOnClickListener(v -> {
+                        Entrant.getOrCreate(deviceId).addOnSuccessListener(entrant -> {
+                            event.addEntrant(entrant).addOnSuccessListener(aVoid -> {
+                                Toast.makeText(itemView.getContext(), "Successfully joined " + event.getName(), Toast.LENGTH_SHORT).show();
+                                updateEntrantCount(event);
+                                updateUIBasedOnStatus(DatabaseHandler.STATUS_WAITING, event);
+                                joinButton.setVisibility(View.GONE);
+                                leaveButton.setVisibility(View.VISIBLE);
+                                if (regStatusMessage != null) regStatusMessage.setVisibility(View.GONE);
+                            }).addOnFailureListener(e -> {
+                                Toast.makeText(itemView.getContext(), "Failed to join event: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+                            });
                         }).addOnFailureListener(e -> {
-                            Toast.makeText(itemView.getContext(), "Failed to leave event: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+                            Toast.makeText(itemView.getContext(), "Error retrieving user profile", Toast.LENGTH_SHORT).show();
                         });
-                    }).addOnFailureListener(e -> {
-                        Toast.makeText(itemView.getContext(), "Error retrieving user profile", Toast.LENGTH_SHORT).show();
                     });
-                });
+                }
+
+                // Handle Leave Button
+                if (leaveButton != null) {
+                    leaveButton.setOnClickListener(v -> {
+                        Entrant.getOrCreate(deviceId).addOnSuccessListener(entrant -> {
+                            event.removeEntrant(entrant).addOnSuccessListener(aVoid -> {
+                                Toast.makeText(itemView.getContext(), "Successfully left " + event.getName(), Toast.LENGTH_SHORT).show();
+                                updateEntrantCount(event);
+                                updateUIBasedOnStatus(null, event);
+                                leaveButton.setVisibility(View.GONE);
+                                joinButton.setVisibility(View.VISIBLE);
+                                // Re-check registration status when showing join button again
+                                bind(event, dateFormat, fullDateFormat, isAdmin, managementMode, isExpanded, onDelete, onToggleExpand);
+                            }).addOnFailureListener(e -> {
+                                Toast.makeText(itemView.getContext(), "Failed to leave event: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+                            });
+                        }).addOnFailureListener(e -> {
+                            Toast.makeText(itemView.getContext(), "Error retrieving user profile", Toast.LENGTH_SHORT).show();
+                        });
+                    });
+                }
             }
 
             // Handle Accept Button

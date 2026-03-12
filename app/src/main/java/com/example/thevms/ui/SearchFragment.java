@@ -242,16 +242,30 @@ public class SearchFragment extends Fragment {
 
     private void applyFilters() {
         filteredEvents.clear();
+        long now = System.currentTimeMillis();
+        long oneDayMillis = 86400000L;
+
         for (Event event : allEvents) {
+            // 1. Don't show if registration start is more than a day away
+            if (event.getRegistrationStartTime() != null) {
+                if (event.getRegistrationStartTime().getTime() - now > oneDayMillis) {
+                    continue;
+                }
+            }
+            // 2. Don't show if registration end was more than a day ago
+            if (event.getRegistrationEndTime() != null) {
+                if (now - event.getRegistrationEndTime().getTime() > oneDayMillis) {
+                    continue;
+                }
+            }
+
             String eventName = event.getName() != null ? event.getName() : "";
             boolean matchesName = eventName.toLowerCase().contains(nameFilter);
 
             boolean matchesDate = true;
             if (startDateFilter != null && endDateFilter != null && event.getEventStartTime() != null) {
                 long eventTime = event.getEventStartTime().getTime();
-                // Normalize event time to start of day for accurate comparison if needed, 
-                // but usually ranges cover the whole day.
-                matchesDate = eventTime >= startDateFilter && eventTime <= endDateFilter + 86400000; // +1 day
+                matchesDate = eventTime >= startDateFilter && eventTime <= endDateFilter + oneDayMillis;
             }
 
             boolean matchesTime = true;
