@@ -158,7 +158,7 @@ public class Event {
     public static Event fromMap(Map<String, Object> data) {
         if (data == null) return null;
 
-        Long id = (Long) data.get("eventId");
+        Long id = data.get("eventId") instanceof Long ? (Long) data.get("eventId") : null;
         String name = (String) data.get("name");
         String desc = (String) data.get("description");
         String img = (String) data.get("imageUrl");
@@ -167,25 +167,26 @@ public class Event {
         String fName = (String) data.get("organizerFirstName");
         String lName = (String) data.get("organizerLastName");
         String phone = (String) data.get("organizerPhone");
-        Organizer organizer = new Organizer(orgId, email, fName, lName, phone);
+        Organizer organizer = (orgId != null) ? new Organizer(orgId, email, fName, lName, phone) : null;
         String location = (String) data.get("location");
         Date regStart = toDate(data.get("registrationStartTime"));
         Date regEnd = toDate(data.get("registrationEndTime"));
         Date eventStart = toDate(data.get("eventStartTime"));
         Date eventEnd = toDate(data.get("eventEndTime"));
-        Boolean geoRequired = (Boolean) data.get("geolocationRequired");
-        Double radius = (Double) data.get("radius");
-        Location geoLocation = new Location("event_location");
-        geoLocation.setLatitude((Double) data.get("latitude"));
-        geoLocation.setLongitude((Double) data.get("longitude"));
+        Boolean geoRequired = data.get("geolocationRequired") instanceof Boolean ? (Boolean) data.get("geolocationRequired") : false;
+        Double radius = data.get("radius") instanceof Double ? (Double) data.get("radius") : 0.0;
+        
+        Location geoLocation = null;
+        if (data.containsKey("latitude") && data.get("latitude") != null && data.containsKey("longitude") && data.get("longitude") != null) {
+            geoLocation = new Location("event_location");
+            geoLocation.setLatitude((Double) data.get("latitude"));
+            geoLocation.setLongitude((Double) data.get("longitude"));
+        }
 
-        Event event = new Event(id, name, desc, organizer, location, img, regStart, regEnd, eventStart, eventEnd, geoRequired, radius, geoLocation);
+        Event event = new Event(id, name, desc, organizer, location, img, regStart, regEnd, eventStart, eventEnd, geoRequired != null && geoRequired, radius, geoLocation);
 
         if (data.containsKey("maxAttendees") && data.get("maxAttendees") != null) {
             event.setMaxAttendees(((Long) data.get("maxAttendees")).intValue());
-        }
-        if (data.containsKey("geolocationRequired") && data.get("geolocationRequired") != null) {
-            event.setGeolocationRequired((Boolean) data.get("geolocationRequired"));
         }
         if (data.containsKey("limitDistance") && data.get("limitDistance") != null) {
             Object dist = data.get("limitDistance");
@@ -195,41 +196,13 @@ public class Event {
         if (data.containsKey("locationName")) {
             event.setLocationName((String) data.get("locationName"));
         }
-        if (data.containsKey("organizerId")) {
-            event.setOrganizer(new Organizer((String) data.get("organizerId"), null, null, null, null));
-        }
 
         return event;
     }
 
     public static Event fromDoc(DocumentSnapshot doc) {
-        Long eventId = doc.getLong("eventId");
-        String name = doc.getString("name");
-        String description = doc.getString("description");
-        String orgId = doc.getString("organizerId");
-        String email = doc.getString("organizerEmail");
-        String fName = doc.getString("organizerFirstName");
-        String lName = doc.getString("organizerLastName");
-        String phone = doc.getString("organizerPhone");
-        Organizer organizer = new Organizer(orgId, email, fName, lName, phone);
-        String location = doc.getString("location");
-        String imageUrl = doc.getString("imageUrl");
-        Date regStart = doc.getDate("registrationStartTime");
-        Date regEnd = doc.getDate("registrationEndTime");
-        Date eventStart = doc.getDate("eventStartTime");
-        Date eventEnd = doc.getDate("eventEndTime");
-        Boolean geoRequired = (Boolean) doc.get("geolocationRequired");
-        Double radius = (Double) doc.get("radius");
-        Location geolocation = null;
-        if (doc.contains("latitude") && doc.contains("longitude")) {
-            geolocation = new Location("event_location");
-            geolocation.setLatitude(doc.getDouble("latitude"));
-            geolocation.setLongitude(doc.getDouble("longitude"));
-        }
-
-
-        return new Event(eventId, name, description, organizer, location, imageUrl, regStart, regEnd, eventStart, eventEnd, geoRequired, radius, geolocation);
-        //return fromMap(doc.getData());
+        if (!doc.exists()) return null;
+        return fromMap(doc.getData());
     }
 
     public Task<Void> save() {
@@ -341,4 +314,3 @@ public class Event {
     public Double getLimitDistance() { return limitDistance; }
     public void setLimitDistance(Double limitDistance) { this.limitDistance = limitDistance; }
 }
-
