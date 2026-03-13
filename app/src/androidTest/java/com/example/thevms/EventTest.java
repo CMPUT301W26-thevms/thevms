@@ -22,8 +22,9 @@ public class EventTest {
         Constructor<Event> constructor = Event.class.getDeclaredConstructor(
                 Long.class, String.class, String.class, 
                 com.example.thevms.model.Organizer.class, 
-                android.location.Location.class, String.class, 
-                Date.class, Date.class, Date.class, Date.class
+                String.class, String.class,
+                Date.class, Date.class, Date.class, Date.class,
+                boolean.class, Double.class, android.location.Location.class
         );
         constructor.setAccessible(true);
 
@@ -33,7 +34,7 @@ public class EventTest {
 
         Event event = constructor.newInstance(
                 1L, "Test Event", "Description", null, null, null,
-                futureStart, futureEnd, null, null
+                futureStart, futureEnd, null, null, false, null, null
         );
 
         Entrant entrant = new Entrant("device123", "test@example.com", "First", "Last", null);
@@ -51,10 +52,11 @@ public class EventTest {
     @Test
     public void testAddEntrantTooLate() throws Exception {
         Constructor<Event> constructor = Event.class.getDeclaredConstructor(
-                Long.class, String.class, String.class, 
-                com.example.thevms.model.Organizer.class, 
-                android.location.Location.class, String.class, 
-                Date.class, Date.class, Date.class, Date.class
+                Long.class, String.class, String.class,
+                com.example.thevms.model.Organizer.class,
+                String.class, String.class,
+                Date.class, Date.class, Date.class, Date.class,
+                boolean.class, Double.class, android.location.Location.class
         );
         constructor.setAccessible(true);
 
@@ -64,8 +66,9 @@ public class EventTest {
 
         Event event = constructor.newInstance(
                 1L, "Test Event", "Description", null, null, null,
-                pastStart, pastEnd, null, null
+                pastStart, pastEnd, null, null, false, null, null
         );
+
 
         Entrant entrant = new Entrant("device123", "test@example.com", "First", "Last", null);
 

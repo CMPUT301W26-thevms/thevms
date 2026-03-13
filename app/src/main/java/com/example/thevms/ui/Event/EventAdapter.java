@@ -3,6 +3,7 @@ package com.example.thevms.ui.Event;
 import android.annotation.SuppressLint;
 import android.app.AlertDialog;
 import android.provider.Settings;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -36,6 +37,7 @@ public class EventAdapter extends RecyclerView.Adapter<EventAdapter.EventViewHol
     private final SimpleDateFormat dateFormat = new SimpleDateFormat("MMM dd", Locale.getDefault());
     private final SimpleDateFormat fullDateFormat = new SimpleDateFormat("MMM dd, yyyy HH:mm", Locale.getDefault());
     private final Set<Long> expandedEventIds = new HashSet<>();
+    public static android.location.Location testLocation = null;
 
     public void setEvents(List<Event> events) {
         this.events = events;
@@ -50,6 +52,10 @@ public class EventAdapter extends RecyclerView.Adapter<EventAdapter.EventViewHol
     public void setManagementMode(boolean managementMode) {
         this.managementMode = managementMode;
         notifyDataSetChanged();
+    }
+
+    public static void setTestLocation(android.location.Location location) {
+        testLocation = location;
     }
 
     @NonNull
@@ -89,6 +95,7 @@ public class EventAdapter extends RecyclerView.Adapter<EventAdapter.EventViewHol
     }
 
     static class EventViewHolder extends RecyclerView.ViewHolder {
+        private final com.google.android.gms.location.FusedLocationProviderClient fusedLocationClient;
         TextView nameTextView, statusTextView, timeTextView, locationTextView;
         Button joinButton, removeButton, leaveButton, acceptButton, declineButton, expandButton;
         ImageView eventImageView;
@@ -115,9 +122,11 @@ public class EventAdapter extends RecyclerView.Adapter<EventAdapter.EventViewHol
             eventStartTextView = itemView.findViewById(R.id.event_start_details);
             eventEndTextView = itemView.findViewById(R.id.event_end_details);
             expandButton = itemView.findViewById(R.id.btn_expand_details);
+
+            fusedLocationClient = com.google.android.gms.location.LocationServices.getFusedLocationProviderClient(itemView.getContext());
         }
 
-        public void bind(Event event, SimpleDateFormat dateFormat, SimpleDateFormat fullDateFormat,
+        public void bind(Event event, SimpleDateFormat dateFormat, SimpleDateFormat fullDateFormat, 
                          boolean isAdmin, boolean managementMode, boolean isExpanded, Runnable onDelete,
                          java.util.function.Consumer<Boolean> onToggleExpand) {
 
@@ -142,6 +151,9 @@ public class EventAdapter extends RecyclerView.Adapter<EventAdapter.EventViewHol
                 if (removeButton != null) removeButton.setVisibility(View.GONE);
             }
 
+            if (locationTextView != null) {
+                locationTextView.setText(event.getLocation());
+            }
             updateEntrantCount(event, null);
             dbHandler.getEntrantStatus(String.valueOf(event.getEventId()), deviceId).addOnSuccessListener(status -> {
                 updateUIBasedOnStatus(status, event, deviceId, dbHandler);
@@ -226,17 +238,37 @@ public class EventAdapter extends RecyclerView.Adapter<EventAdapter.EventViewHol
             updateEntrantCount(event, statusPrefix);
         }
 
-        private void setupJoinButton(Event event, String deviceId) {
-            joinButton.setOnClickListener(v -> {
-                Entrant.getOrCreate(deviceId).addOnSuccessListener(entrant -> {
-                    event.addEntrant(entrant).addOnSuccessListener(aVoid -> {
-                        Toast.makeText(itemView.getContext(), "Joined " + event.getName(), Toast.LENGTH_SHORT).show();
-                        refreshUI(event, deviceId);
-                    });
+//        private void setupJoinButton(Event event, String deviceId) {
+//            joinButton.setOnClickListener(v -> {
+//                Entrant.getOrCreate(deviceId).addOnSuccessListener(entrant -> {
+//                    event.addEntrant(entrant).addOnSuccessListener(aVoid -> {
+//                        Toast.makeText(itemView.getContext(), "Joined " + event.getName(), Toast.LENGTH_SHORT).show();
+//                        refreshUI(event, deviceId);
+//                    });
+//                });
+//            });
+//        }
+
+        private void setupJoinButton(Event event, String deviceId){
+            Entrant.getOrCreate(deviceId).addOnSuccessListener(entrant -> {
+                event.inEvent(entrant).addOnSuccessListener(isIn -> {
+                    if (joinButton != null) {
+                        joinButton.setVisibility(isIn ? View.GONE : View.VISIBLE);
+                        // If user is already in event, hide the "not started/ended" message too
+                        if (isIn && regStatusMessage != null) {
+                            regStatusMessage.setVisibility(View.GONE);
+                        }
+                    }
+                    if (leaveButton != null) {
+                        leaveButton.setVisibility(isIn ? View.VISIBLE : View.GONE);
+                    }
                 });
             });
-        }
+            if (joinButton != null) {
+                joinButton.setOnClickListener(v -> checkLocation(event, deviceId));
+            }
 
+        }
         private void setupLeaveButton(Event event, String deviceId) {
             leaveButton.setOnClickListener(v -> {
                 Entrant.getOrCreate(deviceId).addOnSuccessListener(entrant -> {
@@ -272,6 +304,123 @@ public class EventAdapter extends RecyclerView.Adapter<EventAdapter.EventViewHol
         private void refreshUI(Event event, String deviceId) {
             new DatabaseHandler().getEntrantStatus(String.valueOf(event.getEventId()), deviceId).addOnSuccessListener(newStatus -> {
                 updateUIBasedOnStatus(newStatus, event, deviceId, new DatabaseHandler());
+            });
+        }
+        // Handle join event
+        private void joinEvent(Event event, String deviceId) {
+            Entrant.getOrCreate(deviceId).addOnSuccessListener(entrant -> {
+                event.addEntrant(entrant).addOnSuccessListener(aVoid -> {
+                    Toast.makeText(itemView.getContext(), "Successfully joined " + event.getName(), Toast.LENGTH_SHORT).show();
+                    updateEntrantCount(event);
+                    joinButton.setVisibility(View.GONE);
+                    leaveButton.setVisibility(View.VISIBLE);
+                    if (regStatusMessage != null) {
+                        regStatusMessage.setVisibility(View.GONE);
+                    }
+                }).addOnFailureListener(e -> {
+                    Toast.makeText(itemView.getContext(), "Failed to join event: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+                });
+            }).addOnFailureListener(e -> {
+                Toast.makeText(itemView.getContext(), "Error retrieving user profile", Toast.LENGTH_SHORT).show();
+            });
+        }
+
+        // Handle geolocation
+        private void handleLocationResult(android.location.Location currentLoc, Event event, String deviceId) {
+            float[] results = new float[1];
+            android.location.Location.distanceBetween(
+                    currentLoc.getLatitude(), currentLoc.getLongitude(),
+                    event.getGeoLocation().getLatitude(), event.getGeoLocation().getLongitude(),
+                    results);
+
+            float distanceInMeters = results[0];
+            double radiusInMeters = event.getRadius() * 1000;
+
+            if (distanceInMeters <= radiusInMeters) {
+                joinEvent(event, deviceId);
+            } else {
+                Toast.makeText(itemView.getContext(),
+                        "Out of location requirement", Toast.LENGTH_LONG).show();
+            }
+        }
+
+        private void checkLocation(Event event, String deviceId) {
+            if (!event.isGeolocationRequired()) {
+                joinEvent(event, deviceId);
+                return;
+            }
+
+            if (EventAdapter.testLocation != null) {
+                handleLocationResult(EventAdapter.testLocation, event, deviceId);
+                return;
+            }
+
+            if (event.getGeoLocation() == null) {
+                Log.e("JOIN_ERROR", "Event coordinates are missing in database!");
+                Toast.makeText(itemView.getContext(), "Error: Event has no location data.", Toast.LENGTH_LONG).show();
+                return;
+            }
+
+            if (androidx.core.content.ContextCompat.checkSelfPermission(itemView.getContext(),
+                    android.Manifest.permission.ACCESS_FINE_LOCATION) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                if (itemView.getContext() instanceof android.app.Activity) {
+                    androidx.core.app.ActivityCompat.requestPermissions(
+                            (android.app.Activity) itemView.getContext(),
+                            new String[]{android.Manifest.permission.ACCESS_FINE_LOCATION, android.Manifest.permission.ACCESS_COARSE_LOCATION},
+                            77
+                    );
+                    Toast.makeText(itemView.getContext(), "Please give permission to access your location.", Toast.LENGTH_LONG).show();
+                }
+                return;
+            }
+
+            Toast.makeText(itemView.getContext(), "Checking your location...", Toast.LENGTH_SHORT).show();
+            com.google.android.gms.location.LocationRequest locationRequest =
+                    new com.google.android.gms.location.LocationRequest.Builder(
+                            com.google.android.gms.location.Priority.PRIORITY_HIGH_ACCURACY, 1000)
+                            .setMaxUpdates(1)
+                            .build();
+            com.google.android.gms.location.LocationCallback locationCallback = new com.google.android.gms.location.LocationCallback() {
+                @Override
+                public void onLocationResult(@NonNull com.google.android.gms.location.LocationResult locationResult) {
+                    fusedLocationClient.removeLocationUpdates(this);
+
+                    android.location.Location currentLoc = locationResult.getLastLocation();
+                    if (currentLoc != null) {
+                        float[] results = new float[1];
+                        android.location.Location.distanceBetween(
+                                currentLoc.getLatitude(), currentLoc.getLongitude(),
+                                event.getGeoLocation().getLatitude(), event.getGeoLocation().getLongitude(),
+                                results);
+
+                        float distanceInMeters = results[0];
+                        double radiusInMeters = event.getRadius() * 1000;
+
+                        if (distanceInMeters <= radiusInMeters) {
+                            joinEvent(event, deviceId);
+                        } else {
+                            Toast.makeText(itemView.getContext(), "Out of location requirement", Toast.LENGTH_LONG).show();
+                        }
+                    } else {
+                        Toast.makeText(itemView.getContext(), "Still cannot get location", Toast.LENGTH_SHORT).show();
+                    }
+                }
+                };
+
+
+            fusedLocationClient.requestLocationUpdates(
+                    locationRequest,
+                    locationCallback,
+                    android.os.Looper.getMainLooper()
+            );
+        }
+
+        private void updateEntrantCount(Event event) {
+            if (statusTextView == null) return;
+            event.fetchEntrantCount().addOnSuccessListener(count -> {
+                statusTextView.setText(String.format(Locale.getDefault(), "☆ %d people joined", count));
+            }).addOnFailureListener(e -> {
+                statusTextView.setText("☆ -- people joined");
             });
         }
 
