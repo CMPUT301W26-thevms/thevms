@@ -1,4 +1,5 @@
 @startuml
+
 class com.example.thevms.ui.Event.AttendeeAdapter {
 - List<AttendeeItem> allAttendees
 - List<AttendeeItem> filteredAttendees
@@ -14,7 +15,7 @@ class com.example.thevms.ui.Event.AttendeeAdapter {
 + void onBindViewHolder(ViewHolder,int)
 + int getItemCount()
 }
-
+note right of com.example.thevms.ui.Event.AttendeeAdapter : Manages the display and status-based\nfiltering of event participants.
 
 interface com.example.thevms.ui.Event.AttendeeAdapter$OnCancelEntrantListener {
 ~ void onCancel(AttendeeItem)
@@ -36,7 +37,7 @@ class com.example.thevms.model.Organizer {
 + void createEvent(Date,Date,Date,Date,String,String,Location,Integer,Integer)
 + void sendNotification(List<Entrant>,Event)
 }
-
+note left of com.example.thevms.model.Organizer : An Entrant with elevated privileges\nto manage their own events.
 
 enum com.example.thevms.model.UserRole {
 +  ENTRANT
@@ -93,7 +94,7 @@ class com.example.thevms.ui.Event.OrganizerEventAdapter {
 + void onBindViewHolder(ViewHolder,int)
 + int getItemCount()
 }
-
+note top of com.example.thevms.ui.Event.OrganizerEventAdapter : Controller for the organizer's dashboard\nview of their hosted events.
 
 interface com.example.thevms.ui.Event.OrganizerEventAdapter$OnEventCancelListener {
 ~ void onCancel(Event)
@@ -170,6 +171,7 @@ class com.example.thevms.model.Admin {
 + {static} Admin fromMap(String,Map<String,Object>)
 + void removeEvent(Event,List<Event>)
 }
+note left of com.example.thevms.model.Admin : System administrator with the ability\nto moderate events and user accounts.
 
 class com.example.thevms.ui.CreateEventFragment {
 - EditText etName
@@ -221,7 +223,7 @@ class com.example.thevms.model.DatabaseHandler {
 + Task<Void> selectAndInviteNextEntrant(String)
 + FirebaseFirestore getDb()
 }
-
+note right of com.example.thevms.model.DatabaseHandler : Central utility for all Firestore interactions,\nmaintaining data consistency across the app.
 
 class com.example.thevms.ui.Admin.AdminEventsFragment {
 - RecyclerView recyclerView
@@ -296,7 +298,7 @@ class com.example.thevms.model.Event {
 + Double getLimitDistance()
 + void setLimitDistance(Double)
 }
-
+note left of com.example.thevms.model.Event : Core entity representing an event\nand its lottery configuration.
 
 class com.example.thevms.model.Entrant {
 # DatabaseHandler dbHandler
@@ -332,7 +334,7 @@ class com.example.thevms.model.Entrant {
 + void registerInEvent(Event)
 + void unregisterFromEvent(Event)
 }
-
+note left of com.example.thevms.model.Entrant : Primary user class representing anyone\nregistered in the system.
 
 class com.example.thevms.ui.ProfileFragment {
 - TextView nameText
@@ -401,7 +403,7 @@ class com.example.thevms.ui.MainActivity {
 + void openAdminDrawer()
 - void checkUserRoleAndAdjustUI(BottomNavigationView)
 }
-
+note top of com.example.thevms.ui.MainActivity : The main entry point and navigation hub\nfor the application.
 
 class com.example.thevms.ui.SearchFragment {
 - EditText searchEditText
@@ -478,26 +480,26 @@ androidx.appcompat.app.AppCompatActivity <|-- com.example.thevms.ui.SignupActivi
 androidx.appcompat.app.AppCompatActivity <|-- com.example.thevms.ui.MainActivity
 androidx.fragment.app.Fragment <|-- com.example.thevms.ui.SearchFragment
 
-com.example.thevms.ui.Event.AttendeeAdapter o-- "*" com.example.thevms.model.AttendeeItem
-com.example.thevms.model.Organizer o-- "*" com.example.thevms.model.Event
-com.example.thevms.ui.MyEventsActivity o-- "1" com.example.thevms.ui.Event.OrganizerEventAdapter
-com.example.thevms.ui.MyEventsActivity o-- "1" com.example.thevms.model.DatabaseHandler
-com.example.thevms.ui.Event.OrganizerEventAdapter o-- "*" com.example.thevms.model.Event
-com.example.thevms.ui.Event.OrganizerEventAdapter$ViewHolder o-- "1" com.example.thevms.ui.Event.AttendeeAdapter
-com.example.thevms.ui.Event.OrganizerEventAdapter$ViewHolder o-- "1" com.example.thevms.model.DatabaseHandler
-com.example.thevms.ui.Event.EventAdapter o-- "*" com.example.thevms.model.Event
-com.example.thevms.model.Event o-- "1" com.example.thevms.model.DatabaseHandler
-com.example.thevms.model.Event o-- "1" com.example.thevms.model.Organizer
-com.example.thevms.model.Event o-- "*" com.example.thevms.model.Entrant
-com.example.thevms.model.Entrant o-- "1" com.example.thevms.model.DatabaseHandler
-com.example.thevms.model.Entrant o-- "1" com.example.thevms.model.UserRole
-com.example.thevms.ui.Admin.AdminProfilesFragment o-- "1" com.example.thevms.ui.Admin.AdminProfilesFragment$ProfileAdapter
-com.example.thevms.ui.Admin.AdminProfilesFragment o-- "*" com.example.thevms.model.Entrant
-com.example.thevms.ui.Admin.AdminProfilesFragment o-- "1" com.example.thevms.model.DatabaseHandler
-com.example.thevms.ui.Admin.AdminProfilesFragment$ProfileAdapter o-- "*" com.example.thevms.model.Entrant
-com.example.thevms.ui.SearchFragment o-- "1" com.example.thevms.ui.Event.EventAdapter
-com.example.thevms.ui.SearchFragment o-- "*" com.example.thevms.model.Event
-com.example.thevms.model.AttendeeItem o-- "1" com.example.thevms.model.Entrant
+com.example.thevms.ui.Event.AttendeeAdapter "1" o-- "*" com.example.thevms.model.AttendeeItem
+com.example.thevms.model.Organizer "1" o-- "*" com.example.thevms.model.Event
+com.example.thevms.ui.MyEventsActivity "1" o-- "1" com.example.thevms.ui.Event.OrganizerEventAdapter
+com.example.thevms.ui.MyEventsActivity "1" o-- "1" com.example.thevms.model.DatabaseHandler
+com.example.thevms.ui.Event.OrganizerEventAdapter "1" o-- "*" com.example.thevms.model.Event
+com.example.thevms.ui.Event.OrganizerEventAdapter$ViewHolder "1" o-- "1" com.example.thevms.ui.Event.AttendeeAdapter
+com.example.thevms.ui.Event.OrganizerEventAdapter$ViewHolder "1" o-- "1" com.example.thevms.model.DatabaseHandler
+com.example.thevms.ui.Event.EventAdapter "1" o-- "*" com.example.thevms.model.Event
+com.example.thevms.model.Event "1" o-- "1" com.example.thevms.model.DatabaseHandler
+com.example.thevms.model.Event "1" o-- "1" com.example.thevms.model.Organizer
+com.example.thevms.model.Event "1" o-- "*" com.example.thevms.model.Entrant
+com.example.thevms.model.Entrant "1" o-- "1" com.example.thevms.model.DatabaseHandler
+com.example.thevms.model.Entrant "1" o-- "1" com.example.thevms.model.UserRole
+com.example.thevms.ui.Admin.AdminProfilesFragment "1" o-- "1" com.example.thevms.ui.Admin.AdminProfilesFragment$ProfileAdapter
+com.example.thevms.ui.Admin.AdminProfilesFragment "1" o-- "*" com.example.thevms.model.Entrant
+com.example.thevms.ui.Admin.AdminProfilesFragment "1" o-- "1" com.example.thevms.model.DatabaseHandler
+com.example.thevms.ui.Admin.AdminProfilesFragment$ProfileAdapter "1" o-- "*" com.example.thevms.model.Entrant
+com.example.thevms.ui.SearchFragment "1" o-- "1" com.example.thevms.ui.Event.EventAdapter
+com.example.thevms.ui.SearchFragment "1" o-- "*" com.example.thevms.model.Event
+com.example.thevms.model.AttendeeItem "1" o-- "1" com.example.thevms.model.Entrant
 
 com.example.thevms.ui.SignupActivity --> com.example.thevms.ui.MainActivity
 com.example.thevms.ui.MainActivity --> com.example.thevms.ui.SearchFragment
@@ -509,4 +511,5 @@ com.example.thevms.ui.ProfileFragment --> com.example.thevms.ui.MyEventsActivity
 com.example.thevms.ui.Admin.AdminActivity --> com.example.thevms.ui.SearchFragment
 com.example.thevms.ui.Admin.AdminActivity --> com.example.thevms.ui.Admin.AdminProfilesFragment
 com.example.thevms.ui.Admin.AdminActivity --> com.example.thevms.ui.Admin.AdminEventsFragment
+
 @enduml
