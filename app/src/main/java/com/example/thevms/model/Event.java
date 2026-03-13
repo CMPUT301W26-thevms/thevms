@@ -330,7 +330,7 @@ public class Event {
     public Date getEventEndTime() {return eventEndTime;}
     public void setEventEndTime(Date eventEndTime) {this.eventEndTime = eventEndTime;}
     public HashMap<Entrant, Boolean> getEntrantList() {return entrantList;}
-    Integer getMaxAttendees() { return maxAttendees; }
+    public Integer getMaxAttendees() { return maxAttendees; }
     public void setMaxAttendees(Integer maxAttendees) { this.maxAttendees = maxAttendees; }
     public boolean isGeolocationRequired() {return geolocationRequired;}
     public void setGeolocationRequired(boolean geolocationRequired) {this.geolocationRequired = geolocationRequired;}
