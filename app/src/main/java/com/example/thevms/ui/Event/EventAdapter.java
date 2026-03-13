@@ -2,11 +2,7 @@ package com.example.thevms.ui.Event;
 
 import android.annotation.SuppressLint;
 import android.app.AlertDialog;
-import android.content.res.ColorStateList;
-import android.graphics.Color;
 import android.provider.Settings;
-import android.text.Html;
-import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -25,7 +21,6 @@ import com.example.thevms.model.Event;
 
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
-import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -68,23 +63,23 @@ public class EventAdapter extends RecyclerView.Adapter<EventAdapter.EventViewHol
     public void onBindViewHolder(@NonNull EventViewHolder holder, int position) {
         Event event = events.get(position);
         boolean isExpanded = expandedEventIds.contains(event.getEventId());
-        
+
         holder.bind(event, dateFormat, fullDateFormat, isAdmin, managementMode, isExpanded,
-            () -> {
-                int currentPos = holder.getAdapterPosition();
-                if (currentPos != RecyclerView.NO_POSITION) {
-                    events.remove(currentPos);
-                    notifyItemRemoved(currentPos);
+                () -> {
+                    int currentPos = holder.getAdapterPosition();
+                    if (currentPos != RecyclerView.NO_POSITION) {
+                        events.remove(currentPos);
+                        notifyItemRemoved(currentPos);
+                    }
+                },
+                (expand) -> {
+                    if (expand) {
+                        expandedEventIds.add(event.getEventId());
+                    } else {
+                        expandedEventIds.remove(event.getEventId());
+                    }
+                    notifyItemChanged(holder.getAdapterPosition());
                 }
-            },
-            (expand) -> {
-                if (expand) {
-                    expandedEventIds.add(event.getEventId());
-                } else {
-                    expandedEventIds.remove(event.getEventId());
-                }
-                notifyItemChanged(holder.getAdapterPosition());
-            }
         );
     }
 
@@ -122,13 +117,16 @@ public class EventAdapter extends RecyclerView.Adapter<EventAdapter.EventViewHol
             expandButton = itemView.findViewById(R.id.btn_expand_details);
         }
 
-        public void bind(Event event, SimpleDateFormat dateFormat, SimpleDateFormat fullDateFormat, 
+        public void bind(Event event, SimpleDateFormat dateFormat, SimpleDateFormat fullDateFormat,
                          boolean isAdmin, boolean managementMode, boolean isExpanded, Runnable onDelete,
                          java.util.function.Consumer<Boolean> onToggleExpand) {
-            
+
             if (nameTextView != null) nameTextView.setText(event.getName());
             if (timeTextView != null && event.getEventStartTime() != null) {
                 timeTextView.setText(String.format("Starts %s", dateFormat.format(event.getEventStartTime())));
+            }
+            if (locationTextView != null) {
+                locationTextView.setText("📍 " + (event.getLocationName() != null ? event.getLocationName() : "No location"));
             }
 
             @SuppressLint("HardwareIds")
@@ -140,17 +138,36 @@ public class EventAdapter extends RecyclerView.Adapter<EventAdapter.EventViewHol
                     removeButton.setVisibility(View.VISIBLE);
                     removeButton.setOnClickListener(v -> showDeleteConfirmation(event, onDelete));
                 }
-                updateEntrantCount(event, null);
-                return;
+            } else {
+                if (removeButton != null) removeButton.setVisibility(View.GONE);
             }
 
+            updateEntrantCount(event, null);
             dbHandler.getEntrantStatus(String.valueOf(event.getEventId()), deviceId).addOnSuccessListener(status -> {
                 updateUIBasedOnStatus(status, event, deviceId, dbHandler);
             });
 
             // Bind detailed info
-            if (descriptionTextView != null) descriptionTextView.setText(event.getDescription());
-            if (expandableDetails != null) expandableDetails.setVisibility(isExpanded ? View.VISIBLE : View.GONE);
+            if (descriptionTextView != null) {
+                descriptionTextView.setText(event.getDescription() != null ? event.getDescription() : "No description provided.");
+            }
+            if (regStartTextView != null) {
+                regStartTextView.setText("Registration Starts: " + (event.getRegistrationStartTime() != null ? fullDateFormat.format(event.getRegistrationStartTime()) : "TBD"));
+            }
+            if (regEndTextView != null) {
+                regEndTextView.setText("Registration Ends: " + (event.getRegistrationEndTime() != null ? fullDateFormat.format(event.getRegistrationEndTime()) : "TBD"));
+            }
+            if (eventStartTextView != null) {
+                eventStartTextView.setText("Event Starts: " + (event.getEventStartTime() != null ? fullDateFormat.format(event.getEventStartTime()) : "TBD"));
+            }
+            if (eventEndTextView != null) {
+                eventEndTextView.setText("Event Ends: " + (event.getEventEndTime() != null ? fullDateFormat.format(event.getEventEndTime()) : "TBD"));
+            }
+
+            // Handle Expansion state
+            if (expandableDetails != null) {
+                expandableDetails.setVisibility(isExpanded ? View.VISIBLE : View.GONE);
+            }
             if (expandButton != null) {
                 expandButton.setText(isExpanded ? "Show Less" : "Show More Details");
                 expandButton.setOnClickListener(v -> onToggleExpand.accept(!isExpanded));
@@ -275,7 +292,8 @@ public class EventAdapter extends RecyclerView.Adapter<EventAdapter.EventViewHol
             ImageView ivClose = dialogView.findViewById(R.id.iv_close);
 
             if (title != null) title.setText("Delete Event");
-            if (message != null) message.setText("Are you sure you want to delete " + event.getName() + "?");
+            if (message != null)
+                message.setText("Are you sure you want to delete " + event.getName() + "?");
 
             if (btnCancel != null) btnCancel.setOnClickListener(v -> dialog.dismiss());
             if (ivClose != null) ivClose.setOnClickListener(v -> dialog.dismiss());
