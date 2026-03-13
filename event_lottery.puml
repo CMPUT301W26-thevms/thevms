@@ -478,25 +478,26 @@ androidx.appcompat.app.AppCompatActivity <|-- com.example.thevms.ui.SignupActivi
 androidx.appcompat.app.AppCompatActivity <|-- com.example.thevms.ui.MainActivity
 androidx.fragment.app.Fragment <|-- com.example.thevms.ui.SearchFragment
 
-com.example.thevms.ui.Event.AttendeeAdapter o-- "0..*" com.example.thevms.model.Entrant
-com.example.thevms.model.Organizer o-- "0..*" com.example.thevms.model.Event
+com.example.thevms.ui.Event.AttendeeAdapter o-- "*" com.example.thevms.model.AttendeeItem
+com.example.thevms.model.Organizer o-- "*" com.example.thevms.model.Event
 com.example.thevms.ui.MyEventsActivity o-- "1" com.example.thevms.ui.Event.OrganizerEventAdapter
 com.example.thevms.ui.MyEventsActivity o-- "1" com.example.thevms.model.DatabaseHandler
-com.example.thevms.ui.Event.OrganizerEventAdapter o-- "0..*" com.example.thevms.model.Event
+com.example.thevms.ui.Event.OrganizerEventAdapter o-- "*" com.example.thevms.model.Event
 com.example.thevms.ui.Event.OrganizerEventAdapter$ViewHolder o-- "1" com.example.thevms.ui.Event.AttendeeAdapter
 com.example.thevms.ui.Event.OrganizerEventAdapter$ViewHolder o-- "1" com.example.thevms.model.DatabaseHandler
-com.example.thevms.ui.Event.EventAdapter o-- "0..*" com.example.thevms.model.Event
+com.example.thevms.ui.Event.EventAdapter o-- "*" com.example.thevms.model.Event
 com.example.thevms.model.Event o-- "1" com.example.thevms.model.DatabaseHandler
 com.example.thevms.model.Event o-- "1" com.example.thevms.model.Organizer
-com.example.thevms.model.Event o-- "0..*" com.example.thevms.model.Entrant
+com.example.thevms.model.Event o-- "*" com.example.thevms.model.Entrant
 com.example.thevms.model.Entrant o-- "1" com.example.thevms.model.DatabaseHandler
 com.example.thevms.model.Entrant o-- "1" com.example.thevms.model.UserRole
 com.example.thevms.ui.Admin.AdminProfilesFragment o-- "1" com.example.thevms.ui.Admin.AdminProfilesFragment$ProfileAdapter
-com.example.thevms.ui.Admin.AdminProfilesFragment o-- "0..*" com.example.thevms.model.Entrant
+com.example.thevms.ui.Admin.AdminProfilesFragment o-- "*" com.example.thevms.model.Entrant
 com.example.thevms.ui.Admin.AdminProfilesFragment o-- "1" com.example.thevms.model.DatabaseHandler
-com.example.thevms.ui.Admin.AdminProfilesFragment$ProfileAdapter o-- "0..*" com.example.thevms.model.Entrant
+com.example.thevms.ui.Admin.AdminProfilesFragment$ProfileAdapter o-- "*" com.example.thevms.model.Entrant
 com.example.thevms.ui.SearchFragment o-- "1" com.example.thevms.ui.Event.EventAdapter
-com.example.thevms.ui.SearchFragment o-- "0..*" com.example.thevms.model.Event
+com.example.thevms.ui.SearchFragment o-- "*" com.example.thevms.model.Event
+com.example.thevms.model.AttendeeItem o-- "1" com.example.thevms.model.Entrant
 
 com.example.thevms.ui.SignupActivity --> com.example.thevms.ui.MainActivity
 com.example.thevms.ui.MainActivity --> com.example.thevms.ui.SearchFragment
@@ -507,4 +508,5 @@ com.example.thevms.ui.ProfileFragment --> com.example.thevms.ui.SettingsActivity
 com.example.thevms.ui.ProfileFragment --> com.example.thevms.ui.MyEventsActivity
 com.example.thevms.ui.Admin.AdminActivity --> com.example.thevms.ui.SearchFragment
 com.example.thevms.ui.Admin.AdminActivity --> com.example.thevms.ui.Admin.AdminProfilesFragment
+com.example.thevms.ui.Admin.AdminActivity --> com.example.thevms.ui.Admin.AdminEventsFragment
 @enduml
