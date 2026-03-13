@@ -16,6 +16,7 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 
 import android.content.Context;
+import android.util.Log;
 import android.view.View;
 
 import androidx.test.core.app.ActivityScenario;
@@ -28,6 +29,8 @@ import androidx.test.filters.LargeTest;
 import androidx.test.platform.app.InstrumentationRegistry;
 import androidx.test.rule.GrantPermissionRule;
 
+import com.example.thevms.model.DatabaseHandler;
+import com.example.thevms.ui.Event.EventAdapter;
 import com.example.thevms.ui.MainActivity;
 import com.example.thevms.ui.SearchFragment;
 import com.google.android.gms.tasks.Tasks;
@@ -39,6 +42,9 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
+import java.util.Date;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -58,20 +64,34 @@ public class MainActivityTest {
     public void setUp() throws Exception {
         Intents.init();
 
-        // 1. Initialize the test helper. Its constructor calls dbHandler.useEmulator().
-        // We do this BEFORE launching the activity to ensure the activity uses the emulator.
         testHelper = new FirestoreTestHelper();
         testHelper.clearDatabase();
+        testHelper.seedDummyEvents(3);
 
-        // 2. Seed dummy events: "Test Event 1" and "Test Event 2"
-        testHelper.seedDummyEvents(2);
+        Map<String, Object> updates = new HashMap<>();
+        updates.put("geolocationRequired", true);
+        updates.put("radius", 1.0);
+        updates.put("latitude", 53.52);
+        updates.put("longitude", -113.52);
 
-        // 3. Launch the activity manually after the environment is ready.
+        Tasks.await(
+                testHelper.getDbHandler().getDb()
+                        .collection(DatabaseHandler.COLLECTION_EVENTS)
+                        .document("1")
+                        .update(updates),
+                5, TimeUnit.SECONDS
+        );
+
+        Context context = InstrumentationRegistry.getInstrumentation().getTargetContext();
+        InstrumentationRegistry.getInstrumentation().getUiAutomation()
+                .executeShellCommand("appops set " + context.getPackageName() + " android:mock_location allow");
+
         scenario = ActivityScenario.launch(MainActivity.class);
     }
 
     @After
     public void tearDown() {
+        EventAdapter.setTestLocation(null);
         if (scenario != null) {
             scenario.close();
         }
@@ -84,8 +104,8 @@ public class MainActivityTest {
      */
     @Test
     public void testFilterByName() throws InterruptedException {
-        // Initially, we expect 2 results
-        onView(withId(R.id.results_count_text)).check(matches(withText(containsString("2 results"))));
+        // Initially, we expect 3 results
+        onView(withId(R.id.results_count_text)).check(matches(withText(containsString("3 results"))));
 
         // Type "Test Event 1" in the search EditText
         onView(withId(R.id.search_edit_text)).perform(typeText("Test Event 1"), closeSoftKeyboard());
@@ -129,7 +149,7 @@ public class MainActivityTest {
         Thread.sleep(1000);
 
         // Verify we still see both results as they fall within the range
-        onView(withId(R.id.results_count_text)).check(matches(withText(containsString("2 results"))));
+        onView(withId(R.id.results_count_text)).check(matches(withText(containsString("3 results"))));
 
         // Verify the "Clear" filters button appeared
         onView(withId(R.id.clear_filters_btn)).check(matches(isDisplayed()));
@@ -150,8 +170,8 @@ public class MainActivityTest {
         onView(withId(R.id.clear_search)).perform(click());
 
         Thread.sleep(1000);
-        // Verify that we are back to seeing all 2 results
-        onView(withId(R.id.results_count_text)).check(matches(withText(containsString("2 results"))));
+        // Verify that we are back to seeing all 3 results
+        onView(withId(R.id.results_count_text)).check(matches(withText(containsString("3 results"))));
     }
 
     /**
@@ -168,6 +188,10 @@ public class MainActivityTest {
      */
     @Test
     public void testJoinEvent_UpdatesCount() throws Exception {
+        android.location.Location loc = new android.location.Location("test");
+        loc.setLatitude(53.52);
+        loc.setLongitude(-113.52);
+        EventAdapter.setTestLocation(loc);
         // Swipe up to ensure bottom sheet is visible
         expandBottomSheetHelper();
         Thread.sleep(1000);
@@ -199,6 +223,10 @@ public class MainActivityTest {
     public void testJoinEvent_WithExistingWaitees() throws Exception {
         // Seed 3 entrants for "Test Event 1" (which should have ID 1 after clearDatabase)
         testHelper.seedEntrants(1, 3);
+        android.location.Location loc = new android.location.Location("test");
+        loc.setLatitude(53.52);
+        loc.setLongitude(-113.52);
+        EventAdapter.setTestLocation(loc);
 
         Thread.sleep(1000);
 
@@ -323,23 +351,16 @@ public class MainActivityTest {
             android.Manifest.permission.ACCESS_COARSE_LOCATION
     );
 
-    @Before
-    public void setUpMockLocation() throws Exception {
-        Context context = InstrumentationRegistry.getInstrumentation().getTargetContext();
-
-        InstrumentationRegistry.getInstrumentation().getUiAutomation()
-                .executeShellCommand("appops set " + context.getPackageName() + " android:mock_location allow");
-
-        testHelper = new FirestoreTestHelper();
-    }
-
     @Test
     public void testJoinEvent_withinLocation() throws Exception {
-        // Seed an event
-        String eventId = "1";
-        testHelper.setMockLocation(53.52, -113.52);
-        Thread.sleep(2000);
+        android.location.Location loc = new android.location.Location("test");
+        loc.setLatitude(53.52);
+        loc.setLongitude(-113.52);
+        EventAdapter.setTestLocation(loc);
+        Log.d("TEST", "testLocation is: " + EventAdapter.testLocation);
 
+        String eventId = "1";
+        Long expectedCount = Tasks.await(testHelper.getDbHandler().getEntrantCount(eventId), 5, TimeUnit.SECONDS) + 1;
 
         // Relaunch to ensure fresh adapter state
         scenario = ActivityScenario.launch(MainActivity.class);
@@ -361,15 +382,19 @@ public class MainActivityTest {
                 ))));
 
         // Check the count in the database
-        Long count = Tasks.await(testHelper.getDbHandler().getEntrantCount(eventId), 5, TimeUnit.SECONDS);
-        assertEquals(1L, (long) count);
+        Long finalCount = Tasks.await(testHelper.getDbHandler().getEntrantCount(eventId), 5, TimeUnit.SECONDS);
+        assertEquals(expectedCount, finalCount);
     }
 
     @Test
     public void testJoinEvent_notWithinLocation() throws Exception {
-        // Seed an event
+        android.location.Location loc = new android.location.Location("test");
+        loc.setLatitude(0);
+        loc.setLongitude(0);
+        EventAdapter.setTestLocation(loc);
+
         String eventId = "1";
-        testHelper.setMockLocation(55, 66);
+        Long initialCount = Tasks.await(testHelper.getDbHandler().getEntrantCount(eventId), 5, TimeUnit.SECONDS);
 
         // Relaunch to ensure fresh adapter state
         scenario = ActivityScenario.launch(MainActivity.class);
@@ -381,7 +406,9 @@ public class MainActivityTest {
                 .perform(RecyclerViewActions.actionOnItemAtPosition(0,
                         clickChildViewWithId(R.id.btn_join_event)));
 
-        // Entrant should be in the waitlist, Join button should not disappear
+        Thread.sleep(3000);
+
+        // Entrant should NOT be in the waitlist, Join button should still be visible
         onView(withId(R.id.events_recycler_view))
                 .check(matches(hasDescendant(allOf(
                         withId(R.id.btn_join_event),
@@ -389,7 +416,7 @@ public class MainActivityTest {
                 ))));
 
         // Check the count in the database
-        Long count = Tasks.await(testHelper.getDbHandler().getEntrantCount(String.valueOf(eventId)), 5, TimeUnit.SECONDS);
-        assertEquals(0L, (long) count);
+        Long finalCount = Tasks.await(testHelper.getDbHandler().getEntrantCount(eventId), 5, TimeUnit.SECONDS);
+        assertEquals(initialCount, finalCount);
     }
 }

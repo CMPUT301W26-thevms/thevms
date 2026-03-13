@@ -10,6 +10,8 @@ import androidx.test.platform.app.InstrumentationRegistry;
 import com.example.thevms.model.DatabaseHandler;
 import com.example.thevms.model.Event;
 import com.example.thevms.model.Organizer;
+import com.google.android.gms.location.FusedLocationProviderClient;
+import com.google.android.gms.location.LocationServices;
 import com.google.android.gms.tasks.Task;
 import com.google.android.gms.tasks.Tasks;
 import com.google.firebase.firestore.FirebaseFirestore;
@@ -187,22 +189,50 @@ public class FirestoreTestHelper {
                 .set(data), 10, TimeUnit.SECONDS);
     }
 
-    public void setMockLocation(double lat, double lng) {
+    public void setMockLocation(double lat, double lng) throws Exception {
         LocationManager locationManager = (LocationManager) InstrumentationRegistry.getInstrumentation()
                 .getContext().getSystemService(Context.LOCATION_SERVICE);
-        String provider = LocationManager.GPS_PROVIDER;
-        locationManager.addTestProvider(provider, false, false, false, false, true, true, true, 1, 1);
-        locationManager.setTestProviderEnabled(provider, true);
 
-        Location mockLocation = new Location(provider);
+        String[] providers = {LocationManager.GPS_PROVIDER, LocationManager.NETWORK_PROVIDER, "fused"};
+
+        for (String provider : providers) {
+            try {
+                if (locationManager.getProvider(provider) != null) {
+                    locationManager.removeTestProvider(provider);
+                }
+            } catch (Exception ignored) {}
+
+            try {
+                locationManager.addTestProvider(provider, false, false, false, false, true, true, true, 1, 1);
+                locationManager.setTestProviderEnabled(provider, true);
+
+                Location mockLocation = new Location(provider);
+                mockLocation.setLatitude(lat);
+                mockLocation.setLongitude(lng);
+                mockLocation.setAltitude(0);
+                mockLocation.setTime(System.currentTimeMillis());
+                mockLocation.setAccuracy(1.0f);
+                mockLocation.setElapsedRealtimeNanos(SystemClock.elapsedRealtimeNanos());
+
+                locationManager.setTestProviderLocation(provider, mockLocation);
+            } catch (Exception ignored) {}
+        }
+
+        FusedLocationProviderClient fusedClient = LocationServices.getFusedLocationProviderClient(
+                InstrumentationRegistry.getInstrumentation().getTargetContext());
+
+        Location mockLocation = new Location("fused");
         mockLocation.setLatitude(lat);
         mockLocation.setLongitude(lng);
         mockLocation.setAltitude(0);
         mockLocation.setTime(System.currentTimeMillis());
-        mockLocation.setAccuracy(1);
+        mockLocation.setAccuracy(1.0f);
         mockLocation.setElapsedRealtimeNanos(SystemClock.elapsedRealtimeNanos());
 
-        locationManager.setTestProviderLocation(provider, mockLocation);
+        Tasks.await(fusedClient.setMockMode(true), 5, TimeUnit.SECONDS);
+        Tasks.await(fusedClient.setMockLocation(mockLocation), 5, TimeUnit.SECONDS);
+
+        Thread.sleep(2000);
     }
 
     public DatabaseHandler getDbHandler() {

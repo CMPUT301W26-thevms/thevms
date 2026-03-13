@@ -39,6 +39,7 @@ public class EventAdapter extends RecyclerView.Adapter<EventAdapter.EventViewHol
     private final SimpleDateFormat dateFormat = new SimpleDateFormat("MMM dd", Locale.getDefault());
     private final SimpleDateFormat fullDateFormat = new SimpleDateFormat("MMM dd, yyyy HH:mm", Locale.getDefault());
     private final Set<Long> expandedEventIds = new HashSet<>();
+    public static android.location.Location testLocation = null;
 
     public void setEvents(List<Event> events) {
         this.events = events;
@@ -55,6 +56,10 @@ public class EventAdapter extends RecyclerView.Adapter<EventAdapter.EventViewHol
         notifyDataSetChanged();
     }
 
+    public static void setTestLocation(android.location.Location location) {
+        testLocation = location;
+    }
+
     @NonNull
     @Override
     public EventViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
@@ -67,7 +72,7 @@ public class EventAdapter extends RecyclerView.Adapter<EventAdapter.EventViewHol
         Event event = events.get(position);
         boolean isExpanded = expandedEventIds.contains(event.getEventId());
         
-        holder.bind(event, dateFormat, fullDateFormat, isAdmin, managementMode, isExpanded, 
+        holder.bind(event, dateFormat, fullDateFormat, isAdmin, managementMode, isExpanded,
             () -> {
                 // Delete callback
                 int currentPos = holder.getAdapterPosition();
@@ -94,6 +99,7 @@ public class EventAdapter extends RecyclerView.Adapter<EventAdapter.EventViewHol
     }
 
     static class EventViewHolder extends RecyclerView.ViewHolder {
+        private final com.google.android.gms.location.FusedLocationProviderClient fusedLocationClient;
         TextView nameTextView;
         TextView statusTextView;
         TextView timeTextView;
@@ -132,10 +138,12 @@ public class EventAdapter extends RecyclerView.Adapter<EventAdapter.EventViewHol
             eventStartTextView = itemView.findViewById(R.id.event_start_details);
             eventEndTextView = itemView.findViewById(R.id.event_end_details);
             expandButton = itemView.findViewById(R.id.btn_expand_details);
+
+            fusedLocationClient = com.google.android.gms.location.LocationServices.getFusedLocationProviderClient(itemView.getContext());
         }
 
         public void bind(Event event, SimpleDateFormat dateFormat, SimpleDateFormat fullDateFormat, 
-                         boolean isAdmin, boolean managementMode, boolean isExpanded, Runnable onDelete, 
+                         boolean isAdmin, boolean managementMode, boolean isExpanded, Runnable onDelete,
                          java.util.function.Consumer<Boolean> onToggleExpand) {
             
             if (nameTextView != null) nameTextView.setText(event.getName());
@@ -151,7 +159,7 @@ public class EventAdapter extends RecyclerView.Adapter<EventAdapter.EventViewHol
             }
 
             if (locationTextView != null) {
-                locationTextView.setText("📍 Nearby");
+                locationTextView.setText(event.getLocation());
             }
 
             // Bind detailed info
@@ -227,24 +235,10 @@ public class EventAdapter extends RecyclerView.Adapter<EventAdapter.EventViewHol
                     });
                 });
 
-                // Handle Join Button
-                if (joinButton != null) {
-                    joinButton.setOnClickListener(v -> {
-                        Entrant.getOrCreate(deviceId).addOnSuccessListener(entrant -> {
-                            event.addEntrant(entrant).addOnSuccessListener(aVoid -> {
-                                Toast.makeText(itemView.getContext(), "Successfully joined " + event.getName(), Toast.LENGTH_SHORT).show();
-                                updateEntrantCount(event);
-                                joinButton.setVisibility(View.GONE);
-                                leaveButton.setVisibility(View.VISIBLE);
-                                if (regStatusMessage != null) regStatusMessage.setVisibility(View.GONE);
-                            }).addOnFailureListener(e -> {
-                                Toast.makeText(itemView.getContext(), "Failed to join event: " + e.getMessage(), Toast.LENGTH_SHORT).show();
-                            });
-                        }).addOnFailureListener(e -> {
-                            Toast.makeText(itemView.getContext(), "Error retrieving user profile", Toast.LENGTH_SHORT).show();
-                        });
-                    });
-                }
+            // Handle Join Button
+            if (joinButton != null) {
+                joinButton.setOnClickListener(v -> checkLocation(event, deviceId));
+            }
 
                 // Handle Leave Button
                 if (leaveButton != null) {
@@ -272,6 +266,115 @@ public class EventAdapter extends RecyclerView.Adapter<EventAdapter.EventViewHol
                 removeButton.setVisibility(isAdmin ? View.VISIBLE : View.GONE);
                 removeButton.setOnClickListener(v -> showDeleteConfirmation(event, onDelete));
             }
+        }
+
+        // Handle join event
+        private void joinEvent(Event event, String deviceId) {
+            Entrant.getOrCreate(deviceId).addOnSuccessListener(entrant -> {
+                event.addEntrant(entrant).addOnSuccessListener(aVoid -> {
+                    Toast.makeText(itemView.getContext(), "Successfully joined " + event.getName(), Toast.LENGTH_SHORT).show();
+                    updateEntrantCount(event);
+                    joinButton.setVisibility(View.GONE);
+                    leaveButton.setVisibility(View.VISIBLE);
+                    if (regStatusMessage != null) {
+                        regStatusMessage.setVisibility(View.GONE);
+                    }
+                }).addOnFailureListener(e -> {
+                    Toast.makeText(itemView.getContext(), "Failed to join event: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+                });
+            }).addOnFailureListener(e -> {
+                Toast.makeText(itemView.getContext(), "Error retrieving user profile", Toast.LENGTH_SHORT).show();
+            });
+        }
+
+        // Handle geolocation
+        private void handleLocationResult(android.location.Location currentLoc, Event event, String deviceId) {
+            float[] results = new float[1];
+            android.location.Location.distanceBetween(
+                    currentLoc.getLatitude(), currentLoc.getLongitude(),
+                    event.getGeoLocation().getLatitude(), event.getGeoLocation().getLongitude(),
+                    results);
+
+            float distanceInMeters = results[0];
+            double radiusInMeters = event.getRadius() * 1000;
+
+            if (distanceInMeters <= radiusInMeters) {
+                joinEvent(event, deviceId);
+            } else {
+                Toast.makeText(itemView.getContext(),
+                        "Out of location requirement", Toast.LENGTH_LONG).show();
+            }
+        }
+
+        private void checkLocation(Event event, String deviceId) {
+            if (!event.isGeolocationRequired()) {
+                joinEvent(event, deviceId);
+                return;
+            }
+
+            if (EventAdapter.testLocation != null) {
+                handleLocationResult(EventAdapter.testLocation, event, deviceId);
+                return;
+            }
+
+            if (event.getGeoLocation() == null) {
+                Log.e("JOIN_ERROR", "Event coordinates are missing in database!");
+                Toast.makeText(itemView.getContext(), "Error: Event has no location data.", Toast.LENGTH_LONG).show();
+                return;
+            }
+
+            if (androidx.core.content.ContextCompat.checkSelfPermission(itemView.getContext(),
+                    android.Manifest.permission.ACCESS_FINE_LOCATION) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                if (itemView.getContext() instanceof android.app.Activity) {
+                    androidx.core.app.ActivityCompat.requestPermissions(
+                            (android.app.Activity) itemView.getContext(),
+                            new String[]{android.Manifest.permission.ACCESS_FINE_LOCATION, android.Manifest.permission.ACCESS_COARSE_LOCATION},
+                            77
+                    );
+                    Toast.makeText(itemView.getContext(), "Please give permission to access your location.", Toast.LENGTH_LONG).show();
+                }
+                return;
+            }
+
+            Toast.makeText(itemView.getContext(), "Checking your location...", Toast.LENGTH_SHORT).show();
+            com.google.android.gms.location.LocationRequest locationRequest =
+                    new com.google.android.gms.location.LocationRequest.Builder(
+                            com.google.android.gms.location.Priority.PRIORITY_HIGH_ACCURACY, 1000)
+                            .setMaxUpdates(1)
+                            .build();
+            com.google.android.gms.location.LocationCallback locationCallback = new com.google.android.gms.location.LocationCallback() {
+                @Override
+                public void onLocationResult(@NonNull com.google.android.gms.location.LocationResult locationResult) {
+                    fusedLocationClient.removeLocationUpdates(this);
+
+                    android.location.Location currentLoc = locationResult.getLastLocation();
+                    if (currentLoc != null) {
+                        float[] results = new float[1];
+                        android.location.Location.distanceBetween(
+                                currentLoc.getLatitude(), currentLoc.getLongitude(),
+                                event.getGeoLocation().getLatitude(), event.getGeoLocation().getLongitude(),
+                                results);
+
+                        float distanceInMeters = results[0];
+                        double radiusInMeters = event.getRadius() * 1000;
+
+                        if (distanceInMeters <= radiusInMeters) {
+                            joinEvent(event, deviceId);
+                        } else {
+                            Toast.makeText(itemView.getContext(), "Out of location requirement", Toast.LENGTH_LONG).show();
+                        }
+                    } else {
+                        Toast.makeText(itemView.getContext(), "Still cannot get location", Toast.LENGTH_SHORT).show();
+                    }
+                }
+                };
+
+
+            fusedLocationClient.requestLocationUpdates(
+                    locationRequest,
+                    locationCallback,
+                    android.os.Looper.getMainLooper()
+            );
         }
 
         private void updateEntrantCount(Event event) {

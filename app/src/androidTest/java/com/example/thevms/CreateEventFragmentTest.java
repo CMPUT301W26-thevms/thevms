@@ -117,7 +117,7 @@ public class CreateEventFragmentTest {
 
             // Fill text fields
             onView(withId(R.id.et_event_name)).perform(replaceText("Annual Gala"), closeSoftKeyboard());
-            onView(withId(R.id.et_event_location)).perform(replaceText("Grand Hall"), closeSoftKeyboard());
+            onView(withId(R.id.et_event_location)).perform(replaceText("University of Alberta"), closeSoftKeyboard());
             onView(withId(R.id.et_event_description)).perform(replaceText("A night of elegance."), closeSoftKeyboard());
 
             // Click Confirm
