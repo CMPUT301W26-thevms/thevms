@@ -8,6 +8,7 @@ import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.Spinner;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.LinearLayoutManager;
@@ -34,15 +35,15 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
 
     // Display labels shown in the dropdown — must match Firestore status values exactly
     private static final String[] STATUS_LABELS = {
-            "Waiting", "Selected", "Accepted", "Rejected", "Cancelled"
+            "Waiting", "Selected", "Accepted", "Rejected", "Cancelled", "Declined"
     };
 
     private static final String[] STATUS_VALUES = {
-            "waiting", "selected", "accepted", "rejected", "cancelled"
+            "waiting", "selected", "accepted", "rejected", "cancelled", "declined"
     };
 
     private List<Event> events = new ArrayList<>();
-    private final SimpleDateFormat dateFormat = new SimpleDateFormat("MMM d", Locale.getDefault());
+    private static final SimpleDateFormat dateFormat = new SimpleDateFormat("MMM d", Locale.getDefault());
     private OnEventCancelListener cancelListener;
 
     public interface OnEventCancelListener {
@@ -79,7 +80,7 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
 
     static class ViewHolder extends RecyclerView.ViewHolder {
         TextView nameText, distanceText, waitlistText, dateText, descriptionText, exportCsvText;
-        Button cancelBtn;
+        Button cancelBtn, lotteryBtn;
         RecyclerView attendeesRv;
         Spinner statusSpinner;
         AttendeeAdapter attendeeAdapter;
@@ -97,6 +98,7 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
             dateText = itemView.findViewById(R.id.tv_event_date);
             descriptionText = itemView.findViewById(R.id.tv_description);
             cancelBtn = itemView.findViewById(R.id.btn_cancel_event);
+            lotteryBtn = itemView.findViewById(R.id.btn_run_lottery);
             attendeesRv = itemView.findViewById(R.id.rv_attendees);
             statusSpinner = itemView.findViewById(R.id.spinner_attendee_status);
             exportCsvText = itemView.findViewById(R.id.tv_export_csv);
@@ -142,6 +144,39 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
             );
         }
 
+        private void runLottery(Event event) {
+            dbHandler.getEntrantsForEvent(String.valueOf(event.getEventId()))
+                    .addOnSuccessListener(queryDocumentSnapshots -> {
+                        List<DocumentSnapshot> waitingList = new ArrayList<>();
+                        for (QueryDocumentSnapshot doc : queryDocumentSnapshots) {
+                            if (DatabaseHandler.STATUS_WAITING.equals(doc.getString("status"))) {
+                                waitingList.add(doc);
+                            }
+                        }
+
+                        if (waitingList.isEmpty()) {
+                            Toast.makeText(itemView.getContext(), "No one in waiting list", Toast.LENGTH_SHORT).show();
+                            return;
+                        }
+
+                        java.util.Collections.shuffle(waitingList);
+
+                        // Use maxAttendees if specified, otherwise pick a default (e.g., 3)
+                        int capacity = (event.getMaxAttendees() != null && event.getMaxAttendees() > 0) ? event.getMaxAttendees() : 3;
+                        int winnersCount = Math.min(waitingList.size(), capacity);
+
+                        for (int i = 0; i < winnersCount; i++) {
+                            DocumentSnapshot doc = waitingList.get(i);
+                            Map<String, Object> data = new HashMap<>();
+                            data.put("status", DatabaseHandler.STATUS_SELECTED);
+                            dbHandler.updateEntrantStatus(String.valueOf(event.getEventId()), doc.getId(), data);
+                        }
+
+                        Toast.makeText(itemView.getContext(), "Selected " + winnersCount + " entrants!", Toast.LENGTH_SHORT).show();
+                        bind(event, dateFormat, null); // Refresh list
+                    });
+        }
+
         public void bind(Event event, SimpleDateFormat dateFormat, OnEventCancelListener cancelListener) {
             String eventId = String.valueOf(event.getEventId());
             itemView.setTag(eventId);
@@ -162,6 +197,8 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
             cancelBtn.setOnClickListener(v -> {
                 if (cancelListener != null) cancelListener.onCancel(event);
             });
+
+            lotteryBtn.setOnClickListener(v -> runLottery(event));
 
             // Reset spinner to "Waiting" each time a card is bound
             statusSpinner.setSelection(0);
@@ -206,47 +243,12 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
             });
         }
 
-        /**
-         * Cancels a selected entrant and randomly promotes one waiting entrant.
-         *
-         * Flow:
-         * 1. Set cancelled entrant's status → "cancelled"
-         * 2. Query all "waiting" entrants for this event
-         * 3. Pick one at random → set their status to "selected"
-         * 4. TODO: notify newly selected entrant
-         */
         private void cancelEntrantAndSelectNext(String eventId, String cancelledEntrantId) {
-            db.collection("events")
-                    .document(eventId)
-                    .collection("entrants")
-                    .document(cancelledEntrantId)
-                    .update("status", "cancelled")
+            Map<String, Object> cancelData = new HashMap<>();
+            cancelData.put("status", DatabaseHandler.STATUS_CANCELLED);
+            dbHandler.updateEntrantStatus(eventId, cancelledEntrantId, cancelData)
                     .addOnSuccessListener(unused -> {
-                        db.collection("events")
-                                .document(eventId)
-                                .collection("entrants")
-                                .whereEqualTo("status", "waiting")
-                                .get()
-                                .addOnSuccessListener(waitlistSnapshot -> {
-                                    List<QueryDocumentSnapshot> waiting = new ArrayList<>();
-                                    for (QueryDocumentSnapshot doc : waitlistSnapshot) {
-                                        waiting.add(doc);
-                                    }
-
-                                    if (waiting.isEmpty()) return;
-
-                                    // Pick randomly — fair selection, no ordering
-                                    QueryDocumentSnapshot nextDoc = waiting.get(
-                                            new Random().nextInt(waiting.size())
-                                    );
-
-                                    nextDoc.getReference()
-                                            .update("status", "selected")
-                                            .addOnSuccessListener(v -> {
-                                                // TODO: notify newly selected entrant
-                                                // e.g. NotificationHandler.notify(nextDoc.getString("entrantId"), eventId);
-                                            });
-                                });
+                        dbHandler.selectAndInviteNextEntrant(eventId);
                     });
         }
     }

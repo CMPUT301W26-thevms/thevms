@@ -2,10 +2,7 @@ package com.example.thevms.ui.Event;
 
 import android.annotation.SuppressLint;
 import android.app.AlertDialog;
-import android.content.res.ColorStateList;
-import android.graphics.Color;
 import android.provider.Settings;
-import android.text.Html;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -25,10 +22,11 @@ import com.example.thevms.model.Event;
 
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
-import java.util.Date;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 
 public class EventAdapter extends RecyclerView.Adapter<EventAdapter.EventViewHolder> {
@@ -71,25 +69,23 @@ public class EventAdapter extends RecyclerView.Adapter<EventAdapter.EventViewHol
     public void onBindViewHolder(@NonNull EventViewHolder holder, int position) {
         Event event = events.get(position);
         boolean isExpanded = expandedEventIds.contains(event.getEventId());
-        
+
         holder.bind(event, dateFormat, fullDateFormat, isAdmin, managementMode, isExpanded,
-            () -> {
-                // Delete callback
-                int currentPos = holder.getAdapterPosition();
-                if (currentPos != RecyclerView.NO_POSITION) {
-                    events.remove(currentPos);
-                    notifyItemRemoved(currentPos);
+                () -> {
+                    int currentPos = holder.getAdapterPosition();
+                    if (currentPos != RecyclerView.NO_POSITION) {
+                        events.remove(currentPos);
+                        notifyItemRemoved(currentPos);
+                    }
+                },
+                (expand) -> {
+                    if (expand) {
+                        expandedEventIds.add(event.getEventId());
+                    } else {
+                        expandedEventIds.remove(event.getEventId());
+                    }
+                    notifyItemChanged(holder.getAdapterPosition());
                 }
-            },
-            (expand) -> {
-                // Toggle expansion callback
-                if (expand) {
-                    expandedEventIds.add(event.getEventId());
-                } else {
-                    expandedEventIds.remove(event.getEventId());
-                }
-                notifyItemChanged(holder.getAdapterPosition());
-            }
         );
     }
 
@@ -100,24 +96,11 @@ public class EventAdapter extends RecyclerView.Adapter<EventAdapter.EventViewHol
 
     static class EventViewHolder extends RecyclerView.ViewHolder {
         private final com.google.android.gms.location.FusedLocationProviderClient fusedLocationClient;
-        TextView nameTextView;
-        TextView statusTextView;
-        TextView timeTextView;
-        TextView locationTextView;
-        Button joinButton;
-        Button removeButton;
-        Button leaveButton;
+        TextView nameTextView, statusTextView, timeTextView, locationTextView;
+        Button joinButton, removeButton, leaveButton, acceptButton, declineButton, expandButton;
         ImageView eventImageView;
-        TextView regStatusMessage;
-
-        // Expandable views
+        TextView regStatusMessage, descriptionTextView, regStartTextView, regEndTextView, eventStartTextView, eventEndTextView;
         View expandableDetails;
-        TextView descriptionTextView;
-        TextView regStartTextView;
-        TextView regEndTextView;
-        TextView eventStartTextView;
-        TextView eventEndTextView;
-        Button expandButton;
 
         public EventViewHolder(@NonNull View itemView) {
             super(itemView);
@@ -128,9 +111,10 @@ public class EventAdapter extends RecyclerView.Adapter<EventAdapter.EventViewHol
             joinButton = itemView.findViewById(R.id.btn_join_event);
             removeButton = itemView.findViewById(R.id.btn_remove_event);
             leaveButton = itemView.findViewById(R.id.btn_leave_event);
+            acceptButton = itemView.findViewById(R.id.btn_accept_event);
+            declineButton = itemView.findViewById(R.id.btn_decline_event);
             eventImageView = itemView.findViewById(R.id.event_image);
             regStatusMessage = itemView.findViewById(R.id.event_registration_status_message);
-
             expandableDetails = itemView.findViewById(R.id.expandable_details);
             descriptionTextView = itemView.findViewById(R.id.event_description);
             regStartTextView = itemView.findViewById(R.id.event_reg_start_details);
@@ -145,22 +129,35 @@ public class EventAdapter extends RecyclerView.Adapter<EventAdapter.EventViewHol
         public void bind(Event event, SimpleDateFormat dateFormat, SimpleDateFormat fullDateFormat, 
                          boolean isAdmin, boolean managementMode, boolean isExpanded, Runnable onDelete,
                          java.util.function.Consumer<Boolean> onToggleExpand) {
-            
+
             if (nameTextView != null) nameTextView.setText(event.getName());
+            if (timeTextView != null && event.getEventStartTime() != null) {
+                timeTextView.setText(String.format("Starts %s", dateFormat.format(event.getEventStartTime())));
+            }
+            if (locationTextView != null) {
+                locationTextView.setText("📍 " + (event.getLocationName() != null ? event.getLocationName() : "No location"));
+            }
 
-            updateEntrantCount(event);
+            @SuppressLint("HardwareIds")
+            String deviceId = Settings.Secure.getString(itemView.getContext().getContentResolver(), Settings.Secure.ANDROID_ID);
+            DatabaseHandler dbHandler = new DatabaseHandler();
 
-            if (timeTextView != null) {
-                if (event.getEventStartTime() != null) {
-                    timeTextView.setText(String.format("Starts %s", dateFormat.format(event.getEventStartTime())));
-                } else {
-                    timeTextView.setText("Time TBD");
+            if (isAdmin) {
+                if (removeButton != null) {
+                    removeButton.setVisibility(View.VISIBLE);
+                    removeButton.setOnClickListener(v -> showDeleteConfirmation(event, onDelete));
                 }
+            } else {
+                if (removeButton != null) removeButton.setVisibility(View.GONE);
             }
 
             if (locationTextView != null) {
                 locationTextView.setText(event.getLocation());
             }
+            updateEntrantCount(event, null);
+            dbHandler.getEntrantStatus(String.valueOf(event.getEventId()), deviceId).addOnSuccessListener(status -> {
+                updateUIBasedOnStatus(status, event, deviceId, dbHandler);
+            });
 
             // Bind detailed info
             if (descriptionTextView != null) {
@@ -187,87 +184,128 @@ public class EventAdapter extends RecyclerView.Adapter<EventAdapter.EventViewHol
                 expandButton.setText(isExpanded ? "Show Less" : "Show More Details");
                 expandButton.setOnClickListener(v -> onToggleExpand.accept(!isExpanded));
             }
+        }
 
-            @SuppressLint("HardwareIds")
-            String deviceId = Settings.Secure.getString(itemView.getContext().getContentResolver(), Settings.Secure.ANDROID_ID);
+        private void updateEntrantCount(Event event, String statusPrefix) {
+            if (statusTextView == null) return;
+            event.fetchEntrantCount().addOnSuccessListener(count -> {
+                String text = String.format(Locale.getDefault(), "☆ %d people joined", count);
+                if (statusPrefix != null && !statusPrefix.isEmpty()) {
+                    text = statusPrefix + " (" + text + ")";
+                }
+                statusTextView.setText(text);
+            });
+        }
 
-            if (managementMode) {
-                // In management mode, we don't show join/leave or status messages
-                if (joinButton != null) joinButton.setVisibility(View.GONE);
-                if (leaveButton != null) leaveButton.setVisibility(View.GONE);
-                if (regStatusMessage != null) regStatusMessage.setVisibility(View.GONE);
+        private void updateUIBasedOnStatus(String status, Event event, String deviceId, DatabaseHandler dbHandler) {
+            joinButton.setVisibility(View.GONE);
+            leaveButton.setVisibility(View.GONE);
+            acceptButton.setVisibility(View.GONE);
+            declineButton.setVisibility(View.GONE);
+
+            String statusPrefix = "Not joined";
+
+            if (status == null) {
+                joinButton.setVisibility(View.VISIBLE);
+                setupJoinButton(event, deviceId);
             } else {
-                if (joinButton != null) {
-                    Date now = new Date();
-                    boolean isRegistrationStarted = event.getRegistrationStartTime() == null || now.after(event.getRegistrationStartTime());
-                    boolean isRegistrationEnded = event.getRegistrationEndTime() != null && now.after(event.getRegistrationEndTime());
-                    boolean canJoin = isRegistrationStarted && !isRegistrationEnded;
+                switch (status) {
+                    case DatabaseHandler.STATUS_WAITING:
+                        leaveButton.setVisibility(View.VISIBLE);
+                        statusPrefix = "Status: Waiting List";
+                        setupLeaveButton(event, deviceId);
+                        break;
+                    case DatabaseHandler.STATUS_SELECTED:
+                    case DatabaseHandler.STATUS_INVITED:
+                        acceptButton.setVisibility(View.VISIBLE);
+                        declineButton.setVisibility(View.VISIBLE);
+                        statusPrefix = "Status: YOU ARE SELECTED!";
+                        setupAcceptDeclineButtons(event, deviceId, dbHandler);
+                        break;
+                    case DatabaseHandler.STATUS_ACCEPTED:
+                        leaveButton.setVisibility(View.VISIBLE);
+                        statusPrefix = "Status: Accepted";
+                        setupLeaveButton(event, deviceId);
+                        break;
+                    case DatabaseHandler.STATUS_REJECTED:
+                        statusPrefix = "Status: Not Selected";
+                        break;
+                    case DatabaseHandler.STATUS_DECLINED:
+                        statusPrefix = "Status: Declined";
+                        break;
+                }
+            }
+            updateEntrantCount(event, statusPrefix);
+        }
 
-                    joinButton.setEnabled(canJoin);
-                    if (canJoin) {
-                        joinButton.setBackgroundTintList(ColorStateList.valueOf(Color.BLACK));
-                        if (regStatusMessage != null) regStatusMessage.setVisibility(View.GONE);
-                    } else {
-                        joinButton.setBackgroundTintList(ColorStateList.valueOf(Color.LTGRAY));
-                        if (regStatusMessage != null) {
-                            regStatusMessage.setVisibility(View.VISIBLE);
-                            if (!isRegistrationStarted) {
-                                regStatusMessage.setText("Registration hasn't started yet");
-                            } else {
-                                regStatusMessage.setText("Registration has ended");
-                            }
+//        private void setupJoinButton(Event event, String deviceId) {
+//            joinButton.setOnClickListener(v -> {
+//                Entrant.getOrCreate(deviceId).addOnSuccessListener(entrant -> {
+//                    event.addEntrant(entrant).addOnSuccessListener(aVoid -> {
+//                        Toast.makeText(itemView.getContext(), "Joined " + event.getName(), Toast.LENGTH_SHORT).show();
+//                        refreshUI(event, deviceId);
+//                    });
+//                });
+//            });
+//        }
+
+        private void setupJoinButton(Event event, String deviceId){
+            Entrant.getOrCreate(deviceId).addOnSuccessListener(entrant -> {
+                event.inEvent(entrant).addOnSuccessListener(isIn -> {
+                    if (joinButton != null) {
+                        joinButton.setVisibility(isIn ? View.GONE : View.VISIBLE);
+                        // If user is already in event, hide the "not started/ended" message too
+                        if (isIn && regStatusMessage != null) {
+                            regStatusMessage.setVisibility(View.GONE);
                         }
                     }
-                }
-
-                Entrant.getOrCreate(deviceId).addOnSuccessListener(entrant -> {
-                    event.inEvent(entrant).addOnSuccessListener(isIn -> {
-                        if (joinButton != null) {
-                            joinButton.setVisibility(isIn ? View.GONE : View.VISIBLE);
-                            // If user is already in event, hide the "not started/ended" message too
-                            if (isIn && regStatusMessage != null) {
-                                regStatusMessage.setVisibility(View.GONE);
-                            }
-                        }
-                        if (leaveButton != null) {
-                            leaveButton.setVisibility(isIn ? View.VISIBLE : View.GONE);
-                        }
-                    });
+                    if (leaveButton != null) {
+                        leaveButton.setVisibility(isIn ? View.VISIBLE : View.GONE);
+                    }
                 });
-
-            // Handle Join Button
+            });
             if (joinButton != null) {
                 joinButton.setOnClickListener(v -> checkLocation(event, deviceId));
             }
 
-                // Handle Leave Button
-                if (leaveButton != null) {
-                    leaveButton.setOnClickListener(v -> {
-                        Entrant.getOrCreate(deviceId).addOnSuccessListener(entrant -> {
-                            event.removeEntrant(entrant).addOnSuccessListener(aVoid -> {
-                                Toast.makeText(itemView.getContext(), "Successfully left " + event.getName(), Toast.LENGTH_SHORT).show();
-                                updateEntrantCount(event);
-                                leaveButton.setVisibility(View.GONE);
-                                joinButton.setVisibility(View.VISIBLE);
-                                // Re-check registration status when showing join button again
-                                bind(event, dateFormat, fullDateFormat, isAdmin, managementMode, isExpanded, onDelete, onToggleExpand);
-                            }).addOnFailureListener(e -> {
-                                Toast.makeText(itemView.getContext(), "Failed to leave event: " + e.getMessage(), Toast.LENGTH_SHORT).show();
-                            });
-                        }).addOnFailureListener(e -> {
-                            Toast.makeText(itemView.getContext(), "Error retrieving user profile", Toast.LENGTH_SHORT).show();
-                        });
+        }
+        private void setupLeaveButton(Event event, String deviceId) {
+            leaveButton.setOnClickListener(v -> {
+                Entrant.getOrCreate(deviceId).addOnSuccessListener(entrant -> {
+                    event.removeEntrant(entrant).addOnSuccessListener(aVoid -> {
+                        Toast.makeText(itemView.getContext(), "Left " + event.getName(), Toast.LENGTH_SHORT).show();
+                        refreshUI(event, deviceId);
                     });
-                }
-            }
-
-            // Handle Admin/Remove Button
-            if (removeButton != null) {
-                removeButton.setVisibility(isAdmin ? View.VISIBLE : View.GONE);
-                removeButton.setOnClickListener(v -> showDeleteConfirmation(event, onDelete));
-            }
+                });
+            });
         }
 
+        private void setupAcceptDeclineButtons(Event event, String deviceId, DatabaseHandler dbHandler) {
+            acceptButton.setOnClickListener(v -> {
+                Map<String, Object> data = new HashMap<>();
+                data.put("status", DatabaseHandler.STATUS_ACCEPTED);
+                dbHandler.updateEntrantStatus(String.valueOf(event.getEventId()), deviceId, data).addOnSuccessListener(aVoid -> {
+                    Toast.makeText(itemView.getContext(), "Accepted!", Toast.LENGTH_SHORT).show();
+                    refreshUI(event, deviceId);
+                });
+            });
+
+            declineButton.setOnClickListener(v -> {
+                Map<String, Object> data = new HashMap<>();
+                data.put("status", DatabaseHandler.STATUS_DECLINED);
+                dbHandler.updateEntrantStatus(String.valueOf(event.getEventId()), deviceId, data).addOnSuccessListener(aVoid -> {
+                    Toast.makeText(itemView.getContext(), "Declined", Toast.LENGTH_SHORT).show();
+                    dbHandler.selectAndInviteNextEntrant(String.valueOf(event.getEventId()));
+                    refreshUI(event, deviceId);
+                });
+            });
+        }
+
+        private void refreshUI(Event event, String deviceId) {
+            new DatabaseHandler().getEntrantStatus(String.valueOf(event.getEventId()), deviceId).addOnSuccessListener(newStatus -> {
+                updateUIBasedOnStatus(newStatus, event, deviceId, new DatabaseHandler());
+            });
+        }
         // Handle join event
         private void joinEvent(Event event, String deviceId) {
             Entrant.getOrCreate(deviceId).addOnSuccessListener(entrant -> {
@@ -402,34 +440,23 @@ public class EventAdapter extends RecyclerView.Adapter<EventAdapter.EventViewHol
             Button btnDelete = dialogView.findViewById(R.id.btn_dialog_delete);
             ImageView ivClose = dialogView.findViewById(R.id.iv_close);
 
-            String formattedTitle = itemView.getContext().getString(R.string.delete_event_question_formatted, event.getName());
-            title.setText(Html.fromHtml(formattedTitle, Html.FROM_HTML_MODE_LEGACY));
-            message.setText(R.string.delete_event_consequence);
+            if (title != null) title.setText("Delete Event");
+            if (message != null)
+                message.setText("Are you sure you want to delete " + event.getName() + "?");
 
-            btnCancel.setOnClickListener(v -> dialog.dismiss());
-            ivClose.setOnClickListener(v -> dialog.dismiss());
+            if (btnCancel != null) btnCancel.setOnClickListener(v -> dialog.dismiss());
+            if (ivClose != null) ivClose.setOnClickListener(v -> dialog.dismiss());
 
-            btnDelete.setOnClickListener(v -> {
-                deleteEventFromDb(event, onDelete);
-                dialog.dismiss();
-            });
+            if (btnDelete != null) {
+                btnDelete.setOnClickListener(v -> {
+                    new DatabaseHandler().deleteEvent(String.valueOf(event.getEventId())).addOnSuccessListener(aVoid -> {
+                        if (onDelete != null) onDelete.run();
+                        dialog.dismiss();
+                    });
+                });
+            }
 
             dialog.show();
-        }
-
-        private void deleteEventFromDb(Event event, Runnable onDelete) {
-            DatabaseHandler dbHandler = new DatabaseHandler();
-            dbHandler.deleteEvent(String.valueOf(event.getEventId()))
-                    .addOnSuccessListener(aVoid -> {
-                        Toast.makeText(itemView.getContext(), "Event removed", Toast.LENGTH_SHORT).show();
-                        if (onDelete != null) {
-                            onDelete.run();
-                        }
-                    })
-                    .addOnFailureListener(e -> {
-                        Log.e("EventAdapter", "Error deleting event", e);
-                        Toast.makeText(itemView.getContext(), "Failed to remove event", Toast.LENGTH_LONG).show();
-                    });
         }
     }
 }

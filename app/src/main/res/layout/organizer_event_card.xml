@@ -38,14 +38,14 @@
             </com.google.android.material.card.MaterialCardView>
 
             <com.google.android.material.button.MaterialButton
-                android:id="@+id/btn_view_qr"
+                android:id="@+id/btn_run_lottery"
                 style="@style/Widget.MaterialComponents.Button.UnelevatedButton"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_gravity="bottom|start"
                 android:layout_margin="12dp"
                 android:backgroundTint="#2D2D2D"
-                android:text="View QR Code"
+                android:text="Run Lottery"
                 android:textAllCaps="false"
                 android:textColor="@android:color/white"
                 android:textSize="16sp"

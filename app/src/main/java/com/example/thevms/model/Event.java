@@ -54,6 +54,7 @@ public class Event {
     private Organizer organizer;
     private String location;
     private Location geoLocation; // location coordinate
+    private String locationName; // Added for UI convenience
 
     private String qrCode;
     private String imageUrl;
@@ -62,9 +63,13 @@ public class Event {
     private Date registrationEndTime;
     private Date eventStartTime;
     private Date eventEndTime;
+
+    private Integer maxAttendees; // US 01.01.01
+    private boolean geolocationRequired; // US 01.08.01
+    private Double limitDistance;
+
     private HashMap<Entrant, Boolean> entrantList;
     private long entrantCount = 0;
-    private boolean geolocationRequired = false;
     private Double radius = 0.0;
 
     /**
@@ -97,7 +102,6 @@ public class Event {
         this.eventStartTime = eventStartTime;
         this.eventEndTime = eventEndTime;
         this.entrantList = new HashMap<>();
-
         this.qrCode = "NULL FOR NOW";
 
         this.geolocationRequired = geolocationRequired;
@@ -137,23 +141,11 @@ public class Event {
                 Long eventId = task.getResult();
                 return new Event(eventId, name, description, organizer, location, imageUrl, registrationStartTime, registrationEndTime, eventStartTime, eventEndTime, geolocationRequired, radius, geoLocation);
             } else {
-                // If getting the ID fails, the exception is propagated in the returned Task.
                 throw task.getException();
             }
         });
     }
 
-    /**
-     * Helper method to safely convert a Firestore object to a Date.
-     * <p>
-     * Firestore often returns dates as {@link Timestamp} objects. This method
-     * handles the conversion from {@link Timestamp} to {@link Date}, or returns
-     * the object if it is already a {@link Date}.
-     * Creates an Event object from a Firestore DocumentSnapshot.
-     *
-     * @param obj The object to convert (typically from a Firestore document).
-     * @return The converted {@link Date} object, or {@code null} if the object is null or of an unsupported type
-     */
     private static Date toDate(Object obj) {
         if (obj instanceof Timestamp) {
             return ((Timestamp) obj).toDate();
@@ -163,16 +155,6 @@ public class Event {
         return null;
     }
 
-    /**
-     * Creates an Event object from a Map of data (typically from Firestore).
-     * <p>
-     * This method extracts event properties from a Map, handling date conversions
-     * using the {@link #toDate(Object)} helper. It constructs a new Event instance
-     * using the extracted values.
-     *
-     * @param data A Map containing the key-value pairs of the event data.
-     * @return A new {@link Event} object populated with the data from the Map, or {@code null} if the data is null.
-     */
     public static Event fromMap(Map<String, Object> data) {
         if (data == null) return null;
 
@@ -197,15 +179,29 @@ public class Event {
         geoLocation.setLatitude((Double) data.get("latitude"));
         geoLocation.setLongitude((Double) data.get("longitude"));
 
-        return new Event(id, name, desc, organizer, location, img, regStart, regEnd, eventStart, eventEnd, geoRequired, radius, geoLocation);
+        Event event = new Event(id, name, desc, organizer, location, img, regStart, regEnd, eventStart, eventEnd, geoRequired, radius, geoLocation);
+
+        if (data.containsKey("maxAttendees") && data.get("maxAttendees") != null) {
+            event.setMaxAttendees(((Long) data.get("maxAttendees")).intValue());
+        }
+        if (data.containsKey("geolocationRequired") && data.get("geolocationRequired") != null) {
+            event.setGeolocationRequired((Boolean) data.get("geolocationRequired"));
+        }
+        if (data.containsKey("limitDistance") && data.get("limitDistance") != null) {
+            Object dist = data.get("limitDistance");
+            if (dist instanceof Double) event.setLimitDistance((Double) dist);
+            else if (dist instanceof Long) event.setLimitDistance(((Long) dist).doubleValue());
+        }
+        if (data.containsKey("locationName")) {
+            event.setLocationName((String) data.get("locationName"));
+        }
+        if (data.containsKey("organizerId")) {
+            event.setOrganizer(new Organizer((String) data.get("organizerId"), null, null, null, null));
+        }
+
+        return event;
     }
 
-    /**
-     * Creates an Event object from a Firestore DocumentSnapshot.
-     *
-     * @param doc The DocumentSnapshot to parse.
-     * @return An Event object populated with data from the document.
-     */
     public static Event fromDoc(DocumentSnapshot doc) {
         Long eventId = doc.getLong("eventId");
         String name = doc.getString("name");
@@ -233,39 +229,27 @@ public class Event {
 
 
         return new Event(eventId, name, description, organizer, location, imageUrl, regStart, regEnd, eventStart, eventEnd, geoRequired, radius, geolocation);
+        //return fromMap(doc.getData());
     }
 
-    /**
-     * Saves the current state of this Event object to the database.
-     * <p>
-     * This method takes all the properties of the current object, converts them into a format
-     * suitable for the database (a Map), and sends them to be saved or updated in Firestore.
-     * This is an asynchronous network operation.
-     *
-     * @return A {@code Task<Void>} that represents the asynchronous save operation. You can add listeners
-     * to this task to be notified of success or failure.
-     */
     public Task<Void> save() {
         return dbHandler.saveEvent(this.eventId, this.toMap());
     }
 
-    /**
-     * Converts the Event object into a Map format suitable for Firestore.
-     * This is a private helper method used by the {@link #save()} method.
-     *
-     * @return A Map containing the key-value pairs of the event data.
-     */
     private Map<String, Object> toMap() {
         Map<String, Object> map = new HashMap<>();
         map.put("eventId", eventId);
         map.put("name", name);
         map.put("description", description);
-        map.put("organizerId", organizer.getDeviceId());
-        map.put("organizerEmail", organizer.getEmail());
-        map.put("organizerFirstName", organizer.getFirstName());
-        map.put("organizerLastName", organizer.getLastName());
-        map.put("organizerPhone", organizer.getPhoneNumber());
+        if (organizer != null) {
+            map.put("organizerId", organizer.getDeviceId());
+            map.put("organizerEmail", organizer.getEmail());
+            map.put("organizerFirstName", organizer.getFirstName());
+            map.put("organizerLastName", organizer.getLastName());
+            map.put("organizerPhone", organizer.getPhoneNumber());
+        }
         map.put("location", location);
+        map.put("locationName", locationName);
         map.put("imageUrl", imageUrl);
         map.put("registrationStartTime", registrationStartTime);
         map.put("registrationEndTime", registrationEndTime);
@@ -277,31 +261,20 @@ public class Event {
             map.put("latitude", geoLocation.getLatitude());
             map.put("longitude", geoLocation.getLongitude());
         }
+        map.put("maxAttendees", maxAttendees);
+        map.put("limitDistance", limitDistance);
         return map;
     }
 
-    /**
-     * Check if user is in event
-     * @param entrant The entrant to check
-     * @return A Task that resolves to true if the user is in the event, false otherwise
-     */
     public Task<Boolean> inEvent(Entrant entrant) {
         return dbHandler.getDb().collection(DatabaseHandler.COLLECTION_EVENTS)
                 .document(String.valueOf(this.eventId))
                 .collection(DatabaseHandler.COLLECTION_ENTRANTS)
                 .document(entrant.getDeviceId())
                 .get()
-                .continueWith(task -> {
-                    return task.isSuccessful() && task.getResult().exists();
-                });
+                .continueWith(task -> task.isSuccessful() && task.getResult().exists());
     }
 
-    /**
-     * Adds an entrant to the event's entrant list in the database.
-     *
-     * @param entrant The entrant to add.
-     * @return A Task representing the async operation.
-     */
     public Task<Void> addEntrant(Entrant entrant) {
         Date now = new Date();
         if (registrationStartTime != null && now.before(registrationStartTime)) {
@@ -311,25 +284,15 @@ public class Event {
             return Tasks.forException(new IllegalStateException("Registration has ended."));
         }
 
-        this.entrantList.put(entrant, Boolean.FALSE);
-
         Map<String, Object> registrationData = new HashMap<>();
         registrationData.put("entrantId", entrant.getDeviceId());
-        registrationData.put("status", "waiting"); // Default status
+        registrationData.put("status", DatabaseHandler.STATUS_WAITING);
         registrationData.put("registrationTime", now);
 
         return dbHandler.updateEntrantStatus(String.valueOf(this.eventId), entrant.getDeviceId(), registrationData);
     }
 
-    /**
-     * Removes an entrant from the event's entrant list in the database.
-     *
-     * @param entrant The entrant to remove.
-     * @return A Task representing the async operation.
-     */
     public Task<Void> removeEntrant(Entrant entrant) {
-        this.entrantList.remove(entrant); // Update local list
-
         return dbHandler.getDb().collection(DatabaseHandler.COLLECTION_EVENTS)
                 .document(String.valueOf(this.eventId))
                 .collection(DatabaseHandler.COLLECTION_ENTRANTS)
@@ -337,219 +300,45 @@ public class Event {
                 .delete();
     }
 
-    /**
-     * Fetches the current entrant count from the database sub-collection.
-     *
-     * @return A Task that resolves with the count.
-     */
     public Task<Long> fetchEntrantCount() {
         return dbHandler.getEntrantCount(String.valueOf(this.eventId))
                 .addOnSuccessListener(count -> this.entrantCount = count);
     }
 
 
-    public long getEntrantCount() {
-        return entrantCount;
-    }
-
-    public Long getEventId() {
-        return eventId;
-    }
-
-    public String getName() {
-        return name;
-    }
-
-    /**
-     * Sets the name of the event.
-     *
-     * @param name The new name of the event.
-     */
-    public void setName(String name) {
-        this.name = name;
-    }
-
-    /**
-     * Gets the description of the event.
-     *
-     * @return The description of the event.
-     */
-    public String getDescription() {
-        return description;
-    }
-
-    /**
-     * Sets the description of the event.
-     *
-     * @param description The new description of the event.
-     */
-    public void setDescription(String description) {
-        this.description = description;
-    }
-
-    /**
-     * Gets the organizer of the event.
-     *
-     * @return The organizer of the event.
-     */
-    public Organizer getOrganizer() {
-        return organizer;
-    }
-
-    /**
-     * Sets the organizer of the event.
-     *
-     * @param organizer The new organizer of the event.
-     */
-    public void setOrganizer(Organizer organizer) {
-        this.organizer = organizer;
-    }
-
-    /**
-     * Gets the location of the event.
-     *
-     * @return The location of the event.
-     */
-    public String getLocation() {
-        return location;
-    }
-
-    /**
-     * Sets the location of the event.
-     *
-     * @param location The new location of the event.
-     */
-    public void setLocation(String location) {
-        this.location = location;
-    }
-
-    /**
-     * Gets the image URL of the event.
-     *
-     * @return The image URL of the event.
-     */
-    public String getImageUrl() {
-        return imageUrl;
-    }
-
-    /**
-     * Sets the image URL of the event.
-     *
-     * @param imageUrl The new image URL of the event.
-     */
-    public void setImageUrl(String imageUrl) {
-        this.imageUrl = imageUrl;
-    }
-
-    /**
-     * Removes the image URL of the event.
-     */
-    public void removeImageUrl() {
-        this.imageUrl = null;
-    }
-
-    /**
-     * Gets the registration start time.
-     *
-     * @return The registration start time.
-     */
-    public Date getRegistrationStartTime() {
-        return registrationStartTime;
-    }
-
-    /**
-     * Sets the registration start time.
-     *
-     * @param registrationStartTime The new registration start time.
-     */
-    public void setRegistrationStartTime(Date registrationStartTime) {
-        this.registrationStartTime = registrationStartTime;
-    }
-
-    /**
-     * Gets the registration end time.
-     *
-     * @return The registration end time.
-     */
-    public Date getRegistrationEndTime() {
-        return registrationEndTime;
-    }
-
-    /**
-     * Sets the registration end time.
-     *
-     * @param registrationEndTime The new registration end time.
-     */
-    public void setRegistrationEndTime(Date registrationEndTime) {
-        this.registrationEndTime = registrationEndTime;
-    }
-
-    /**
-     * Gets the event start time.
-     *
-     * @return The event start time.
-     */
-    public Date getEventStartTime() {
-        return eventStartTime;
-    }
-
-    /**
-     * Sets the event start time.
-     *
-     * @param eventStartTime The new event start time.
-     */
-    public void setEventStartTime(Date eventStartTime) {
-        this.eventStartTime = eventStartTime;
-    }
-
-    /**
-     * Gets the event end time.
-     *
-     * @return The event end time.
-     */
-    public Date getEventEndTime() {
-        return eventEndTime;
-    }
-
-    /**
-     * Sets the event end time.
-     *
-     * @param eventEndTime The new event end time.
-     */
-    public void setEventEndTime(Date eventEndTime) {
-        this.eventEndTime = eventEndTime;
-    }
-
-    /**
-     * Gets the list of entrants for the event.
-     *
-     * @return A HashMap of entrants and their selection status.
-     */
-    public HashMap<Entrant, Boolean> getEntrantList() {
-        return entrantList;
-    }
-
-    public boolean isGeolocationRequired() {
-        return geolocationRequired;
-    }
-
-    public void setGeolocationRequired(boolean geolocationRequired) {
-        this.geolocationRequired = geolocationRequired;
-    }
-
-    public Double getRadius() {
-        return radius;
-    }
-
-    public void setRadius(Double radius) {
-        this.radius = radius;
-    }
-
-    public Location getGeoLocation() {
-        return geoLocation;
-    }
-
-    public void setGeoLocation(Location geoLocation) {
-        this.geoLocation = geoLocation;
-    }
+    public long getEntrantCount() {return entrantCount;}
+    public Long getEventId() {return eventId;}
+    public String getName() {return name;}
+    public void setName(String name) {this.name = name;}
+    public String getDescription() {return description;}
+    public void setDescription(String description) {this.description = description;}
+    public Organizer getOrganizer() {return organizer;}
+    public void setOrganizer(Organizer organizer) {this.organizer = organizer;}
+    public String getLocation() {return location;}
+    public void setLocation(String location) {this.location = location;}
+    public String getLocationName() { return locationName; }
+    public void setLocationName(String locationName) { this.locationName = locationName; }
+    public String getImageUrl() {return imageUrl;}
+    public void setImageUrl(String imageUrl) {this.imageUrl = imageUrl;}
+    public void removeImageUrl() {this.imageUrl = null;}
+    public Date getRegistrationStartTime() {return registrationStartTime;}
+    public void setRegistrationStartTime(Date registrationStartTime) {this.registrationStartTime = registrationStartTime;}
+    public Date getRegistrationEndTime() {return registrationEndTime;}
+    public void setRegistrationEndTime(Date registrationEndTime) {this.registrationEndTime = registrationEndTime;}
+    public Date getEventStartTime() {return eventStartTime;}
+    public void setEventStartTime(Date eventStartTime) {this.eventStartTime = eventStartTime;}
+    public Date getEventEndTime() {return eventEndTime;}
+    public void setEventEndTime(Date eventEndTime) {this.eventEndTime = eventEndTime;}
+    public HashMap<Entrant, Boolean> getEntrantList() {return entrantList;}
+    Integer getMaxAttendees() { return maxAttendees; }
+    public void setMaxAttendees(Integer maxAttendees) { this.maxAttendees = maxAttendees; }
+    public boolean isGeolocationRequired() {return geolocationRequired;}
+    public void setGeolocationRequired(boolean geolocationRequired) {this.geolocationRequired = geolocationRequired;}
+    public Double getRadius() {return radius;}
+    public void setRadius(Double radius) {this.radius = radius;}
+    public Location getGeoLocation() {return geoLocation;}
+    public void setGeoLocation(Location geoLocation) {this.geoLocation = geoLocation;}
+    public Double getLimitDistance() { return limitDistance; }
+    public void setLimitDistance(Double limitDistance) { this.limitDistance = limitDistance; }
 }
+
