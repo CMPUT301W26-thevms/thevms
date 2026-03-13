@@ -25,37 +25,13 @@ import java.util.concurrent.TimeoutException;
  */
 public class FirestoreTestHelper {
 
-    private static final String EMULATOR_HOST = "10.0.2.2";
-    private static final int EMULATOR_PORT = 8080;
-    
     private final DatabaseHandler dbHandler;
 
-    /**
-     * Creates a new helper and ensures the Firestore emulator is running.
-     */
     public FirestoreTestHelper() {
-        // Verify emulator is running before proceeding
-        checkEmulator();
-        
         this.dbHandler = new DatabaseHandler();
         // Point to the local emulator.
         // 10.0.2.2 is the special alias for the host machine from the Android emulator.
-        this.dbHandler.useEmulator(EMULATOR_HOST, EMULATOR_PORT);
-    }
-
-    /**
-     * Checks if the Firestore emulator is running.
-     * Throws a RuntimeException if it's not reachable.
-     */
-    public static void checkEmulator() {
-        try {
-            new java.net.Socket(EMULATOR_HOST, EMULATOR_PORT).close();
-        } catch (Exception e) {
-            throw new RuntimeException(
-                    "Firestore emulator not running on " + EMULATOR_HOST + ":" + EMULATOR_PORT + ". " +
-                            "Run: firebase emulators:start --only firestore", e
-            );
-        }
+        this.dbHandler.useEmulator("10.0.2.2", 8080);
     }
 
     /**

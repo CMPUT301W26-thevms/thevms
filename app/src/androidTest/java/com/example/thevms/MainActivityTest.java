@@ -51,6 +51,13 @@ public class MainActivityTest {
     private FirestoreTestHelper testHelper;
     private ActivityScenario<MainActivity> scenario;
 
+    /**
+     * Helper to wrap Espresso's hasDescendant matcher for use in other test classes.
+     */
+    public static Matcher<? super View> hasDescendant(Matcher<View> viewMatcher) {
+        return androidx.test.espresso.matcher.ViewMatchers.hasDescendant(viewMatcher);
+    }
+
     @Before
     public void setUp() throws Exception {
         Intents.init();

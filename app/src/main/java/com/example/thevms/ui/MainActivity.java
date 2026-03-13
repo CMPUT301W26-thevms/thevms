@@ -73,10 +73,14 @@ public class MainActivity extends AppCompatActivity {
 
             if (id == R.id.nav_home) {
                 selectedFragment = new SearchFragment();
+            } else if (id == R.id.nav_events) {
+                selectedFragment = new EntrantEventsFragment();
             } else if (id == R.id.nav_profile) {
                 selectedFragment = new ProfileFragment();
             } else if (id == R.id.nav_add) {
                 selectedFragment = new CreateEventFragment();
+            } else if (id == R.id.nav_favorites) {
+                selectedFragment = new EntrantEventsFragment();
             } else if (id == R.id.nav_admin_settings) {
                 openAdminDrawer();
                 return false; // Gear only opens the drawer, doesn't change selection by itself

@@ -54,21 +54,11 @@ public class Entrant {
         this.role = role;
     }
 
-    /**
-     * Saves the current entrant's profile to the database.
-     *
-     * @return A Task representing the async operation.
-     */
     public Task<Void> save() {
         Map<String, Object> data = toMap();
         return dbHandler.saveUser(deviceId, data);
     }
 
-    /**
-     * Converts the Entrant object into a Map format suitable for Firestore.
-     *
-     * @return A Map containing the key-value pairs of the entrant data.
-     */
     protected Map<String, Object> toMap() {
         Map<String, Object> data = new HashMap<>();
         data.put("email", email);
@@ -80,13 +70,6 @@ public class Entrant {
         return data;
     }
 
-    /**
-     * Creates an Entrant object from a Map of data.
-     *
-     * @param deviceId The unique device ID.
-     * @param data     The data map from Firestore.
-     * @return A populated Entrant object.
-     */
     public static Entrant fromMap(String deviceId, Map<String, Object> data) {
         if (data == null) return null;
         String email = (String) data.get("email");
@@ -99,12 +82,6 @@ public class Entrant {
         return new Entrant(deviceId, email, firstName, lastName, phoneNumber, notifications != null ? notifications : true, role);
     }
 
-    /**
-     * Fetches a user from the database based on the device ID, or returns a new Entrant if not found.
-     *
-     * @param deviceId The Android device ID.
-     * @return A Task containing the Entrant object.
-     */
     public static Task<Entrant> getOrCreate(String deviceId) {
         DatabaseHandler dbHandler = new DatabaseHandler();
         return dbHandler.getUser(deviceId).continueWith(task -> {
@@ -113,7 +90,6 @@ public class Entrant {
                 if (doc.exists()) {
                     return Entrant.fromMap(deviceId, doc.getData());
                 } else {
-                    // Return a new entrant instance that hasn't been saved yet
                     return new Entrant(deviceId, null, null, null, null, true, UserRole.ENTRANT);
                 }
             } else {
@@ -123,103 +99,56 @@ public class Entrant {
     }
 
     /**
-     * Retrieves a list of all events this entrant is registered for.
-     *
-     * @return A Task containing a List of Event objects.
+     * Option B: No-Index Version.
+     * Fetches all events and manually filters those where the user is an entrant.
      */
     public Task<List<Event>> getRegisteredEvents() {
-        return dbHandler.getRegistrationsForEntrant(deviceId).continueWithTask(task -> {
+        return dbHandler.getAllEvents().continueWithTask(task -> {
             if (!task.isSuccessful()) throw task.getException();
 
-            QuerySnapshot querySnapshot = task.getResult();
-            List<Task<DocumentSnapshot>> eventTasks = new ArrayList<>();
-            for (QueryDocumentSnapshot doc : querySnapshot) {
-                // The parent of 'entrants' collection is the event document
-                DocumentReference eventRef = doc.getReference().getParent().getParent();
-                if (eventRef != null) {
-                    eventTasks.add(eventRef.get());
+            List<Event> allEvents = new ArrayList<>();
+            List<Task<Boolean>> membershipTasks = new ArrayList<>();
+
+            for (DocumentSnapshot doc : task.getResult()) {
+                Event event = Event.fromDoc(doc);
+                if (event != null) {
+                    allEvents.add(event);
+                    membershipTasks.add(event.inEvent(this));
                 }
             }
 
-            if (eventTasks.isEmpty()) {
+            if (allEvents.isEmpty()) {
                 return Tasks.forResult(new ArrayList<Event>());
             }
 
-            return Tasks.whenAllSuccess(eventTasks).continueWith(allDocsTask -> {
-                List<Event> events = new ArrayList<>();
-                for (Object obj : allDocsTask.getResult()) {
-                    DocumentSnapshot eventDoc = (DocumentSnapshot) obj;
-                    if (eventDoc.exists()) {
-                        events.add(Event.fromMap(eventDoc.getData()));
+            // Wait for all "is user in this event" checks to complete
+            return Tasks.whenAllComplete(membershipTasks).continueWith(checksTask -> {
+                List<Event> joinedEvents = new ArrayList<>();
+                for (int i = 0; i < membershipTasks.size(); i++) {
+                    Task<Boolean> check = membershipTasks.get(i);
+                    if (check.isSuccessful() && check.getResult()) {
+                        joinedEvents.add(allEvents.get(i));
                     }
                 }
-                return events;
+                return joinedEvents;
             });
         });
     }
 
-    public String getDeviceId() {
-        return deviceId;
-    }
-
-    public void setDeviceId(String deviceId) {
-        this.deviceId = deviceId;
-    }
-
-    @Nullable
-    public String getPhoneNumber() {
-        return phoneNumber;
-    }
-
-    public void setPhoneNumber(@Nullable String phoneNumber) {
-        this.phoneNumber = phoneNumber;
-    }
-
-    public String getFirstName() {
-        return firstName;
-    }
-
-    public void setFirstName(String firstName) {
-        this.firstName = firstName;
-    }
-
-    public String getLastName() {
-        return lastName;
-    }
-
-    public void setLastName(String lastName) {
-        this.lastName = lastName;
-    }
-
-    public String getEmail() {
-        return email;
-    }
-
-    public void setEmail(String email) {
-        this.email = email;
-    }
-
-    public boolean isNotificationsEnabled() {
-        return notificationsEnabled;
-    }
-
-    public void setNotificationsEnabled(boolean notificationsEnabled) {
-        this.notificationsEnabled = notificationsEnabled;
-    }
-
-    public UserRole getRole() {
-        return role;
-    }
-
-    public void setRole(UserRole role) {
-        this.role = role;
-    }
-
-    public void registerInEvent(Event event) {
-        event.addEntrant(this);
-    }
-
-    public void unregisterFromEvent(Event event) {
-        event.removeEntrant(this);
-    }
+    public String getDeviceId() { return deviceId; }
+    public void setDeviceId(String deviceId) { this.deviceId = deviceId; }
+    @Nullable public String getPhoneNumber() { return phoneNumber; }
+    public void setPhoneNumber(@Nullable String phoneNumber) { this.phoneNumber = phoneNumber; }
+    public String getFirstName() { return firstName; }
+    public void setFirstName(String firstName) { this.firstName = firstName; }
+    public String getLastName() { return lastName; }
+    public void setLastName(String lastName) { this.lastName = lastName; }
+    public String getEmail() { return email; }
+    public void setEmail(String email) { this.email = email; }
+    public boolean isNotificationsEnabled() { return notificationsEnabled; }
+    public void setNotificationsEnabled(boolean notificationsEnabled) { this.notificationsEnabled = notificationsEnabled; }
+    public UserRole getRole() { return role; }
+    public void setRole(UserRole role) { this.role = role; }
+    public void registerInEvent(Event event) { event.addEntrant(this); }
+    public void unregisterFromEvent(Event event) { event.removeEntrant(this); }
 }

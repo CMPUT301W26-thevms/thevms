@@ -15,8 +15,10 @@ import com.google.firebase.firestore.SetOptions;
 import com.google.firebase.firestore.WriteBatch;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Random;
 
 /**
  * DatabaseHandler provides a clean API for interacting with Firebase Firestore.
@@ -29,6 +31,14 @@ public class DatabaseHandler {
     public static final String COLLECTION_EVENTS = "events";
     public static final String COLLECTION_USERS = "users";
     public static final String COLLECTION_ENTRANTS = "entrants";
+    // Entrant status constants
+    public static final String STATUS_WAITING = "waiting";
+    public static final String STATUS_SELECTED = "selected";
+    public static final String STATUS_ACCEPTED = "accepted";
+    public static final String STATUS_REJECTED = "rejected";
+    public static final String STATUS_INVITED = "invited";
+    public static final String STATUS_DECLINED = "declined";
+    public static final String STATUS_CANCELLED = "cancelled";
 
     public DatabaseHandler() {
         // Lazy initialization to avoid crashes in unit tests where Firebase is not available
@@ -246,6 +256,27 @@ public class DatabaseHandler {
     }
 
     /**
+     * Retrieves an entrant's status within an event.
+     *
+     * @param eventId The event ID.
+     * @param userId  The user ID.
+     * @return A Task that resolves with the status string.
+     */
+    public Task<String> getEntrantStatus(String eventId, String userId) {
+        return getDb().collection(COLLECTION_EVENTS)
+                .document(eventId)
+                .collection(COLLECTION_ENTRANTS)
+                .document(userId)
+                .get()
+                .continueWith(task -> {
+                    if (task.isSuccessful() && task.getResult().exists()) {
+                        return task.getResult().getString("status");
+                    }
+                    return null;
+                });
+    }
+
+    /**
      * Listens for real-time updates to an entrant's status.
      * Can be used to trigger notifications when an entrant's status changes.
      *
@@ -336,6 +367,32 @@ public class DatabaseHandler {
                     } else {
                         throw task.getException();
                     }
+                });
+    }
+
+    /**
+     * Randomly selects one waiting entrant for an event and invites them.
+     *
+     * @param eventId The event ID.
+     * @return A Task representing the operation.
+     */
+    public Task<Void> selectAndInviteNextEntrant(String eventId) {
+        return getDb().collection(COLLECTION_EVENTS)
+                .document(eventId)
+                .collection(COLLECTION_ENTRANTS)
+                .whereEqualTo("status", STATUS_WAITING)
+                .get()
+                .continueWithTask(task -> {
+                    if (!task.isSuccessful() || task.getResult().isEmpty()) {
+                        return Tasks.forResult(null);
+                    }
+
+                    List<DocumentSnapshot> waiting = task.getResult().getDocuments();
+                    DocumentSnapshot next = waiting.get(new Random().nextInt(waiting.size()));
+
+                    Map<String, Object> data = new HashMap<>();
+                    data.put("status", STATUS_SELECTED);
+                    return updateEntrantStatus(eventId, next.getId(), data);
                 });
     }
 
