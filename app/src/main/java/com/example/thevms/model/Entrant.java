@@ -191,19 +191,88 @@ public class Entrant {
         });
     }
 
+    /**
+     * Gets the unique device ID of the entrant.
+     * @return The device ID.
+     */
     public String getDeviceId() { return deviceId; }
+
+    /**
+     * Sets the unique device ID of the entrant.
+     * @param deviceId The new device ID.
+     */
     public void setDeviceId(String deviceId) { this.deviceId = deviceId; }
+
+    /**
+     * Gets the phone number of the entrant.
+     * @return The phone number, or null if not provided.
+     */
     @Nullable public String getPhoneNumber() { return phoneNumber; }
+
+    /**
+     * Sets the phone number of the entrant.
+     * @param phoneNumber The new phone number.
+     */
     public void setPhoneNumber(@Nullable String phoneNumber) { this.phoneNumber = phoneNumber; }
+
+    /**
+     * Gets the first name of the entrant.
+     * @return The first name.
+     */
     public String getFirstName() { return firstName; }
+
+    /**
+     * Sets the first name of the entrant.
+     * @param firstName The new first name.
+     */
     public void setFirstName(String firstName) { this.firstName = firstName; }
+
+    /**
+     * Gets the last name of the entrant.
+     * @return The last name.
+     */
     public String getLastName() { return lastName; }
+
+    /**
+     * Sets the last name of the entrant.
+     * @param lastName The new last name.
+     */
     public void setLastName(String lastName) { this.lastName = lastName; }
+
+    /**
+     * Gets the email address of the entrant.
+     * @return The email address.
+     */
     public String getEmail() { return email; }
+
+    /**
+     * Sets the email address of the entrant.
+     * @param email The new email address.
+     */
     public void setEmail(String email) { this.email = email; }
+
+    /**
+     * Checks if notifications are enabled for this entrant.
+     * @return True if enabled, false otherwise.
+     */
     public boolean isNotificationsEnabled() { return notificationsEnabled; }
+
+    /**
+     * Sets whether notifications are enabled for this entrant.
+     * @param notificationsEnabled True to enable, false to disable.
+     */
     public void setNotificationsEnabled(boolean notificationsEnabled) { this.notificationsEnabled = notificationsEnabled; }
+
+    /**
+     * Gets the role of the entrant.
+     * @return The UserRole.
+     */
     public UserRole getRole() { return role; }
+
+    /**
+     * Sets the role of the entrant.
+     * @param role The new UserRole.
+     */
     public void setRole(UserRole role) { this.role = role; }
 
     /**

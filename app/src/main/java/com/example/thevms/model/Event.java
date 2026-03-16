@@ -329,39 +329,206 @@ public class Event {
                 .addOnSuccessListener(count -> this.entrantCount = count);
     }
 
-
+    /**
+     * Gets the count of entrants registered for the event.
+     * @return The entrant count.
+     */
     public long getEntrantCount() {return entrantCount;}
+
+    /**
+     * Gets the unique event ID.
+     * @return The event ID.
+     */
     public Long getEventId() {return eventId;}
+
+    /**
+     * Gets the name of the event.
+     * @return The event name.
+     */
     public String getName() {return name;}
+
+    /**
+     * Sets the name of the event.
+     * @param name The new event name.
+     */
     public void setName(String name) {this.name = name;}
+
+    /**
+     * Gets the description of the event.
+     * @return The event description.
+     */
     public String getDescription() {return description;}
+
+    /**
+     * Sets the description of the event.
+     * @param description The new event description.
+     */
     public void setDescription(String description) {this.description = description;}
+
+    /**
+     * Gets the organizer of the event.
+     * @return The Organizer object.
+     */
     public Organizer getOrganizer() {return organizer;}
+
+    /**
+     * Sets the organizer of the event.
+     * @param organizer The new Organizer.
+     */
     public void setOrganizer(Organizer organizer) {this.organizer = organizer;}
+
+    /**
+     * Gets the location string of the event.
+     * @return The location string.
+     */
     public String getLocation() {return location;}
+
+    /**
+     * Sets the location string of the event.
+     * @param location The new location string.
+     */
     public void setLocation(String location) {this.location = location;}
+
+    /**
+     * Gets the descriptive name of the location.
+     * @return The location name.
+     */
     public String getLocationName() { return locationName; }
+
+    /**
+     * Sets the descriptive name of the location.
+     * @param locationName The new location name.
+     */
     public void setLocationName(String locationName) { this.locationName = locationName; }
+
+    /**
+     * Gets the URL of the event's banner image.
+     * @return The image URL.
+     */
     public String getImageUrl() {return imageUrl;}
+
+    /**
+     * Sets the URL of the event's banner image.
+     * @param imageUrl The new image URL.
+     */
     public void setImageUrl(String imageUrl) {this.imageUrl = imageUrl;}
+
+    /**
+     * Removes the event's banner image URL.
+     */
     public void removeImageUrl() {this.imageUrl = null;}
+
+    /**
+     * Gets the registration start time.
+     * @return The registration start Date.
+     */
     public Date getRegistrationStartTime() {return registrationStartTime;}
+
+    /**
+     * Sets the registration start time.
+     * @param registrationStartTime The new registration start Date.
+     */
     public void setRegistrationStartTime(Date registrationStartTime) {this.registrationStartTime = registrationStartTime;}
+
+    /**
+     * Gets the registration end time.
+     * @return The registration end Date.
+     */
     public Date getRegistrationEndTime() {return registrationEndTime;}
+
+    /**
+     * Sets the registration end time.
+     * @param registrationEndTime The new registration end Date.
+     */
     public void setRegistrationEndTime(Date registrationEndTime) {this.registrationEndTime = registrationEndTime;}
+
+    /**
+     * Gets the event start time.
+     * @return The event start Date.
+     */
     public Date getEventStartTime() {return eventStartTime;}
+
+    /**
+     * Sets the event start time.
+     * @param eventStartTime The new event start Date.
+     */
     public void setEventStartTime(Date eventStartTime) {this.eventStartTime = eventStartTime;}
+
+    /**
+     * Gets the event end time.
+     * @return The event end Date.
+     */
     public Date getEventEndTime() {return eventEndTime;}
+
+    /**
+     * Sets the event end time.
+     * @param eventEndTime The new event end Date.
+     */
     public void setEventEndTime(Date eventEndTime) {this.eventEndTime = eventEndTime;}
+
+    /**
+     * Gets the list of entrants for the event.
+     * @return A HashMap of entrants and their registration status.
+     */
     public HashMap<Entrant, Boolean> getEntrantList() {return entrantList;}
+
+    /**
+     * Gets the maximum number of attendees allowed for the event.
+     * @return The maximum attendees, or null if no limit.
+     */
     public Integer getMaxAttendees() { return maxAttendees; }
+
+    /**
+     * Sets the maximum number of attendees allowed for the event.
+     * @param maxAttendees The new maximum attendees.
+     */
     public void setMaxAttendees(Integer maxAttendees) { this.maxAttendees = maxAttendees; }
+
+    /**
+     * Checks if geolocation is required to join the event.
+     * @return True if required, false otherwise.
+     */
     public boolean isGeolocationRequired() {return geolocationRequired;}
+
+    /**
+     * Sets whether geolocation is required to join the event.
+     * @param geolocationRequired True to require geolocation, false otherwise.
+     */
     public void setGeolocationRequired(boolean geolocationRequired) {this.geolocationRequired = geolocationRequired;}
+
+    /**
+     * Gets the geofencing radius.
+     * @return The radius in kilometers.
+     */
     public Double getRadius() {return radius;}
+
+    /**
+     * Sets the geofencing radius.
+     * @param radius The new radius in kilometers.
+     */
     public void setRadius(Double radius) {this.radius = radius;}
+
+    /**
+     * Gets the GPS coordinates of the event.
+     * @return The Location object.
+     */
     public Location getGeoLocation() {return geoLocation;}
+
+    /**
+     * Sets the GPS coordinates of the event.
+     * @param geoLocation The new Location object.
+     */
     public void setGeoLocation(Location geoLocation) {this.geoLocation = geoLocation;}
+
+    /**
+     * Gets the distance limit for the event.
+     * @return The limit distance.
+     */
     public Double getLimitDistance() { return limitDistance; }
+
+    /**
+     * Sets the distance limit for the event.
+     * @param limitDistance The new limit distance.
+     */
     public void setLimitDistance(Double limitDistance) { this.limitDistance = limitDistance; }
 }
