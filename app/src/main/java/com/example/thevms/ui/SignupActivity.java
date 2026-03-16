@@ -22,6 +22,10 @@ import com.google.android.material.textfield.TextInputEditText;
 
 import java.util.Objects;
 
+/**
+ * Activity for user registration.
+ * Collects user profile information and saves it to the database.
+ */
 public class SignupActivity extends AppCompatActivity {
 
     private TextInputEditText firstNameEdit, lastNameEdit, emailEdit, phoneEdit;
@@ -63,6 +67,11 @@ public class SignupActivity extends AppCompatActivity {
         });
     }
 
+    /**
+     * Validates input fields and saves the new user profile to the database.
+     *
+     * @param deviceId The unique ID of the device.
+     */
     private void handleSignup(String deviceId) {
         String firstName = Objects.requireNonNull(firstNameEdit.getText()).toString().trim();
         String lastName = Objects.requireNonNull(lastNameEdit.getText()).toString().trim();
@@ -109,6 +118,9 @@ public class SignupActivity extends AppCompatActivity {
         });
     }
 
+    /**
+     * Navigates to the main activity and finishes the current activity.
+     */
     private void navigateToMain() {
         Intent intent = new Intent(SignupActivity.this, MainActivity.class);
         startActivity(intent);

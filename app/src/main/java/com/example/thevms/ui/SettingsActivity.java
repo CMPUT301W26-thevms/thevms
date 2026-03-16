@@ -24,6 +24,10 @@ import com.google.android.material.textfield.TextInputEditText;
 
 import java.util.Objects;
 
+/**
+ * Activity for managing user settings and profile updates.
+ * Allows users to edit their personal information and toggle notification preferences.
+ */
 public class SettingsActivity extends AppCompatActivity {
 
     private TextInputEditText firstNameEdit, lastNameEdit, emailEdit, phoneEdit;
@@ -70,6 +74,11 @@ public class SettingsActivity extends AppCompatActivity {
         loadUserSettings(deviceId);
     }
 
+    /**
+     * Validates the user input fields for correctness.
+     *
+     * @return True if all inputs are valid, false otherwise.
+     */
     private boolean validateInputs() {
         String firstName = Objects.requireNonNull(firstNameEdit.getText()).toString().trim();
         String lastName = Objects.requireNonNull(lastNameEdit.getText()).toString().trim();
@@ -102,6 +111,11 @@ public class SettingsActivity extends AppCompatActivity {
         return isValid;
     }
 
+    /**
+     * Shows a confirmation dialog before saving profile changes.
+     *
+     * @param deviceId The unique ID of the device.
+     */
     private void showConfirmDialog(String deviceId) {
         new AlertDialog.Builder(this)
                 .setTitle("Save Changes")
@@ -111,6 +125,11 @@ public class SettingsActivity extends AppCompatActivity {
                 .show();
     }
 
+    /**
+     * Handles the process of updating the user profile in the database.
+     *
+     * @param deviceId The unique ID of the device.
+     */
     private void handleUpdate(String deviceId) {
         String firstName = Objects.requireNonNull(firstNameEdit.getText()).toString().trim();
         String lastName = Objects.requireNonNull(lastNameEdit.getText()).toString().trim();
@@ -133,6 +152,11 @@ public class SettingsActivity extends AppCompatActivity {
         });
     }
 
+    /**
+     * Loads the current user settings from the database and populates the UI.
+     *
+     * @param deviceId The unique ID of the device.
+     */
     private void loadUserSettings(String deviceId) {
         Entrant.getOrCreate(deviceId).addOnSuccessListener(entrant -> {
             firstNameEdit.setText(entrant.getFirstName());
