@@ -29,6 +29,10 @@ import com.google.firebase.firestore.DocumentSnapshot;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * Fragment for administrators to view and manage user profiles.
+ * Can be configured to show only organizers or all users.
+ */
 public class AdminProfilesFragment extends Fragment {
 
     private static final String ARG_FILTER_ORGANIZERS = "filter_organizers";
@@ -42,6 +46,12 @@ public class AdminProfilesFragment extends Fragment {
     private boolean filterOrganizersOnly = false;
     private String currentDeviceId;
 
+    /**
+     * Creates a new instance of AdminProfilesFragment.
+     *
+     * @param filterOrganizersOnly Whether to filter the list to show only organizers.
+     * @return A new instance of AdminProfilesFragment.
+     */
     public static AdminProfilesFragment newInstance(boolean filterOrganizersOnly) {
         AdminProfilesFragment fragment = new AdminProfilesFragment();
         Bundle args = new Bundle();
@@ -104,6 +114,11 @@ public class AdminProfilesFragment extends Fragment {
         return view;
     }
 
+    /**
+     * Updates the loading state of the UI.
+     *
+     * @param isLoading True if data is being loaded, false otherwise.
+     */
     private void setLoading(boolean isLoading) {
         if (loadingSpinner != null) {
             loadingSpinner.setVisibility(isLoading ? View.VISIBLE : View.GONE);
@@ -116,6 +131,9 @@ public class AdminProfilesFragment extends Fragment {
         }
     }
 
+    /**
+     * Fetches user profiles from the database and updates the local list.
+     */
     private void loadProfiles() {
         setLoading(true);
         dbHandler.getAllUsers().addOnSuccessListener(queryDocumentSnapshots -> {
@@ -142,6 +160,9 @@ public class AdminProfilesFragment extends Fragment {
         });
     }
 
+    /**
+     * Updates the RecyclerView and empty state text based on the current list of profiles.
+     */
     private void updateUI() {
         adapter.notifyDataSetChanged();
         if (profiles.isEmpty()) {
@@ -153,6 +174,9 @@ public class AdminProfilesFragment extends Fragment {
         }
     }
 
+    /**
+     * Adapter for displaying user profiles in the RecyclerView.
+     */
     private static class ProfileAdapter extends RecyclerView.Adapter<ProfileAdapter.ViewHolder> {
         private final List<Entrant> profiles;
         private final String currentDeviceId;
@@ -160,6 +184,15 @@ public class AdminProfilesFragment extends Fragment {
         private final Runnable onActionSuccess;
         private final Runnable onActionFailure;
 
+        /**
+         * Constructs a new ProfileAdapter.
+         *
+         * @param profiles        The list of profiles to display.
+         * @param currentDeviceId The device ID of the current user (to prevent self-deletion).
+         * @param onActionStarted Callback for when a profile action starts.
+         * @param onActionSuccess Callback for when a profile action succeeds.
+         * @param onActionFailure Callback for when a profile action fails.
+         */
         public ProfileAdapter(List<Entrant> profiles, String currentDeviceId, Runnable onActionStarted, Runnable onActionSuccess, Runnable onActionFailure) {
             this.profiles = profiles;
             this.currentDeviceId = currentDeviceId;
@@ -201,6 +234,12 @@ public class AdminProfilesFragment extends Fragment {
             });
         }
 
+        /**
+         * Shows a confirmation dialog before deleting a user profile.
+         *
+         * @param view    The view context for the dialog.
+         * @param entrant The entrant profile to delete.
+         */
         private void showDeleteConfirmation(View view, Entrant entrant) {
             AlertDialog.Builder builder = new AlertDialog.Builder(view.getContext());
             View dialogView = LayoutInflater.from(view.getContext()).inflate(R.layout.dialog_delete_profile, null);
@@ -240,6 +279,12 @@ public class AdminProfilesFragment extends Fragment {
             dialog.show();
         }
 
+        /**
+         * Performs the actual deletion of the user profile and associated data from the database.
+         *
+         * @param view    The view context for toast messages.
+         * @param entrant The entrant profile to delete.
+         */
         private void performDeletion(View view, Entrant entrant) {
             onActionStarted.run();
             DatabaseHandler dbHandler = new DatabaseHandler();
@@ -259,10 +304,18 @@ public class AdminProfilesFragment extends Fragment {
             return profiles.size();
         }
 
+        /**
+         * ViewHolder for profile items in the RecyclerView.
+         */
         public static class ViewHolder extends RecyclerView.ViewHolder {
             TextView nameText, roleText, emailText, phoneText;
             MaterialButton deleteButton;
 
+            /**
+             * Initializes the ViewHolder with the item view and finds subviews.
+             *
+             * @param itemView The view for a single profile item.
+             */
             public ViewHolder(@NonNull View itemView) {
                 super(itemView);
                 nameText = itemView.findViewById(R.id.profile_name);

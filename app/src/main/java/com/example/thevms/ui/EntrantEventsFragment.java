@@ -28,6 +28,10 @@ import com.google.firebase.firestore.DocumentSnapshot;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * Fragment for displaying events relevant to the current user.
+ * Shows registered events for entrants, created events for organizers, and all events for admins.
+ */
 public class EntrantEventsFragment extends Fragment {
 
     private RecyclerView recyclerView;
@@ -52,6 +56,9 @@ public class EntrantEventsFragment extends Fragment {
         return view;
     }
 
+    /**
+     * Determines the user's role and sets up the corresponding view for their event dashboard.
+     */
     private void loadDashboardBasedOnRole() {
         if (loadingBar != null) loadingBar.setVisibility(View.VISIBLE);
         if (emptyText != null) emptyText.setVisibility(View.GONE);
@@ -73,6 +80,11 @@ public class EntrantEventsFragment extends Fragment {
         }).addOnFailureListener(e -> handleFailure("Error identifying user profile."));
     }
 
+    /**
+     * Sets up the view for a regular entrant, showing events they have registered for.
+     *
+     * @param entrant The current entrant.
+     */
     private void setupEntrantView(Entrant entrant) {
         EventAdapter adapter = new EventAdapter();
         recyclerView.setAdapter(adapter);
@@ -84,6 +96,11 @@ public class EntrantEventsFragment extends Fragment {
         }).addOnFailureListener(e -> handleFailure("Query failed. You might need to create a Firestore Index. Check Logcat."));
     }
 
+    /**
+     * Sets up the view for an organizer, showing events they have created.
+     *
+     * @param deviceId The device ID of the organizer.
+     */
     private void setupOrganizerView(String deviceId) {
         OrganizerEventAdapter adapter = new OrganizerEventAdapter();
         recyclerView.setAdapter(adapter);
@@ -98,6 +115,9 @@ public class EntrantEventsFragment extends Fragment {
         }).addOnFailureListener(e -> handleFailure("Error fetching your events."));
     }
 
+    /**
+     * Sets up the view for an administrator, showing all events in the system.
+     */
     private void setupAdminView() {
         EventAdapter adapter = new EventAdapter();
         adapter.setAdmin(true);
@@ -113,6 +133,12 @@ public class EntrantEventsFragment extends Fragment {
         }).addOnFailureListener(e -> handleFailure("Admin access failed."));
     }
 
+    /**
+     * Updates the UI based on the list of events fetched.
+     *
+     * @param events       The list of events.
+     * @param emptyMessage The message to show if the list is empty.
+     */
     private void updateUI(List<Event> events, String emptyMessage) {
         if (loadingBar != null) loadingBar.setVisibility(View.GONE);
         if (events == null || events.isEmpty()) {
@@ -125,6 +151,11 @@ public class EntrantEventsFragment extends Fragment {
         }
     }
 
+    /**
+     * Handles failures in data fetching by logging the error and showing a message to the user.
+     *
+     * @param message The error message.
+     */
     private void handleFailure(String message) {
         Log.e("HistoryTab", message);
         if (loadingBar != null) loadingBar.setVisibility(View.GONE);

@@ -25,6 +25,10 @@ import com.google.firebase.firestore.DocumentSnapshot;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * Activity for organizers to view and manage their own created events.
+ * Displays a list of events associated with the current device ID.
+ */
 public class MyEventsActivity extends AppCompatActivity {
 
     private RecyclerView recyclerView;
@@ -60,6 +64,11 @@ public class MyEventsActivity extends AppCompatActivity {
         loadMyEvents();
     }
 
+    /**
+     * Shows a confirmation dialog before cancelling (deleting) an event.
+     *
+     * @param event The event to be cancelled.
+     */
     private void showCancelConfirmationDialog(Event event) {
         View dialogView = LayoutInflater.from(this).inflate(R.layout.dialog_cancel_confirmation, null);
         AlertDialog dialog = new AlertDialog.Builder(this)
@@ -90,6 +99,9 @@ public class MyEventsActivity extends AppCompatActivity {
         dialog.show();
     }
 
+    /**
+     * Fetches the list of events organized by the current user and updates the UI.
+     */
     private void loadMyEvents() {
         loadingBar.setVisibility(View.VISIBLE);
         emptyText.setVisibility(View.GONE);
