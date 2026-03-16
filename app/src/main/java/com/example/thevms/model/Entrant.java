@@ -16,6 +16,7 @@ import java.util.Map;
 
 /**
  * Represents an entrant in an event.
+ * An entrant can register for events, update their profile, and receive notifications.
  */
 public class Entrant {
     protected final DatabaseHandler dbHandler;
@@ -28,10 +29,29 @@ public class Entrant {
     private boolean notificationsEnabled;
     private UserRole role;
 
+    /**
+     * Constructs a new Entrant with default notification settings and role.
+     *
+     * @param deviceId    The unique ID of the device.
+     * @param email       The entrant's email address.
+     * @param firstName   The entrant's first name.
+     * @param lastName    The entrant's last name.
+     * @param phoneNumber The entrant's phone number (optional).
+     */
     public Entrant(String deviceId, String email, String firstName, String lastName, @Nullable String phoneNumber) {
         this(deviceId, email, firstName, lastName, phoneNumber, true, UserRole.ENTRANT);
     }
 
+    /**
+     * Constructs a new Entrant with specified notification settings and default role.
+     *
+     * @param deviceId             The unique ID of the device.
+     * @param email                The entrant's email address.
+     * @param firstName            The entrant's first name.
+     * @param lastName             The entrant's last name.
+     * @param phoneNumber          The entrant's phone number (optional).
+     * @param notificationsEnabled Whether notifications are enabled for this entrant.
+     */
     public Entrant(String deviceId, String email, String firstName, String lastName, @Nullable String phoneNumber, boolean notificationsEnabled) {
         this.dbHandler = new DatabaseHandler();
         this.deviceId = deviceId;
@@ -43,6 +63,17 @@ public class Entrant {
         this.role = UserRole.ENTRANT;
     }
 
+    /**
+     * Constructs a new Entrant with specified notification settings and role.
+     *
+     * @param deviceId             The unique ID of the device.
+     * @param email                The entrant's email address.
+     * @param firstName            The entrant's first name.
+     * @param lastName             The entrant's last name.
+     * @param phoneNumber          The entrant's phone number (optional).
+     * @param notificationsEnabled Whether notifications are enabled for this entrant.
+     * @param role                 The role of the user.
+     */
     public Entrant(String deviceId, String email, String firstName, String lastName, @Nullable String phoneNumber, boolean notificationsEnabled, UserRole role) {
         this.dbHandler = new DatabaseHandler();
         this.deviceId = deviceId;
@@ -54,11 +85,21 @@ public class Entrant {
         this.role = role;
     }
 
+    /**
+     * Saves the entrant's profile to the database.
+     *
+     * @return A Task representing the asynchronous save operation.
+     */
     public Task<Void> save() {
         Map<String, Object> data = toMap();
         return dbHandler.saveUser(deviceId, data);
     }
 
+    /**
+     * Converts the entrant's data into a Map for Firestore storage.
+     *
+     * @return A Map containing the entrant's data.
+     */
     protected Map<String, Object> toMap() {
         Map<String, Object> data = new HashMap<>();
         data.put("email", email);
@@ -70,6 +111,13 @@ public class Entrant {
         return data;
     }
 
+    /**
+     * Creates an Entrant object from a data map.
+     *
+     * @param deviceId The unique ID of the device.
+     * @param data     The data map from Firestore.
+     * @return A new Entrant object, or null if data is null.
+     */
     public static Entrant fromMap(String deviceId, Map<String, Object> data) {
         if (data == null) return null;
         String email = (String) data.get("email");
@@ -82,6 +130,12 @@ public class Entrant {
         return new Entrant(deviceId, email, firstName, lastName, phoneNumber, notifications != null ? notifications : true, role);
     }
 
+    /**
+     * Retrieves an existing entrant profile from the database, or creates a blank one if it doesn't exist.
+     *
+     * @param deviceId The unique ID of the device.
+     * @return A Task that resolves with the Entrant object.
+     */
     public static Task<Entrant> getOrCreate(String deviceId) {
         DatabaseHandler dbHandler = new DatabaseHandler();
         return dbHandler.getUser(deviceId).continueWith(task -> {
@@ -99,8 +153,10 @@ public class Entrant {
     }
 
     /**
-     * Option B: No-Index Version.
-     * Fetches all events and manually filters those where the user is an entrant.
+     * Fetches all events where this entrant is currently registered (waitlisted or otherwise).
+     * This implementation fetches all events and filters them manually.
+     *
+     * @return A Task that resolves with a list of registered events.
      */
     public Task<List<Event>> getRegisteredEvents() {
         return dbHandler.getAllEvents().continueWithTask(task -> {
@@ -149,6 +205,18 @@ public class Entrant {
     public void setNotificationsEnabled(boolean notificationsEnabled) { this.notificationsEnabled = notificationsEnabled; }
     public UserRole getRole() { return role; }
     public void setRole(UserRole role) { this.role = role; }
+
+    /**
+     * Registers the entrant in a specific event.
+     *
+     * @param event The event to register in.
+     */
     public void registerInEvent(Event event) { event.addEntrant(this); }
+
+    /**
+     * Unregisters the entrant from a specific event.
+     *
+     * @param event The event to unregister from.
+     */
     public void unregisterFromEvent(Event event) { event.removeEntrant(this); }
 }
