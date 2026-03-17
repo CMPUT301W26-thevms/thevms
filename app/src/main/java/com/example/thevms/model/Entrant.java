@@ -96,6 +96,16 @@ public class Entrant {
     }
 
     /**
+     * Performs a comprehensive deletion of the entrant's profile and all associated data.
+     *
+     * @param deviceId The device ID of the account to delete.
+     * @return A Task representing the asynchronous deletion operation.
+     */
+    public static Task<Void> deleteAccount(String deviceId) {
+        return new DatabaseHandler().deleteUserAccountCompletely(deviceId);
+    }
+
+    /**
      * Converts the entrant's data into a Map for Firestore storage.
      *
      * @return A Map containing the entrant's data.
