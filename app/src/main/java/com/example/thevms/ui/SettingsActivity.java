@@ -8,6 +8,7 @@ import android.util.Patterns;
 import android.view.View;
 import android.widget.Button;
 import android.widget.ImageView;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.activity.EdgeToEdge;
@@ -68,10 +69,64 @@ public class SettingsActivity extends AppCompatActivity {
 
         Button deleteAccountButton = findViewById(R.id.btn_delete_account);
         deleteAccountButton.setOnClickListener(v -> {
-            // Logic for deleting account will go here
+            showDeleteAccountConfirmation(deviceId);
         });
 
         loadUserSettings(deviceId);
+    }
+
+    /**
+     * Shows a confirmation dialog before deleting the user account.
+     * Uses the existing dialog_delete_event layout for consistency.
+     *
+     * @param deviceId The unique ID of the device.
+     */
+    private void showDeleteAccountConfirmation(String deviceId) {
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        View dialogView = getLayoutInflater().inflate(R.layout.dialog_delete_event, null);
+        builder.setView(dialogView);
+
+        AlertDialog dialog = builder.create();
+        if (dialog.getWindow() != null) {
+            dialog.getWindow().setBackgroundDrawableResource(android.R.color.transparent);
+        }
+
+        TextView title = dialogView.findViewById(R.id.tv_dialog_title);
+        TextView message = dialogView.findViewById(R.id.tv_dialog_message);
+        Button btnCancel = dialogView.findViewById(R.id.btn_dialog_cancel);
+        Button btnDelete = dialogView.findViewById(R.id.btn_dialog_delete);
+        ImageView ivClose = dialogView.findViewById(R.id.iv_close);
+
+        if (title != null) title.setText("Delete Account");
+        if (message != null) message.setText("Are you sure you want to delete your profile? This will remove you from all event waitlists and delete any events you have organized. This action cannot be undone.");
+
+        if (btnDelete != null) {
+            btnDelete.setText("Delete");
+            btnDelete.setOnClickListener(v -> {
+                handleDeleteAccount(deviceId);
+                dialog.dismiss();
+            });
+        }
+
+        if (btnCancel != null) btnCancel.setOnClickListener(v -> dialog.dismiss());
+        if (ivClose != null) ivClose.setOnClickListener(v -> dialog.dismiss());
+
+        dialog.show();
+    }
+
+    /**
+     * Handles the process of deleting the user account from the database.
+     *
+     * @param deviceId The unique ID of the device.
+     */
+    private void handleDeleteAccount(String deviceId) {
+        Entrant.deleteAccount(deviceId).addOnSuccessListener(aVoid -> {
+            Toast.makeText(SettingsActivity.this, "Account deleted successfully", Toast.LENGTH_SHORT).show();
+            // Close all activities and exit the app
+            finishAffinity();
+        }).addOnFailureListener(e -> {
+            Toast.makeText(SettingsActivity.this, "Failed to delete account: " + e.getMessage(), Toast.LENGTH_LONG).show();
+        });
     }
 
     /**
