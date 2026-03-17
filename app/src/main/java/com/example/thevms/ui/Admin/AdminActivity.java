@@ -20,6 +20,11 @@ public class AdminActivity {
     private final Activity activity;
     private final DrawerLayout drawerLayout;
 
+    /**
+     * Constructs an AdminActivity controller.
+     *
+     * @param activity The activity hosting the admin drawer.
+     */
     public AdminActivity(Activity activity) {
         this.activity = activity;
         this.drawerLayout = activity.findViewById(R.id.drawer_layout);
@@ -35,6 +40,9 @@ public class AdminActivity {
         new AdminActivity(activity);
     }
 
+    /**
+     * Configures click listeners for the various administrative action buttons.
+     */
     private void setupClickListeners() {
         View panel = activity.findViewById(R.id.admin_panel_root);
         if (panel == null) return;
@@ -46,6 +54,11 @@ public class AdminActivity {
         panel.findViewById(R.id.admin_manage_organizers).setOnClickListener(v -> handleAction("Manage Organizers"));
     }
 
+    /**
+     * Handles an administrative action by navigating to the appropriate fragment or showing a message.
+     *
+     * @param actionName The name of the action to be performed.
+     */
     private void handleAction(String actionName) {
         Log.d("AdminActivity", "Action clicked: " + actionName);
 

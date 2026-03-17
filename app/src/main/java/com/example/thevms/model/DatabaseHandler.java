@@ -40,6 +40,10 @@ public class DatabaseHandler {
     public static final String STATUS_DECLINED = "declined";
     public static final String STATUS_CANCELLED = "cancelled";
 
+    /**
+     * Default constructor for DatabaseHandler.
+     * Lazy initializes the Firestore instance when needed.
+     */
     public DatabaseHandler() {
         // Lazy initialization to avoid crashes in unit tests where Firebase is not available
     }
@@ -73,7 +77,7 @@ public class DatabaseHandler {
     }
 
     /**
-     * Gets the next available event ID.
+     * Gets the next available event ID by querying the highest existing ID.
      *
      * @return A Task that will resolve to the next available event ID.
      */
@@ -98,7 +102,7 @@ public class DatabaseHandler {
     }
 
     /**
-     * Stores or updates an event's details.
+     * Stores or updates an event's details in Firestore.
      *
      * @param eventId   Unique identifier for the event.
      * @param eventData Map containing event attributes.
@@ -141,9 +145,9 @@ public class DatabaseHandler {
     }
 
     /**
-     * Stores or updates a user profile.
+     * Stores or updates a user profile in Firestore.
      *
-     * @param userId   Unique identifier for the user.
+     * @param userId   Unique identifier for the user (device ID).
      * @param userData Map containing user profile attributes.
      * @return Task representing the async operation.
      */
@@ -152,9 +156,9 @@ public class DatabaseHandler {
     }
 
     /**
-     * Retrieves a specific user's profile.
+     * Retrieves a specific user's profile from Firestore.
      *
-     * @param userId The user ID.
+     * @param userId The user ID (device ID).
      * @return Task containing DocumentSnapshot of the user.
      */
     public Task<DocumentSnapshot> getUser(String userId) {
@@ -162,7 +166,7 @@ public class DatabaseHandler {
     }
 
     /**
-     * Retrieves all user profiles.
+     * Retrieves all user profiles from the database.
      *
      * @return Task containing QuerySnapshot of all users.
      */
@@ -256,7 +260,7 @@ public class DatabaseHandler {
     }
 
     /**
-     * Retrieves an entrant's status within an event.
+     * Retrieves an entrant's current status for a specific event.
      *
      * @param eventId The event ID.
      * @param userId  The user ID.
@@ -396,6 +400,11 @@ public class DatabaseHandler {
                 });
     }
 
+    /**
+     * Gets the current Firestore instance, initializing it if necessary.
+     *
+     * @return The FirebaseFirestore instance.
+     */
     public FirebaseFirestore getDb() {
         if (db == null) {
             db = FirebaseFirestore.getInstance();

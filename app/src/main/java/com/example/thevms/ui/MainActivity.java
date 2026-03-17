@@ -23,6 +23,7 @@ import com.google.android.material.bottomnavigation.BottomNavigationView;
 
 /**
  * The main activity of the application that manages fragment navigation and the admin drawer.
+ * It serves as the primary entry point after signup and handles user role-based UI adjustments.
  */
 public class MainActivity extends AppCompatActivity {
 
@@ -125,6 +126,8 @@ public class MainActivity extends AppCompatActivity {
 
     /**
      * Checks the user's role from the database and shows/hides role-specific buttons.
+     *
+     * @param bottomNav The BottomNavigationView to adjust.
      */
     private void checkUserRoleAndAdjustUI(BottomNavigationView bottomNav) {
         @SuppressLint("HardwareIds")

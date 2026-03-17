@@ -34,6 +34,7 @@ import java.util.TimeZone;
 
 /**
  * Fragment for creating a new event.
+ * Handles event details input, date-time selection, and geolocation settings.
  */
 public class CreateEventFragment extends Fragment {
 
@@ -96,6 +97,11 @@ public class CreateEventFragment extends Fragment {
 
     /**
      * Testing helper to manually set dates and bypass picker UI.
+     *
+     * @param rs Registration start date.
+     * @param re Registration end date.
+     * @param es Event start date.
+     * @param ee Event end date.
      */
     @VisibleForTesting
     public void setTestingDates(Date rs, Date re, Date es, Date ee) {
@@ -112,6 +118,7 @@ public class CreateEventFragment extends Fragment {
 
     /**
      * Shows a Material Date Picker followed by a Time Picker and updates the selected date-time.
+     *
      * @param type 1: RegStart, 2: RegEnd, 3: EventStart, 4: EventEnd
      */
     private void showDateTimePicker(int type) {
@@ -271,6 +278,9 @@ public class CreateEventFragment extends Fragment {
         });
     }
 
+    /**
+     * Shows a confirmation dialog when the user attempts to cancel event creation.
+     */
     private void showCancelConfirmationDialog() {
         View dialogView = LayoutInflater.from(requireContext()).inflate(R.layout.dialog_cancel_confirmation, null);
 
@@ -297,6 +307,12 @@ public class CreateEventFragment extends Fragment {
         dialog.show();
     }
 
+    /**
+     * Converts a location name (address) string into GPS coordinates.
+     *
+     * @param strAddress The location name to geocode.
+     * @return An android.location.Location object with latitude and longitude, or null if geocoding fails.
+     */
     private android.location.Location getLocationFromAddress(String strAddress) {
         android.location.Geocoder geocoder = new android.location.Geocoder(requireContext(), Locale.getDefault());
         try {

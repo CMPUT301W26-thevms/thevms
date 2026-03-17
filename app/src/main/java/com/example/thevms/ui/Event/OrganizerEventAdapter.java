@@ -29,8 +29,11 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.Random;
 
+/**
+ * Adapter for organizers to manage their events.
+ * Displays event details, attendee lists with status filtering, and controls for running a lottery or cancelling events.
+ */
 public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAdapter.ViewHolder> {
 
     // Display labels shown in the dropdown — must match Firestore status values exactly
@@ -46,15 +49,33 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
     private static final SimpleDateFormat dateFormat = new SimpleDateFormat("MMM d", Locale.getDefault());
     private OnEventCancelListener cancelListener;
 
+    /**
+     * Interface for listening to event cancellation actions.
+     */
     public interface OnEventCancelListener {
+        /**
+         * Called when an event is cancelled by the organizer.
+         *
+         * @param event The event being cancelled.
+         */
         void onCancel(Event event);
     }
 
+    /**
+     * Updates the list of events to be displayed.
+     *
+     * @param events The new list of events.
+     */
     public void setEvents(List<Event> events) {
         this.events = events;
         notifyDataSetChanged();
     }
 
+    /**
+     * Sets the listener for event cancellation actions.
+     *
+     * @param cancelListener The listener to set.
+     */
     public void setOnEventCancelListener(OnEventCancelListener cancelListener) {
         this.cancelListener = cancelListener;
     }
@@ -78,6 +99,10 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
         return events.size();
     }
 
+    /**
+     * ViewHolder class for organizer event cards.
+     * Manages nested RecyclerView for attendees and event management controls.
+     */
     static class ViewHolder extends RecyclerView.ViewHolder {
         TextView nameText, distanceText, waitlistText, dateText, descriptionText, exportCsvText;
         Button cancelBtn, lotteryBtn;
@@ -90,6 +115,11 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
         // Stored so the CSV export can use it for the filename
         String currentEventName = "";
 
+        /**
+         * Initializes the ViewHolder and sets up nested UI components like the attendee list and status spinner.
+         *
+         * @param itemView The view representing a single organizer event card.
+         */
         public ViewHolder(@NonNull View itemView) {
             super(itemView);
             nameText = itemView.findViewById(R.id.tv_event_name);
@@ -144,6 +174,11 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
             );
         }
 
+        /**
+         * Executes the lottery for an event, randomly selecting winners from the waiting list.
+         *
+         * @param event The event for which to run the lottery.
+         */
         private void runLottery(Event event) {
             dbHandler.getEntrantsForEvent(String.valueOf(event.getEventId()))
                     .addOnSuccessListener(queryDocumentSnapshots -> {
@@ -177,6 +212,13 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
                     });
         }
 
+        /**
+         * Binds an event's data to the ViewHolder and fetches the list of entrants.
+         *
+         * @param event          The event to bind.
+         * @param dateFormat     The date format for the event date.
+         * @param cancelListener The listener for event cancellation.
+         */
         public void bind(Event event, SimpleDateFormat dateFormat, OnEventCancelListener cancelListener) {
             String eventId = String.valueOf(event.getEventId());
             itemView.setTag(eventId);
@@ -243,6 +285,12 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
             });
         }
 
+        /**
+         * Cancels a specific entrant's selection and automatically invites the next person from the waiting list.
+         *
+         * @param eventId            The ID of the event.
+         * @param cancelledEntrantId The ID of the entrant to cancel.
+         */
         private void cancelEntrantAndSelectNext(String eventId, String cancelledEntrantId) {
             Map<String, Object> cancelData = new HashMap<>();
             cancelData.put("status", DatabaseHandler.STATUS_CANCELLED);

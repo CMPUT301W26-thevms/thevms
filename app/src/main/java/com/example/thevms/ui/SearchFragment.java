@@ -42,7 +42,7 @@ import java.util.Locale;
 
 /**
  * Fragment for the main search/event listing screen.
- * Allows entrants to filter events by name, date range, and time range.
+ * Allows users to browse and filter events by name, date range, and time range.
  */
 public class SearchFragment extends Fragment {
 
@@ -94,6 +94,9 @@ public class SearchFragment extends Fragment {
         return view;
     }
 
+    /**
+     * Initializes listeners for search input and filter buttons.
+     */
     private void setupListeners() {
         searchEditText.addTextChangedListener(new TextWatcher() {
             @Override
@@ -133,6 +136,13 @@ public class SearchFragment extends Fragment {
 
     /**
      * Testing helper to manually set filters and bypass picker UI.
+     *
+     * @param startDate Long representing start date in millis.
+     * @param endDate   Long representing end date in millis.
+     * @param startHour Integer start hour.
+     * @param startMin  Integer start minute.
+     * @param endHour   Integer end hour.
+     * @param endMin    Integer end minute.
      */
     @VisibleForTesting
     public void setTestingFilters(Long startDate, Long endDate, Integer startHour, Integer startMin, Integer endHour, Integer endMin) {
@@ -166,6 +176,9 @@ public class SearchFragment extends Fragment {
         }
     }
 
+    /**
+     * Checks the user's role to determine UI visibility and then fetches the event list.
+     */
     private void checkUserRoleAndFetchEvents() {
         @SuppressLint("HardwareIds")
         String deviceId = Settings.Secure.getString(requireContext().getContentResolver(), Settings.Secure.ANDROID_ID);
@@ -190,6 +203,9 @@ public class SearchFragment extends Fragment {
         });
     }
 
+    /**
+     * Fetches all events from the database and triggers the filtering logic.
+     */
     private void fetchEvents() {
         DatabaseHandler dbHandler = new DatabaseHandler();
         dbHandler.getAllEvents().addOnSuccessListener(queryDocumentSnapshots -> {
@@ -208,6 +224,9 @@ public class SearchFragment extends Fragment {
         });
     }
 
+    /**
+     * Displays a Material Date Range Picker for filtering events.
+     */
     private void showDateRangePicker() {
         MaterialDatePicker<Pair<Long, Long>> dateRangePicker = MaterialDatePicker.Builder.dateRangePicker()
                 .setTitleText("Select date range")
@@ -223,6 +242,9 @@ public class SearchFragment extends Fragment {
         dateRangePicker.show(getParentFragmentManager(), "DATE_RANGE_PICKER");
     }
 
+    /**
+     * Displays sequential Time Pickers to select a start and end time range for filtering.
+     */
     private void showTimeRangePicker() {
         // Simplified: Pick start time then end time
         new TimePickerDialog(getContext(), (view, hourOfDay, minute) -> {
@@ -240,6 +262,10 @@ public class SearchFragment extends Fragment {
         }, 12, 0, true).show();
     }
 
+    /**
+     * Applies the current filters (name, date range, time range) to the list of all events.
+     * Also handles visibility of events based on registration window.
+     */
     private void applyFilters() {
         filteredEvents.clear();
         long now = System.currentTimeMillis();

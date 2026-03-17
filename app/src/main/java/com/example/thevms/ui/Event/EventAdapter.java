@@ -29,6 +29,10 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 
+/**
+ * Adapter for displaying a list of events in a RecyclerView.
+ * Handles event binding, expansion, and user interactions such as joining or leaving an event.
+ */
 public class EventAdapter extends RecyclerView.Adapter<EventAdapter.EventViewHolder> {
 
     private List<Event> events = new ArrayList<>();
@@ -39,21 +43,41 @@ public class EventAdapter extends RecyclerView.Adapter<EventAdapter.EventViewHol
     private final Set<Long> expandedEventIds = new HashSet<>();
     public static android.location.Location testLocation = null;
 
+    /**
+     * Updates the list of events to be displayed.
+     *
+     * @param events The new list of events.
+     */
     public void setEvents(List<Event> events) {
         this.events = events;
         notifyDataSetChanged();
     }
 
+    /**
+     * Sets whether the current user has administrative privileges.
+     *
+     * @param admin True if the user is an admin, false otherwise.
+     */
     public void setAdmin(boolean admin) {
         isAdmin = admin;
         notifyDataSetChanged();
     }
 
+    /**
+     * Sets whether the adapter is in management mode (e.g., for organizers).
+     *
+     * @param managementMode True if in management mode, false otherwise.
+     */
     public void setManagementMode(boolean managementMode) {
         this.managementMode = managementMode;
         notifyDataSetChanged();
     }
 
+    /**
+     * Sets a test location for geolocation checks.
+     *
+     * @param location The location to use for testing.
+     */
     public static void setTestLocation(android.location.Location location) {
         testLocation = location;
     }
@@ -94,6 +118,10 @@ public class EventAdapter extends RecyclerView.Adapter<EventAdapter.EventViewHol
         return events.size();
     }
 
+    /**
+     * ViewHolder class for individual event items.
+     * Manages the UI components and user actions for a single event card.
+     */
     static class EventViewHolder extends RecyclerView.ViewHolder {
         private final com.google.android.gms.location.FusedLocationProviderClient fusedLocationClient;
         TextView nameTextView, statusTextView, timeTextView, locationTextView;
@@ -102,6 +130,11 @@ public class EventAdapter extends RecyclerView.Adapter<EventAdapter.EventViewHol
         TextView regStatusMessage, descriptionTextView, regStartTextView, regEndTextView, eventStartTextView, eventEndTextView;
         View expandableDetails;
 
+        /**
+         * Initializes the ViewHolder with the item view and finds all necessary subviews.
+         *
+         * @param itemView The view representing a single event item.
+         */
         public EventViewHolder(@NonNull View itemView) {
             super(itemView);
             nameTextView = itemView.findViewById(R.id.event_name);
@@ -126,6 +159,18 @@ public class EventAdapter extends RecyclerView.Adapter<EventAdapter.EventViewHol
             fusedLocationClient = com.google.android.gms.location.LocationServices.getFusedLocationProviderClient(itemView.getContext());
         }
 
+        /**
+         * Binds an event to the ViewHolder, setting text and visibility for various UI elements.
+         *
+         * @param event          The event to bind.
+         * @param dateFormat     Formatter for short dates.
+         * @param fullDateFormat Formatter for full date and time.
+         * @param isAdmin        Whether the user is an admin.
+         * @param managementMode Whether the adapter is in management mode.
+         * @param isExpanded     Whether this item's details are currently expanded.
+         * @param onDelete       Callback for when an event is deleted.
+         * @param onToggleExpand Callback for toggling the expansion state.
+         */
         public void bind(Event event, SimpleDateFormat dateFormat, SimpleDateFormat fullDateFormat, 
                          boolean isAdmin, boolean managementMode, boolean isExpanded, Runnable onDelete,
                          java.util.function.Consumer<Boolean> onToggleExpand) {
@@ -186,6 +231,12 @@ public class EventAdapter extends RecyclerView.Adapter<EventAdapter.EventViewHol
             }
         }
 
+        /**
+         * Updates the entrant count text with an optional status prefix.
+         *
+         * @param event        The event to fetch the count for.
+         * @param statusPrefix An optional status message to display before the count.
+         */
         private void updateEntrantCount(Event event, String statusPrefix) {
             if (statusTextView == null) return;
             event.fetchEntrantCount().addOnSuccessListener(count -> {
@@ -197,6 +248,14 @@ public class EventAdapter extends RecyclerView.Adapter<EventAdapter.EventViewHol
             });
         }
 
+        /**
+         * Updates the UI buttons and status text based on the user's status for the event.
+         *
+         * @param status    The user's status (e.g., waiting, invited, accepted).
+         * @param event     The event in question.
+         * @param deviceId  The unique ID of the device.
+         * @param dbHandler The database handler to use for updates.
+         */
         private void updateUIBasedOnStatus(String status, Event event, String deviceId, DatabaseHandler dbHandler) {
             joinButton.setVisibility(View.GONE);
             leaveButton.setVisibility(View.GONE);
@@ -238,17 +297,12 @@ public class EventAdapter extends RecyclerView.Adapter<EventAdapter.EventViewHol
             updateEntrantCount(event, statusPrefix);
         }
 
-//        private void setupJoinButton(Event event, String deviceId) {
-//            joinButton.setOnClickListener(v -> {
-//                Entrant.getOrCreate(deviceId).addOnSuccessListener(entrant -> {
-//                    event.addEntrant(entrant).addOnSuccessListener(aVoid -> {
-//                        Toast.makeText(itemView.getContext(), "Joined " + event.getName(), Toast.LENGTH_SHORT).show();
-//                        refreshUI(event, deviceId);
-//                    });
-//                });
-//            });
-//        }
-
+        /**
+         * Sets up the join button with appropriate visibility and click listener.
+         *
+         * @param event    The event to join.
+         * @param deviceId The unique ID of the device.
+         */
         private void setupJoinButton(Event event, String deviceId){
             Entrant.getOrCreate(deviceId).addOnSuccessListener(entrant -> {
                 event.inEvent(entrant).addOnSuccessListener(isIn -> {
@@ -269,6 +323,13 @@ public class EventAdapter extends RecyclerView.Adapter<EventAdapter.EventViewHol
             }
 
         }
+
+        /**
+         * Sets up the leave button with appropriate click listener.
+         *
+         * @param event    The event to leave.
+         * @param deviceId The unique ID of the device.
+         */
         private void setupLeaveButton(Event event, String deviceId) {
             leaveButton.setOnClickListener(v -> {
                 Entrant.getOrCreate(deviceId).addOnSuccessListener(entrant -> {
@@ -280,6 +341,13 @@ public class EventAdapter extends RecyclerView.Adapter<EventAdapter.EventViewHol
             });
         }
 
+        /**
+         * Sets up the accept and decline buttons for invited users.
+         *
+         * @param event     The event to accept or decline.
+         * @param deviceId  The unique ID of the device.
+         * @param dbHandler The database handler to use for updates.
+         */
         private void setupAcceptDeclineButtons(Event event, String deviceId, DatabaseHandler dbHandler) {
             acceptButton.setOnClickListener(v -> {
                 Map<String, Object> data = new HashMap<>();
@@ -301,12 +369,24 @@ public class EventAdapter extends RecyclerView.Adapter<EventAdapter.EventViewHol
             });
         }
 
+        /**
+         * Refreshes the UI for a specific event by fetching the current user's status.
+         *
+         * @param event    The event to refresh.
+         * @param deviceId The unique ID of the device.
+         */
         private void refreshUI(Event event, String deviceId) {
             new DatabaseHandler().getEntrantStatus(String.valueOf(event.getEventId()), deviceId).addOnSuccessListener(newStatus -> {
                 updateUIBasedOnStatus(newStatus, event, deviceId, new DatabaseHandler());
             });
         }
-        // Handle join event
+
+        /**
+         * Handles the logic for a user joining an event.
+         *
+         * @param event    The event to join.
+         * @param deviceId The unique ID of the device.
+         */
         private void joinEvent(Event event, String deviceId) {
             Entrant.getOrCreate(deviceId).addOnSuccessListener(entrant -> {
                 event.addEntrant(entrant).addOnSuccessListener(aVoid -> {
@@ -325,7 +405,13 @@ public class EventAdapter extends RecyclerView.Adapter<EventAdapter.EventViewHol
             });
         }
 
-        // Handle geolocation
+        /**
+         * Compares the user's current location with the event's location requirement.
+         *
+         * @param currentLoc The user's current location.
+         * @param event      The event being joined.
+         * @param deviceId   The unique ID of the device.
+         */
         private void handleLocationResult(android.location.Location currentLoc, Event event, String deviceId) {
             float[] results = new float[1];
             android.location.Location.distanceBetween(
@@ -344,6 +430,12 @@ public class EventAdapter extends RecyclerView.Adapter<EventAdapter.EventViewHol
             }
         }
 
+        /**
+         * Checks if the user is within the required geolocation for the event before joining.
+         *
+         * @param event    The event to check location for.
+         * @param deviceId The unique ID of the device.
+         */
         private void checkLocation(Event event, String deviceId) {
             if (!event.isGeolocationRequired()) {
                 joinEvent(event, deviceId);
@@ -415,6 +507,11 @@ public class EventAdapter extends RecyclerView.Adapter<EventAdapter.EventViewHol
             );
         }
 
+        /**
+         * Updates the entrant count text for an event.
+         *
+         * @param event The event to fetch the count for.
+         */
         private void updateEntrantCount(Event event) {
             if (statusTextView == null) return;
             event.fetchEntrantCount().addOnSuccessListener(count -> {
@@ -424,6 +521,12 @@ public class EventAdapter extends RecyclerView.Adapter<EventAdapter.EventViewHol
             });
         }
 
+        /**
+         * Shows a confirmation dialog before deleting an event.
+         *
+         * @param event    The event to be deleted.
+         * @param onDelete Callback for when the event is successfully deleted.
+         */
         private void showDeleteConfirmation(Event event, Runnable onDelete) {
             AlertDialog.Builder builder = new AlertDialog.Builder(itemView.getContext());
             View dialogView = LayoutInflater.from(itemView.getContext()).inflate(R.layout.dialog_delete_event, null);
