@@ -309,11 +309,15 @@ public class EventAdapter extends RecyclerView.Adapter<EventAdapter.EventViewHol
                 if (text.isEmpty()) return;
 
                 dbHandler.getUser(deviceId).addOnSuccessListener(userDoc -> {
-                    String userName = userDoc.getString("name");
-                    if (userName == null || userName.isEmpty()) {
-                        userName = "Anonymous";
+                    String firstName = userDoc.getString("firstName");
+                    String lastName = userDoc.getString("lastName");
+                    if (firstName == null || firstName.isEmpty()) {
+                        firstName = "Anonymous";
                     }
-                    Comment comment = new Comment(deviceId, userName, text, new Date());
+                    if (lastName == null) {
+                        lastName = "";
+                    }
+                    Comment comment = new Comment(deviceId, firstName, lastName, text, new Date());
                     dbHandler.addComment(eventId, comment).addOnSuccessListener(aVoid -> {
                         commentEditText.setText("");
                     });

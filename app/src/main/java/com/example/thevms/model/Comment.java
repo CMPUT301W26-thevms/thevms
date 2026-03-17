@@ -8,7 +8,8 @@ import java.util.Date;
  */
 public class Comment {
     private String userId;
-    private String userName;
+    private String firstName;
+    private String lastName;
     private String text;
     private Date timestamp;
 
@@ -16,9 +17,10 @@ public class Comment {
         // Required for Firebase
     }
 
-    public Comment(String userId, String userName, String text, Date timestamp) {
+    public Comment(String userId, String firstName, String lastName, String text, Date timestamp) {
         this.userId = userId;
-        this.userName = userName;
+        this.firstName = firstName;
+        this.lastName = lastName;
         this.text = text;
         this.timestamp = timestamp;
     }
@@ -26,8 +28,11 @@ public class Comment {
     public String getUserId() { return userId; }
     public void setUserId(String userId) { this.userId = userId; }
 
-    public String getUserName() { return userName; }
-    public void setUserName(String userName) { this.userName = userName; }
+    public String getFirstName() { return firstName; }
+    public void setFirstName(String firstName) { this.firstName = firstName; }
+
+    public String getLastName() { return lastName; }
+    public void setLastName(String lastName) { this.lastName = lastName; }
 
     public String getText() { return text; }
     public void setText(String text) { this.text = text; }
