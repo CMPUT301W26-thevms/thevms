@@ -1,12 +1,14 @@
 package com.example.thevms.ui.Event;
 
 import android.annotation.SuppressLint;
+import android.app.Activity;
 import android.app.AlertDialog;
 import android.provider.Settings;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.inputmethod.InputMethodManager;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ImageView;
@@ -119,6 +121,16 @@ public class EventAdapter extends RecyclerView.Adapter<EventAdapter.EventViewHol
                     notifyItemChanged(holder.getAdapterPosition());
                 },
                 (expandComments) -> {
+                    if (!expandComments) {
+                        // Clear focus and hide keyboard before hiding the layout
+                        if (holder.commentEditText.hasFocus()) {
+                            holder.commentEditText.clearFocus();
+                            InputMethodManager imm = (InputMethodManager) holder.itemView.getContext().getSystemService(Activity.INPUT_METHOD_SERVICE);
+                            if (imm != null) {
+                                imm.hideSoftInputFromWindow(holder.commentEditText.getWindowToken(), 0);
+                            }
+                        }
+                    }
                     if (expandComments) {
                         expandedCommentIds.add(event.getEventId());
                     } else {
@@ -294,12 +306,14 @@ public class EventAdapter extends RecyclerView.Adapter<EventAdapter.EventViewHol
                     return;
                 }
 
+                if (value == null) return;
+
                 List<Comment> comments = new ArrayList<>();
                 for (QueryDocumentSnapshot doc : value) {
                     comments.add(doc.toObject(Comment.class));
                 }
                 commentAdapter.setComments(comments);
-                if (comments.size() > 0) {
+                if (comments.size() > 0 && commentsRecyclerView.getVisibility() == View.VISIBLE) {
                     commentsRecyclerView.smoothScrollToPosition(comments.size() - 1);
                 }
             });
@@ -602,7 +616,7 @@ public class EventAdapter extends RecyclerView.Adapter<EventAdapter.EventViewHol
         }
 
         /**
-         * Updates the entrant count text for an event.
+         * Updates the entrant count for an event.
          *
          * @param event The event to fetch the count for.
          */
