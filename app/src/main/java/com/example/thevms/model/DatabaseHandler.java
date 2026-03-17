@@ -2,6 +2,7 @@ package com.example.thevms.model;
 
 import com.google.android.gms.tasks.Task;
 import com.google.android.gms.tasks.Tasks;
+import com.google.firebase.firestore.DocumentReference;
 import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.EventListener;
 import com.google.firebase.firestore.FirebaseFirestore;
@@ -31,6 +32,8 @@ public class DatabaseHandler {
     public static final String COLLECTION_EVENTS = "events";
     public static final String COLLECTION_USERS = "users";
     public static final String COLLECTION_ENTRANTS = "entrants";
+    public static final String COLLECTION_COMMENTS = "comments";
+    
     // Entrant status constants
     public static final String STATUS_WAITING = "waiting";
     public static final String STATUS_SELECTED = "selected";
@@ -398,6 +401,35 @@ public class DatabaseHandler {
                     data.put("status", STATUS_SELECTED);
                     return updateEntrantStatus(eventId, next.getId(), data);
                 });
+    }
+
+    /**
+     * Adds a comment to an event.
+     *
+     * @param eventId The event ID.
+     * @param comment The comment object.
+     * @return A Task representing the operation.
+     */
+    public Task<DocumentReference> addComment(String eventId, Comment comment) {
+        return getDb().collection(COLLECTION_EVENTS)
+                .document(eventId)
+                .collection(COLLECTION_COMMENTS)
+                .add(comment);
+    }
+
+    /**
+     * Listens for real-time updates to comments for a specific event.
+     *
+     * @param eventId  The event ID.
+     * @param listener Callback to handle comment updates.
+     * @return ListenerRegistration.
+     */
+    public ListenerRegistration listenToComments(String eventId, EventListener<QuerySnapshot> listener) {
+        return getDb().collection(COLLECTION_EVENTS)
+                .document(eventId)
+                .collection(COLLECTION_COMMENTS)
+                .orderBy("timestamp", Query.Direction.ASCENDING)
+                .addSnapshotListener(listener);
     }
 
     /**

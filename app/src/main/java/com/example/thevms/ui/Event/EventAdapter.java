@@ -8,20 +8,26 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
+import android.widget.EditText;
 import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
+import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.thevms.R;
+import com.example.thevms.model.Comment;
 import com.example.thevms.model.DatabaseHandler;
 import com.example.thevms.model.Entrant;
 import com.example.thevms.model.Event;
+import com.google.firebase.firestore.ListenerRegistration;
+import com.google.firebase.firestore.QueryDocumentSnapshot;
 
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -41,6 +47,7 @@ public class EventAdapter extends RecyclerView.Adapter<EventAdapter.EventViewHol
     private final SimpleDateFormat dateFormat = new SimpleDateFormat("MMM dd", Locale.getDefault());
     private final SimpleDateFormat fullDateFormat = new SimpleDateFormat("MMM dd, yyyy HH:mm", Locale.getDefault());
     private final Set<Long> expandedEventIds = new HashSet<>();
+    private final Set<Long> expandedCommentIds = new HashSet<>();
     public static android.location.Location testLocation = null;
 
     /**
@@ -93,8 +100,9 @@ public class EventAdapter extends RecyclerView.Adapter<EventAdapter.EventViewHol
     public void onBindViewHolder(@NonNull EventViewHolder holder, int position) {
         Event event = events.get(position);
         boolean isExpanded = expandedEventIds.contains(event.getEventId());
+        boolean isCommentsExpanded = expandedCommentIds.contains(event.getEventId());
 
-        holder.bind(event, dateFormat, fullDateFormat, isAdmin, managementMode, isExpanded,
+        holder.bind(event, dateFormat, fullDateFormat, isAdmin, managementMode, isExpanded, isCommentsExpanded,
                 () -> {
                     int currentPos = holder.getAdapterPosition();
                     if (currentPos != RecyclerView.NO_POSITION) {
@@ -107,6 +115,14 @@ public class EventAdapter extends RecyclerView.Adapter<EventAdapter.EventViewHol
                         expandedEventIds.add(event.getEventId());
                     } else {
                         expandedEventIds.remove(event.getEventId());
+                    }
+                    notifyItemChanged(holder.getAdapterPosition());
+                },
+                (expandComments) -> {
+                    if (expandComments) {
+                        expandedCommentIds.add(event.getEventId());
+                    } else {
+                        expandedCommentIds.remove(event.getEventId());
                     }
                     notifyItemChanged(holder.getAdapterPosition());
                 }
@@ -125,10 +141,14 @@ public class EventAdapter extends RecyclerView.Adapter<EventAdapter.EventViewHol
     static class EventViewHolder extends RecyclerView.ViewHolder {
         private final com.google.android.gms.location.FusedLocationProviderClient fusedLocationClient;
         TextView nameTextView, statusTextView, timeTextView, locationTextView;
-        Button joinButton, removeButton, leaveButton, acceptButton, declineButton, expandButton;
+        Button joinButton, removeButton, leaveButton, acceptButton, declineButton, expandButton, viewCommentsButton, postCommentButton;
         ImageView eventImageView;
         TextView regStatusMessage, descriptionTextView, regStartTextView, regEndTextView, eventStartTextView, eventEndTextView;
-        View expandableDetails;
+        View expandableDetails, commentsSection;
+        RecyclerView commentsRecyclerView;
+        EditText commentEditText;
+        CommentAdapter commentAdapter;
+        ListenerRegistration commentsListener;
 
         /**
          * Initializes the ViewHolder with the item view and finds all necessary subviews.
@@ -155,6 +175,16 @@ public class EventAdapter extends RecyclerView.Adapter<EventAdapter.EventViewHol
             eventStartTextView = itemView.findViewById(R.id.event_start_details);
             eventEndTextView = itemView.findViewById(R.id.event_end_details);
             expandButton = itemView.findViewById(R.id.btn_expand_details);
+            
+            viewCommentsButton = itemView.findViewById(R.id.btn_view_comments);
+            commentsSection = itemView.findViewById(R.id.comments_section);
+            commentsRecyclerView = itemView.findViewById(R.id.comments_recycler_view);
+            commentEditText = itemView.findViewById(R.id.edit_comment);
+            postCommentButton = itemView.findViewById(R.id.btn_post_comment);
+
+            commentsRecyclerView.setLayoutManager(new LinearLayoutManager(itemView.getContext()));
+            commentAdapter = new CommentAdapter();
+            commentsRecyclerView.setAdapter(commentAdapter);
 
             fusedLocationClient = com.google.android.gms.location.LocationServices.getFusedLocationProviderClient(itemView.getContext());
         }
@@ -168,12 +198,16 @@ public class EventAdapter extends RecyclerView.Adapter<EventAdapter.EventViewHol
          * @param isAdmin        Whether the user is an admin.
          * @param managementMode Whether the adapter is in management mode.
          * @param isExpanded     Whether this item's details are currently expanded.
+         * @param isCommentsExpanded Whether this item's comments are currently expanded.
          * @param onDelete       Callback for when an event is deleted.
          * @param onToggleExpand Callback for toggling the expansion state.
+         * @param onToggleComments Callback for toggling the comments expansion state.
          */
         public void bind(Event event, SimpleDateFormat dateFormat, SimpleDateFormat fullDateFormat, 
-                         boolean isAdmin, boolean managementMode, boolean isExpanded, Runnable onDelete,
-                         java.util.function.Consumer<Boolean> onToggleExpand) {
+                         boolean isAdmin, boolean managementMode, boolean isExpanded, boolean isCommentsExpanded,
+                         Runnable onDelete,
+                         java.util.function.Consumer<Boolean> onToggleExpand,
+                         java.util.function.Consumer<Boolean> onToggleComments) {
 
             if (nameTextView != null) nameTextView.setText(event.getName());
             if (timeTextView != null && event.getEventStartTime() != null) {
@@ -229,6 +263,62 @@ public class EventAdapter extends RecyclerView.Adapter<EventAdapter.EventViewHol
                 expandButton.setText(isExpanded ? "Show Less" : "Show More Details");
                 expandButton.setOnClickListener(v -> onToggleExpand.accept(!isExpanded));
             }
+
+            // Handle Comments state
+            if (commentsSection != null) {
+                commentsSection.setVisibility(isCommentsExpanded ? View.VISIBLE : View.GONE);
+            }
+            if (viewCommentsButton != null) {
+                viewCommentsButton.setText(isCommentsExpanded ? "Hide Comments" : "View Comments");
+                viewCommentsButton.setOnClickListener(v -> onToggleComments.accept(!isCommentsExpanded));
+            }
+
+            if (isCommentsExpanded) {
+                setupComments(String.valueOf(event.getEventId()), deviceId, dbHandler);
+            } else {
+                if (commentsListener != null) {
+                    commentsListener.remove();
+                    commentsListener = null;
+                }
+            }
+        }
+
+        private void setupComments(String eventId, String deviceId, DatabaseHandler dbHandler) {
+            if (commentsListener != null) {
+                commentsListener.remove();
+            }
+            
+            commentsListener = dbHandler.listenToComments(eventId, (value, error) -> {
+                if (error != null) {
+                    Log.w("EventAdapter", "Listen failed.", error);
+                    return;
+                }
+
+                List<Comment> comments = new ArrayList<>();
+                for (QueryDocumentSnapshot doc : value) {
+                    comments.add(doc.toObject(Comment.class));
+                }
+                commentAdapter.setComments(comments);
+                if (comments.size() > 0) {
+                    commentsRecyclerView.smoothScrollToPosition(comments.size() - 1);
+                }
+            });
+
+            postCommentButton.setOnClickListener(v -> {
+                String text = commentEditText.getText().toString().trim();
+                if (text.isEmpty()) return;
+
+                dbHandler.getUser(deviceId).addOnSuccessListener(userDoc -> {
+                    String userName = userDoc.getString("name");
+                    if (userName == null || userName.isEmpty()) {
+                        userName = "Anonymous";
+                    }
+                    Comment comment = new Comment(deviceId, userName, text, new Date());
+                    dbHandler.addComment(eventId, comment).addOnSuccessListener(aVoid -> {
+                        commentEditText.setText("");
+                    });
+                });
+            });
         }
 
         /**
