@@ -115,8 +115,14 @@ public class ProfileFragment extends Fragment {
         Entrant.deleteAccount(deviceId).addOnSuccessListener(aVoid -> {
             if (isAdded()) {
                 Toast.makeText(getContext(), "Account deleted successfully", Toast.LENGTH_SHORT).show();
+                
+                // Redirect to SignupActivity
+                Intent intent = new Intent(getActivity(), SignupActivity.class);
+                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+                startActivity(intent);
+                
                 if (getActivity() != null) {
-                    getActivity().finishAffinity();
+                    getActivity().finish();
                 }
             }
         }).addOnFailureListener(e -> {
