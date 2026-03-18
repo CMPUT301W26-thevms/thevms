@@ -33,4 +33,12 @@
     <string name="placeholder_user_name">User Name</string>
     <string name="placeholder_email">email@example.com</string>
     <string name="placeholder_phone">123-456-7890</string>
+
+    <!-- Guidelines Strings -->
+    <string name="guidelines_title">Guidelines</string>
+    <string name="guidelines_description">We believe everyone should have a fair shot at popular community events—without the stress of \"first-come, first-served\" or constant page refreshing. Here’s how our selection process ensures accessibility for all:</string>
+    <string name="guideline_item_1">1. The Waiting List</string>
+    <string name="guideline_item_2">2. Random Selection</string>
+    <string name="guideline_item_3">3. Notification &amp; Confirmation</string>
+    <string name="btn_dismiss">Dismiss</string>
 </resources>

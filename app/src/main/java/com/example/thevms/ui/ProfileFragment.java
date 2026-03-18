@@ -30,6 +30,7 @@ public class ProfileFragment extends Fragment {
     private TextView nameText, emailText, phoneText;
     private LinearLayout settingsButton;
     private LinearLayout myEventsButton;
+    private LinearLayout howItWorksButton;
     private Button deleteProfileButton;
 
     @Nullable
@@ -43,22 +44,35 @@ public class ProfileFragment extends Fragment {
         phoneText = view.findViewById(R.id.profile_phone);
         settingsButton = view.findViewById(R.id.btn_settings);
         myEventsButton = view.findViewById(R.id.btn_my_events);
+        howItWorksButton = view.findViewById(R.id.btn_how_it_works);
         deleteProfileButton = view.findViewById(R.id.btn_delete_profile);
 
         @SuppressLint("HardwareIds")
         String deviceId = Settings.Secure.getString(getContext().getContentResolver(), Settings.Secure.ANDROID_ID);
 
+        // Navigation to Guidelines Activity
+        if (howItWorksButton != null) {
+            howItWorksButton.setOnClickListener(v -> {
+                Intent intent = new Intent(getActivity(), GuidelinesActivity.class);
+                startActivity(intent);
+            });
+        }
+
         // Navigation to Settings
-        settingsButton.setOnClickListener(v -> {
-            Intent intent = new Intent(getActivity(), SettingsActivity.class);
-            startActivity(intent);
-        });
+        if (settingsButton != null) {
+            settingsButton.setOnClickListener(v -> {
+                Intent intent = new Intent(getActivity(), SettingsActivity.class);
+                startActivity(intent);
+            });
+        }
 
         // Navigation to My Events
-        myEventsButton.setOnClickListener(v -> {
-            Intent intent = new Intent(getActivity(), MyEventsActivity.class);
-            startActivity(intent);
-        });
+        if (myEventsButton != null) {
+            myEventsButton.setOnClickListener(v -> {
+                Intent intent = new Intent(getActivity(), MyEventsActivity.class);
+                startActivity(intent);
+            });
+        }
 
         // Delete Profile action
         if (deleteProfileButton != null) {

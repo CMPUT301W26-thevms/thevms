@@ -33,6 +33,9 @@
         <activity
             android:name=".ui.MyEventsActivity"
             android:exported="false" />
+        <activity
+            android:name=".ui.GuidelinesActivity"
+            android:exported="false" />
 
         <provider
             android:name="androidx.core.content.FileProvider"
