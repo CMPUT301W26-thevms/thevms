@@ -6,6 +6,7 @@ import android.app.AlertDialog;
 import android.provider.Settings;
 import android.util.Log;
 import android.view.LayoutInflater;
+import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.inputmethod.InputMethodManager;
@@ -167,6 +168,7 @@ public class EventAdapter extends RecyclerView.Adapter<EventAdapter.EventViewHol
          *
          * @param itemView The view representing a single event item.
          */
+        @SuppressLint("ClickableViewAccessibility")
         public EventViewHolder(@NonNull View itemView) {
             super(itemView);
             nameTextView = itemView.findViewById(R.id.event_name);
@@ -197,6 +199,16 @@ public class EventAdapter extends RecyclerView.Adapter<EventAdapter.EventViewHol
             commentsRecyclerView.setLayoutManager(new LinearLayoutManager(itemView.getContext()));
             commentAdapter = new CommentAdapter();
             commentsRecyclerView.setAdapter(commentAdapter);
+
+            // Fix for nested scrolling: allow the comments RecyclerView to intercept touch events
+            commentsRecyclerView.setOnTouchListener((v, event) -> {
+                if (event.getAction() == MotionEvent.ACTION_DOWN) {
+                    v.getParent().requestDisallowInterceptTouchEvent(true);
+                } else if (event.getAction() == MotionEvent.ACTION_UP || event.getAction() == MotionEvent.ACTION_CANCEL) {
+                    v.getParent().requestDisallowInterceptTouchEvent(false);
+                }
+                return false;
+            });
 
             fusedLocationClient = com.google.android.gms.location.LocationServices.getFusedLocationProviderClient(itemView.getContext());
         }
