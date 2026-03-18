@@ -50,13 +50,11 @@ public class ProfileFragment extends Fragment {
         @SuppressLint("HardwareIds")
         String deviceId = Settings.Secure.getString(getContext().getContentResolver(), Settings.Secure.ANDROID_ID);
 
-        // Navigation to Guidelines
+        // Navigation to Guidelines Activity
         if (howItWorksButton != null) {
             howItWorksButton.setOnClickListener(v -> {
-                getParentFragmentManager().beginTransaction()
-                        .replace(R.id.fragment_container, new GuidelinesFragment())
-                        .addToBackStack(null)
-                        .commit();
+                Intent intent = new Intent(getActivity(), GuidelinesActivity.class);
+                startActivity(intent);
             });
         }
 
