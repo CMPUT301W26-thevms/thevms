@@ -321,10 +321,12 @@ public class EventAdapter extends RecyclerView.Adapter<EventAdapter.EventViewHol
                 if (value == null) return;
 
                 List<Comment> comments = new ArrayList<>();
+                List<String> commentIds = new ArrayList<>();
                 for (QueryDocumentSnapshot doc : value) {
                     comments.add(doc.toObject(Comment.class));
+                    commentIds.add(doc.getId());
                 }
-                commentAdapter.setComments(comments);
+                commentAdapter.setComments(comments, commentIds);
                 if (comments.size() > 0 && commentsRecyclerView.getVisibility() == View.VISIBLE) {
                     commentsRecyclerView.smoothScrollToPosition(comments.size() - 1);
                 }

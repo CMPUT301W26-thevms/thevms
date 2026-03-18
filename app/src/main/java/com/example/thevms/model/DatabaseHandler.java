@@ -433,6 +433,21 @@ public class DatabaseHandler {
     }
 
     /**
+     * Deletes a comment from an event.
+     *
+     * @param eventId   The event ID.
+     * @param commentId The comment ID.
+     * @return A Task representing the operation.
+     */
+    public Task<Void> deleteComment(String eventId, String commentId) {
+        return getDb().collection(COLLECTION_EVENTS)
+                .document(eventId)
+                .collection(COLLECTION_COMMENTS)
+                .document(commentId)
+                .delete();
+    }
+
+    /**
      * Gets the current Firestore instance, initializing it if necessary.
      *
      * @return The FirebaseFirestore instance.
