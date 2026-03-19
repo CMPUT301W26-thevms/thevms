@@ -5,13 +5,11 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ImageButton;
-import android.widget.LinearLayout;
 import android.widget.TextView;
 import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
 import com.example.thevms.R;
 import com.example.thevms.model.Notification;
-import com.google.android.material.button.MaterialButton;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -57,8 +55,6 @@ public class NotificationAdapter extends RecyclerView.Adapter<NotificationAdapte
     class NotificationViewHolder extends RecyclerView.ViewHolder {
         TextView title, from, description, time;
         ImageButton btnDelete;
-        LinearLayout buttonContainer;
-        MaterialButton btnPlaceholder;
 
         public NotificationViewHolder(@NonNull View itemView) {
             super(itemView);
@@ -67,8 +63,6 @@ public class NotificationAdapter extends RecyclerView.Adapter<NotificationAdapte
             description = itemView.findViewById(R.id.notification_description);
             time = itemView.findViewById(R.id.notification_time);
             btnDelete = itemView.findViewById(R.id.btn_delete_notification);
-            buttonContainer = itemView.findViewById(R.id.notification_button_container);
-            btnPlaceholder = itemView.findViewById(R.id.btn_placeholder);
         }
 
         public void bind(Notification notification) {
@@ -85,11 +79,6 @@ public class NotificationAdapter extends RecyclerView.Adapter<NotificationAdapte
                 if (deleteListener != null) {
                     deleteListener.onDelete(notification);
                 }
-            });
-
-            // Placeholder button logic
-            btnPlaceholder.setOnClickListener(v -> {
-                // To be implemented
             });
         }
     }
