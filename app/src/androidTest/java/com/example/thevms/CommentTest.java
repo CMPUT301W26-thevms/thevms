@@ -10,6 +10,7 @@ import static androidx.test.espresso.matcher.ViewMatchers.isAssignableFrom;
 import static androidx.test.espresso.matcher.ViewMatchers.isDisplayed;
 import static androidx.test.espresso.matcher.ViewMatchers.withId;
 import static androidx.test.espresso.matcher.ViewMatchers.withText;
+import static org.hamcrest.CoreMatchers.not;
 
 import android.provider.Settings;
 import android.view.View;
@@ -24,6 +25,7 @@ import androidx.test.filters.LargeTest;
 import androidx.test.platform.app.InstrumentationRegistry;
 
 import com.example.thevms.ui.MainActivity;
+import com.example.thevms.ui.MyEventsActivity;
 import com.example.thevms.ui.SearchFragment;
 import com.google.android.gms.tasks.Tasks;
 
@@ -108,6 +110,53 @@ public class CommentTest {
                 .check(matches(hasDescendant(withText("John"))));
         onView(withId(R.id.comments_recycler_view))
                 .check(matches(hasDescendant(withText("Doe"))));
+    }
+
+    /**
+     * Test for deleting a comment as an organizer.
+     * Seeds one event with exactly one comment, then deletes it and verifies it's gone.
+     */
+    @Test
+    public void testDeleteCommentAsOrganizer() throws Exception {
+        testHelper.clearDatabase();
+        String deviceId = Settings.Secure.getString(
+                InstrumentationRegistry.getInstrumentation().getContext().getContentResolver(),
+                Settings.Secure.ANDROID_ID);
+
+        // 1. Seed exactly one event for the current organizer
+        testHelper.seedDummyEventsForOrganizer(1, deviceId);
+
+        // 2. Seed exactly one comment for that event
+        // The first event seeded after clearDatabase will have ID "1"
+        String commentContent = "Organizer test comment to delete";
+        testHelper.seedComment("1", "otherUser", "Jane", "Smith", commentContent);
+
+        // 3. Launch MyEventsActivity (the Organizer's events page)
+        try (ActivityScenario<MyEventsActivity> organizerScenario = ActivityScenario.launch(MyEventsActivity.class)) {
+            // Wait for Firestore data to load and RecyclerView to populate
+            Thread.sleep(2500);
+
+            // 4. Verify the comment is visible initially
+            onView(withId(R.id.rv_comments))
+                    .check(matches(hasDescendant(withText(commentContent))));
+
+            // 5. Click the delete button for the first comment in the list
+            onView(withId(R.id.rv_comments))
+                    .perform(RecyclerViewActions.actionOnItemAtPosition(0,
+                            MainActivityTest.clickChildViewWithId(R.id.btn_delete_comment)));
+
+            Thread.sleep(1500);
+
+            // 6. Confirm the deletion in the confirmation dialog
+            onView(withId(R.id.btn_dialog_yes)).perform(click());
+
+            // Wait for the deletion to propagate to Firestore and the UI to refresh
+            Thread.sleep(1500);
+
+            // 7. Verify the comment is no longer displayed in the list
+            onView(withId(R.id.rv_comments))
+                    .check(matches(not(hasDescendant(withText(commentContent)))));
+        }
     }
 
     /**
