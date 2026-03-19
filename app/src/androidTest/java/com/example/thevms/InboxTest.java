@@ -2,18 +2,22 @@ package com.example.thevms;
 
 import static androidx.test.espresso.Espresso.onView;
 import static androidx.test.espresso.action.ViewActions.click;
+import static androidx.test.espresso.assertion.ViewAssertions.doesNotExist;
 import static androidx.test.espresso.assertion.ViewAssertions.matches;
 import static androidx.test.espresso.matcher.ViewMatchers.isDisplayed;
 import static androidx.test.espresso.matcher.ViewMatchers.withId;
 import static androidx.test.espresso.matcher.ViewMatchers.withText;
 import static org.hamcrest.CoreMatchers.containsString;
+import static org.hamcrest.CoreMatchers.not;
 
 import android.content.Context;
 import android.provider.Settings;
 import android.view.View;
 
+import androidx.recyclerview.widget.RecyclerView;
 import androidx.test.core.app.ActivityScenario;
 import androidx.test.core.app.ApplicationProvider;
+import androidx.test.espresso.ViewAssertion;
 import androidx.test.ext.junit.runners.AndroidJUnit4;
 
 import com.example.thevms.model.Entrant;
@@ -43,6 +47,9 @@ public class InboxTest {
     public void setUp() throws Exception {
         testHelper = new FirestoreTestHelper();
         testHelper.clearDatabase();
+
+        // Give the emulator/listeners a moment to settle after clearing
+        Thread.sleep(500);
 
         Context context = ApplicationProvider.getApplicationContext();
         deviceId = Settings.Secure.getString(context.getContentResolver(), Settings.Secure.ANDROID_ID);
@@ -82,6 +89,22 @@ public class InboxTest {
         onView(matcher).check(matches(isDisplayed()));
     }
 
+    public static ViewAssertion hasItemCount(int expectedCount) {
+        return (view, noViewFoundException) -> {
+            if (!(view instanceof RecyclerView)) {
+                throw noViewFoundException;
+            }
+            RecyclerView recyclerView = (RecyclerView) view;
+            RecyclerView.Adapter adapter = recyclerView.getAdapter();
+            if (adapter == null) {
+                throw new AssertionError("RecyclerView adapter is null");
+            }
+            if (adapter.getItemCount() != expectedCount) {
+                throw new AssertionError("RecyclerView item count mismatch. Expected: " + expectedCount + ", Actual: " + adapter.getItemCount());
+            }
+        };
+    }
+
     @Test
     public void testNotificationFieldsDisplayCorrectly() throws InterruptedException {
         try (ActivityScenario<MainActivity> scenario = ActivityScenario.launch(MainActivity.class)) {
@@ -98,6 +121,46 @@ public class InboxTest {
 
             // Check for the presence of the delete button
             onView(withId(R.id.btn_delete_notification)).check(matches(isDisplayed()));
+        }
+    }
+
+    @Test
+    public void testDeleteNotificationConfirmationAndExecution() throws InterruptedException {
+        try (ActivityScenario<MainActivity> scenario = ActivityScenario.launch(MainActivity.class)) {
+            // Navigate to Inbox
+            waitForView(withId(R.id.nav_inbox), 5000);
+            onView(withId(R.id.nav_inbox)).perform(click());
+
+            // Verify notification is there
+            waitForView(withText("Welcome Title"), 5000);
+
+            // Click delete button
+            onView(withId(R.id.btn_delete_notification)).perform(click());
+
+            // Verify confirmation dialog appears
+            waitForView(withText("Delete Notification?"), 2000);
+            onView(withText("Delete")).check(matches(isDisplayed()));
+            onView(withText("Cancel")).check(matches(isDisplayed()));
+
+            // Test Cancel
+            onView(withId(R.id.btn_dialog_cancel)).perform(click());
+            onView(withText("Delete Notification?")).check(doesNotExist());
+
+            // Confirm notification is still visible
+            onView(withText("Welcome Title")).check(matches(isDisplayed()));
+
+            // Click delete again and Confirm
+            onView(withId(R.id.btn_delete_notification)).perform(click());
+            waitForView(withText("Delete Notification?"), 2000);
+            onView(withId(R.id.btn_dialog_delete)).perform(click());
+
+            // Verify empty state is shown
+            waitForView(withText("No Notifications"), 5000);
+            onView(withId(R.id.empty_inbox_text)).check(matches(isDisplayed()));
+
+            // Verify content is hidden/gone
+            onView(withText("Welcome Title")).check(matches(not(isDisplayed())));
+            onView(withId(R.id.notifications_recycler_view)).check(hasItemCount(0));
         }
     }
 }
