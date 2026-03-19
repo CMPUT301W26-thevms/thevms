@@ -103,7 +103,7 @@ public class InboxFragment extends Fragment {
         btnCancel.setOnClickListener(v -> dialog.dismiss());
 
         btnDelete.setOnClickListener(v -> {
-            dbHandler.deleteNotification(notification.getId())
+            notification.delete()
                     .addOnSuccessListener(aVoid -> {
                         Toast.makeText(getContext(), "Notification deleted", Toast.LENGTH_SHORT).show();
                         dialog.dismiss();
@@ -130,7 +130,7 @@ public class InboxFragment extends Fragment {
                 "This is a test notification sent to yourself to verify the inbox functionality."
             );
             
-            dbHandler.sendNotification(testNotif)
+            testNotif.send()
                 .addOnSuccessListener(aVoid -> {
                     Toast.makeText(getContext(), "Test notification sent!", Toast.LENGTH_SHORT).show();
                 })
