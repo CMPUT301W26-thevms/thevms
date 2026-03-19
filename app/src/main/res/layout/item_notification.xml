@@ -68,7 +68,39 @@
             android:textColor="#424242"
             android:textSize="15sp"
             android:lineSpacingExtra="2dp"
-            android:text="This is the description of the notification. It can span multiple lines to provide more information to the user." />
+            android:text="This is the description of the notification." />
+
+        <LinearLayout
+            android:id="@+id/invite_actions_container"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:orientation="horizontal"
+            android:gravity="end"
+            android:visibility="gone">
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btn_reject"
+                style="@style/Widget.MaterialComponents.Button.TextButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginEnd="8dp"
+                android:text="Reject"
+                android:textColor="#E53935"
+                android:textAllCaps="false" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btn_accept"
+                style="@style/Widget.MaterialComponents.Button.UnelevatedButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:backgroundTint="#43A047"
+                android:text="Accept"
+                android:textColor="@android:color/white"
+                android:textAllCaps="false"
+                app:cornerRadius="8dp" />
+
+        </LinearLayout>
 
         <TextView
             android:id="@+id/notification_time"

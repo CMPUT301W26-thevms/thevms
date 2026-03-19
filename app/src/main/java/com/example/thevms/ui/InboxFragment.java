@@ -13,12 +13,14 @@ import android.view.Window;
 import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
+
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
+
 import com.example.thevms.R;
 import com.example.thevms.model.DatabaseHandler;
 import com.example.thevms.model.Notification;
@@ -26,6 +28,7 @@ import com.example.thevms.model.UserRole;
 import com.google.android.material.button.MaterialButton;
 import com.google.firebase.firestore.ListenerRegistration;
 import com.google.firebase.firestore.QueryDocumentSnapshot;
+
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Date;
@@ -44,6 +47,7 @@ public class InboxFragment extends Fragment {
     private ListenerRegistration notificationsListener;
     private String deviceId;
     private MaterialButton btnTestNotification;
+    private MaterialButton btnTestInvite;
     private boolean isInitialLoad = true;
 
     public InboxFragment() {
@@ -61,14 +65,15 @@ public class InboxFragment extends Fragment {
         emptyInboxText = view.findViewById(R.id.empty_inbox_text);
         swipeRefreshLayout = view.findViewById(R.id.swipe_refresh_layout);
         btnTestNotification = view.findViewById(R.id.btn_test_notification);
-        
+        btnTestInvite = view.findViewById(R.id.btn_test_invite);
+
         dbHandler = new DatabaseHandler();
         deviceId = Settings.Secure.getString(requireContext().getContentResolver(), Settings.Secure.ANDROID_ID);
 
         setupRecyclerView();
-        setupTestButton();
+        setupTestButtons();
         setupSwipeRefresh();
-        
+
         return view;
     }
 
@@ -78,6 +83,20 @@ public class InboxFragment extends Fragment {
         recyclerView.setAdapter(adapter);
 
         adapter.setOnNotificationDeleteListener(this::showDeleteConfirmationDialog);
+
+        adapter.setOnInviteActionListener(new NotificationAdapter.OnInviteActionListener() {
+            @Override
+            public void onAccept(Notification notification) {
+                Toast.makeText(getContext(), "Accepted Invite: " + notification.getTitle(), Toast.LENGTH_SHORT).show();
+                // Logic for accepting invite (e.g. updating entrant status) will be added later
+            }
+
+            @Override
+            public void onReject(Notification notification) {
+                Toast.makeText(getContext(), "Rejected Invite: " + notification.getTitle(), Toast.LENGTH_SHORT).show();
+                // Logic for rejecting invite will be added later
+            }
+        });
     }
 
     /**
@@ -117,26 +136,48 @@ public class InboxFragment extends Fragment {
         dialog.show();
     }
 
-    private void setupTestButton() {
+    private void setupTestButtons() {
         btnTestNotification.setOnClickListener(v -> {
             Notification testNotif = new Notification(
-                null,
-                "Test Notification",
-                deviceId,
-                "Test System",
-                UserRole.ADMIN,
-                deviceId,
-                new Date(),
-                "This is a test notification sent to yourself to verify the inbox functionality."
+                    null,
+                    "Test Notification",
+                    deviceId,
+                    "Test System",
+                    UserRole.ADMIN,
+                    deviceId,
+                    new Date(),
+                    "This is a test notification sent to yourself to verify the inbox functionality."
             );
-            
+
             testNotif.send()
-                .addOnSuccessListener(aVoid -> {
-                    Toast.makeText(getContext(), "Test notification sent!", Toast.LENGTH_SHORT).show();
-                })
-                .addOnFailureListener(e -> {
-                    Toast.makeText(getContext(), "Failed to send: " + e.getMessage(), Toast.LENGTH_SHORT).show();
-                });
+                    .addOnSuccessListener(aVoid -> {
+                        Toast.makeText(getContext(), "Test notification sent!", Toast.LENGTH_SHORT).show();
+                    })
+                    .addOnFailureListener(e -> {
+                        Toast.makeText(getContext(), "Failed to send: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+                    });
+        });
+
+        btnTestInvite.setOnClickListener(v -> {
+            Notification testInvite = new Notification(
+                    null,
+                    "Event Invitation",
+                    deviceId,
+                    "Event Organizer",
+                    UserRole.ORGANIZER,
+                    deviceId,
+                    new Date(),
+                    "You have been selected for the upcoming event! Would you like to attend?",
+                    Notification.TYPE_INVITE
+            );
+
+            testInvite.send()
+                    .addOnSuccessListener(aVoid -> {
+                        Toast.makeText(getContext(), "Test invite sent!", Toast.LENGTH_SHORT).show();
+                    })
+                    .addOnFailureListener(e -> {
+                        Toast.makeText(getContext(), "Failed to send: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+                    });
         });
     }
 
@@ -195,7 +236,7 @@ public class InboxFragment extends Fragment {
                         // Skip malformed documents
                     }
                 }
-                
+
                 // Sort by timestamp descending (most recent first)
                 Collections.sort(notifications, (n1, n2) -> {
                     if (n1.getTimestamp() == null || n2.getTimestamp() == null) return 0;

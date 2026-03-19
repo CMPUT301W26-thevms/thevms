@@ -10,6 +10,9 @@ import java.util.Date;
  * Notifications are sent by organizers or the system to users (entrants).
  */
 public class Notification {
+    public static final String TYPE_GENERAL = "general";
+    public static final String TYPE_INVITE = "invite";
+
     private String id;
     private String title;
     private String senderId;
@@ -18,6 +21,7 @@ public class Notification {
     private String receiverId;
     private Date timestamp;
     private String description;
+    private String type;
     private boolean isRead;
 
     @Exclude // Exclude is used so that it is not saved to the DB
@@ -29,6 +33,7 @@ public class Notification {
     public Notification() {
         this.dbHandler = new DatabaseHandler();
         this.isRead = false;
+        this.type = TYPE_GENERAL;
     }
 
     /**
@@ -44,6 +49,23 @@ public class Notification {
      * @param description The main content/message of the notification.
      */
     public Notification(String id, String title, String senderId, String senderName, UserRole senderRole, String receiverId, Date timestamp, String description) {
+        this(id, title, senderId, senderName, senderRole, receiverId, timestamp, description, TYPE_GENERAL);
+    }
+
+    /**
+     * Constructs a new Notification with a specific type.
+     *
+     * @param id          The unique identifier for the notification.
+     * @param title       The headline of the notification.
+     * @param senderId    The device ID of the sender.
+     * @param senderName  The display name of the sender.
+     * @param senderRole  The role of the sender.
+     * @param receiverId  The device ID of the receiver.
+     * @param timestamp   The date and time of the notification.
+     * @param description The main content of the notification.
+     * @param type        The type of notification (e.g., general, invite).
+     */
+    public Notification(String id, String title, String senderId, String senderName, UserRole senderRole, String receiverId, Date timestamp, String description, String type) {
         this.dbHandler = new DatabaseHandler();
         this.id = id;
         this.title = title;
@@ -53,6 +75,7 @@ public class Notification {
         this.receiverId = receiverId;
         this.timestamp = timestamp;
         this.description = description;
+        this.type = type;
         this.isRead = false;
     }
 
@@ -136,6 +159,14 @@ public class Notification {
 
     public void setDescription(String description) {
         this.description = description;
+    }
+
+    public String getType() {
+        return type;
+    }
+
+    public void setType(String type) {
+        this.type = type;
     }
 
     public boolean isRead() {
