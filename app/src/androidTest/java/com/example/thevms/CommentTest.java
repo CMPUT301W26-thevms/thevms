@@ -24,6 +24,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4;
 import androidx.test.filters.LargeTest;
 import androidx.test.platform.app.InstrumentationRegistry;
 
+import com.example.thevms.model.UserRole;
 import com.example.thevms.ui.MainActivity;
 import com.example.thevms.ui.MyEventsActivity;
 import com.example.thevms.ui.SearchFragment;
@@ -39,6 +40,9 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
+/**
+ * UI tests for comment functionality across different user roles.
+ */
 @RunWith(AndroidJUnit4.class)
 @LargeTest
 public class CommentTest {
@@ -50,7 +54,6 @@ public class CommentTest {
     public void setUp() throws Exception {
         testHelper = new FirestoreTestHelper();
         testHelper.clearDatabase();
-        testHelper.seedDummyEvents(1);
 
         // Create a user profile so we have a name for comments
         String deviceId = Settings.Secure.getString(
@@ -59,7 +62,12 @@ public class CommentTest {
         Map<String, Object> userData = new HashMap<>();
         userData.put("firstName", "John");
         userData.put("lastName", "Doe");
+        // Default to Admin role for tests that need to access admin panel
+        userData.put("role", UserRole.ADMIN.name());
         Tasks.await(testHelper.getDbHandler().getDb().collection("users").document(deviceId).set(userData), 5, TimeUnit.SECONDS);
+
+        // Seed an event so MainActivity has something to show
+        testHelper.seedDummyEvents(1);
 
         scenario = ActivityScenario.launch(MainActivity.class);
     }
@@ -114,7 +122,7 @@ public class CommentTest {
 
     /**
      * Test for deleting a comment as an organizer.
-     * Seeds one event with exactly one comment, then deletes it and verifies it's gone.
+     * Seeds one event with one comment, then deletes it and verifies it's gone.
      */
     @Test
     public void testDeleteCommentAsOrganizer() throws Exception {
@@ -157,6 +165,60 @@ public class CommentTest {
             onView(withId(R.id.rv_comments))
                     .check(matches(not(hasDescendant(withText(commentContent)))));
         }
+    }
+
+    /**
+     * Test for deleting a comment as an administrator.
+     * Seeds one event with exactly one comment, navigates to the admin events panel,
+     * then deletes the comment and verifies it's gone.
+     */
+    @Test
+    public void testDeleteCommentAsAdmin() throws Exception {
+        // 1. Seed exactly one event and one comment
+        testHelper.clearDatabase();
+        testHelper.seedDummyEvents(1);
+        String commentContent = "Admin test comment to delete";
+        testHelper.seedComment("1", "otherUser", "Jane", "Smith", commentContent);
+
+        // Ensure user is admin (setUp does this, but clearing DB above removed it)
+        String deviceId = Settings.Secure.getString(
+                InstrumentationRegistry.getInstrumentation().getContext().getContentResolver(),
+                Settings.Secure.ANDROID_ID);
+        Map<String, Object> userData = new HashMap<>();
+        userData.put("firstName", "Admin");
+        userData.put("lastName", "User");
+        userData.put("role", UserRole.ADMIN.name());
+        Tasks.await(testHelper.getDbHandler().getDb().collection("users").document(deviceId).set(userData), 5, TimeUnit.SECONDS);
+
+        // 2. Click the admin gear in bottom nav (nav_admin_settings)
+        onView(withId(R.id.nav_admin_settings)).perform(click());
+        Thread.sleep(1000);
+
+        // 3. Click "Manage Event" in the admin drawer
+        onView(withId(R.id.admin_manage_event)).perform(click());
+        Thread.sleep(2000);
+
+        // 4. Click "View Comments" on the first event card in the admin view
+        onView(withId(R.id.events_recycler_view))
+                .perform(RecyclerViewActions.actionOnItemAtPosition(0, MainActivityTest.clickChildViewWithId(R.id.btn_view_comments)));
+        Thread.sleep(1000);
+
+        // 5. Verify the comment is visible
+        onView(withId(R.id.comments_recycler_view))
+                .check(matches(hasDescendant(withText(commentContent))));
+
+        // 6. Click the delete button on the comment
+        onView(withId(R.id.comments_recycler_view))
+                .perform(RecyclerViewActions.actionOnItemAtPosition(0, MainActivityTest.clickChildViewWithId(R.id.btn_delete_comment)));
+        Thread.sleep(1500);
+
+        // 7. Confirm deletion in the dialog
+        onView(withId(R.id.btn_dialog_yes)).perform(click());
+        Thread.sleep(1500);
+
+        // 8. Verify the comment is gone
+        onView(withId(R.id.comments_recycler_view))
+                .check(matches(not(hasDescendant(withText(commentContent)))));
     }
 
     /**
