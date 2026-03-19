@@ -1,6 +1,7 @@
 package com.example.thevms.ui.Event;
 
 import android.app.AlertDialog;
+import android.provider.Settings;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -8,6 +9,7 @@ import android.view.ViewGroup;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
+import android.widget.EditText;
 import android.widget.ImageView;
 import android.widget.Spinner;
 import android.widget.TextView;
@@ -30,6 +32,7 @@ import com.google.firebase.firestore.QueryDocumentSnapshot;
 
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
@@ -110,9 +113,10 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
      */
     static class ViewHolder extends RecyclerView.ViewHolder {
         TextView nameText, distanceText, waitlistText, dateText, descriptionText, exportCsvText;
-        Button cancelBtn, lotteryBtn;
+        Button cancelBtn, lotteryBtn, postCommentBtn;
         RecyclerView attendeesRv, commentsRv;
         Spinner statusSpinner;
+        EditText commentEditText;
         AttendeeAdapter attendeeAdapter;
         CommentAdapter commentAdapter;
         DatabaseHandler dbHandler;
@@ -140,6 +144,8 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
             commentsRv = itemView.findViewById(R.id.rv_comments);
             statusSpinner = itemView.findViewById(R.id.spinner_attendee_status);
             exportCsvText = itemView.findViewById(R.id.tv_export_csv);
+            commentEditText = itemView.findViewById(R.id.et_organizer_comment);
+            postCommentBtn = itemView.findViewById(R.id.btn_post_organizer_comment);
 
             attendeesRv.setLayoutManager(new LinearLayoutManager(itemView.getContext()));
             attendeeAdapter = new AttendeeAdapter();
@@ -258,6 +264,8 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
 
             lotteryBtn.setOnClickListener(v -> runLottery(event));
 
+            postCommentBtn.setOnClickListener(v -> postOrganizerComment(eventId));
+
             // Reset spinner to "Waiting" each time a card is bound
             statusSpinner.setSelection(0);
 
@@ -327,6 +335,25 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
 
             commentAdapter.setOnCommentDeleteListener((comment, commentId) -> {
                 showDeleteCommentConfirmation(eventId, commentId);
+            });
+        }
+
+        private void postOrganizerComment(String eventId) {
+            String text = commentEditText.getText().toString().trim();
+            if (text.isEmpty()) return;
+
+            String deviceId = Settings.Secure.getString(itemView.getContext().getContentResolver(), Settings.Secure.ANDROID_ID);
+            dbHandler.getUser(deviceId).addOnSuccessListener(userDoc -> {
+                String firstName = userDoc.getString("firstName");
+                String lastName = userDoc.getString("lastName");
+                if (firstName == null) firstName = "Organizer";
+                if (lastName == null) lastName = "";
+
+                Comment comment = new Comment(deviceId, firstName, lastName, text, new Date(), true);
+                dbHandler.addComment(eventId, comment).addOnSuccessListener(aVoid -> {
+                    commentEditText.setText("");
+                    Toast.makeText(itemView.getContext(), "Comment posted", Toast.LENGTH_SHORT).show();
+                });
             });
         }
 

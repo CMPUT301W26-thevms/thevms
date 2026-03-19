@@ -64,6 +64,12 @@ public class CommentAdapter extends RecyclerView.Adapter<CommentAdapter.CommentV
             holder.timeTextView.setText("");
         }
 
+        if (comment.getIsOrganizer()) {
+            holder.organizerTag.setVisibility(View.VISIBLE);
+        } else {
+            holder.organizerTag.setVisibility(View.GONE);
+        }
+
         if (showDeleteButton) {
             holder.deleteButton.setVisibility(View.VISIBLE);
             holder.deleteButton.setOnClickListener(v -> {
@@ -82,7 +88,7 @@ public class CommentAdapter extends RecyclerView.Adapter<CommentAdapter.CommentV
     }
 
     static class CommentViewHolder extends RecyclerView.ViewHolder {
-        TextView firstNameTextView, lastNameTextView, textTextView, timeTextView;
+        TextView firstNameTextView, lastNameTextView, textTextView, timeTextView, organizerTag;
         ImageButton deleteButton;
 
         public CommentViewHolder(@NonNull View itemView) {
@@ -92,6 +98,7 @@ public class CommentAdapter extends RecyclerView.Adapter<CommentAdapter.CommentV
             textTextView = itemView.findViewById(R.id.comment_text);
             timeTextView = itemView.findViewById(R.id.comment_time);
             deleteButton = itemView.findViewById(R.id.btn_delete_comment);
+            organizerTag = itemView.findViewById(R.id.tv_organizer_tag);
         }
     }
 }

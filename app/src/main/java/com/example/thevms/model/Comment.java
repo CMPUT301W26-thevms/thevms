@@ -12,17 +12,23 @@ public class Comment {
     private String lastName;
     private String text;
     private Date timestamp;
+    private boolean isOrganizer;
 
     public Comment() {
         // Required for Firebase
     }
 
     public Comment(String userId, String firstName, String lastName, String text, Date timestamp) {
+        this(userId, firstName, lastName, text, timestamp, false);
+    }
+
+    public Comment(String userId, String firstName, String lastName, String text, Date timestamp, boolean isOrganizer) {
         this.userId = userId;
         this.firstName = firstName;
         this.lastName = lastName;
         this.text = text;
         this.timestamp = timestamp;
+        this.isOrganizer = isOrganizer;
     }
 
     public String getUserId() { return userId; }
@@ -39,4 +45,7 @@ public class Comment {
 
     public Date getTimestamp() { return timestamp; }
     public void setTimestamp(Date timestamp) { this.timestamp = timestamp; }
+
+    public boolean getIsOrganizer() { return isOrganizer; }
+    public void setIsOrganizer(boolean organizer) { isOrganizer = organizer; }
 }
