@@ -1,11 +1,16 @@
 package com.example.thevms.ui.Event;
 
+import android.app.AlertDialog;
+import android.provider.Settings;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
+import android.widget.EditText;
+import android.widget.ImageView;
 import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -16,15 +21,18 @@ import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.thevms.R;
 import com.example.thevms.model.AttendeeItem;
+import com.example.thevms.model.Comment;
 import com.example.thevms.model.DatabaseHandler;
 import com.example.thevms.model.Entrant;
 import com.example.thevms.model.Event;
 import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FirebaseFirestore;
+import com.google.firebase.firestore.ListenerRegistration;
 import com.google.firebase.firestore.QueryDocumentSnapshot;
 
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
@@ -105,12 +113,15 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
      */
     static class ViewHolder extends RecyclerView.ViewHolder {
         TextView nameText, distanceText, waitlistText, dateText, descriptionText, exportCsvText;
-        Button cancelBtn, lotteryBtn;
-        RecyclerView attendeesRv;
+        Button cancelBtn, lotteryBtn, postCommentBtn;
+        RecyclerView attendeesRv, commentsRv;
         Spinner statusSpinner;
+        EditText commentEditText;
         AttendeeAdapter attendeeAdapter;
+        CommentAdapter commentAdapter;
         DatabaseHandler dbHandler;
         FirebaseFirestore db;
+        ListenerRegistration commentsListener;
 
         // Stored so the CSV export can use it for the filename
         String currentEventName = "";
@@ -130,12 +141,21 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
             cancelBtn = itemView.findViewById(R.id.btn_cancel_event);
             lotteryBtn = itemView.findViewById(R.id.btn_run_lottery);
             attendeesRv = itemView.findViewById(R.id.rv_attendees);
+            commentsRv = itemView.findViewById(R.id.rv_comments);
             statusSpinner = itemView.findViewById(R.id.spinner_attendee_status);
             exportCsvText = itemView.findViewById(R.id.tv_export_csv);
+            commentEditText = itemView.findViewById(R.id.et_organizer_comment);
+            postCommentBtn = itemView.findViewById(R.id.btn_post_organizer_comment);
 
             attendeesRv.setLayoutManager(new LinearLayoutManager(itemView.getContext()));
             attendeeAdapter = new AttendeeAdapter();
             attendeesRv.setAdapter(attendeeAdapter);
+
+            commentsRv.setLayoutManager(new LinearLayoutManager(itemView.getContext()));
+            commentAdapter = new CommentAdapter();
+            commentAdapter.setShowDeleteButton(true);
+            commentsRv.setAdapter(commentAdapter);
+
             dbHandler = new DatabaseHandler();
             db = FirebaseFirestore.getInstance();
 
@@ -161,8 +181,10 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
                 public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
                     attendeeAdapter.filterByStatus(STATUS_VALUES[position]);
                 }
+
                 @Override
-                public void onNothingSelected(AdapterView<?> parent) {}
+                public void onNothingSelected(AdapterView<?> parent) {
+                }
             });
 
             // Wire export CSV button — exports whatever is currently filtered in the list
@@ -242,6 +264,8 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
 
             lotteryBtn.setOnClickListener(v -> runLottery(event));
 
+            postCommentBtn.setOnClickListener(v -> postOrganizerComment(eventId));
+
             // Reset spinner to "Waiting" each time a card is bound
             statusSpinner.setSelection(0);
 
@@ -283,6 +307,89 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
                     attendeeAdapter.setAttendees(new ArrayList<>());
                 }
             });
+
+            setupComments(eventId);
+        }
+
+        private void setupComments(String eventId) {
+            if (commentsListener != null) {
+                commentsListener.remove();
+            }
+
+            commentsListener = dbHandler.listenToComments(eventId, (value, error) -> {
+                if (error != null) {
+                    Log.w("OrganizerEventAdapter", "Listen failed.", error);
+                    return;
+                }
+
+                if (value == null) return;
+
+                List<Comment> comments = new ArrayList<>();
+                List<String> commentIds = new ArrayList<>();
+                for (QueryDocumentSnapshot doc : value) {
+                    comments.add(doc.toObject(Comment.class));
+                    commentIds.add(doc.getId());
+                }
+                commentAdapter.setComments(comments, commentIds);
+            });
+
+            commentAdapter.setOnCommentDeleteListener((comment, commentId) -> {
+                showDeleteCommentConfirmation(eventId, commentId);
+            });
+        }
+
+        private void postOrganizerComment(String eventId) {
+            String text = commentEditText.getText().toString().trim();
+            if (text.isEmpty()) return;
+
+            String deviceId = Settings.Secure.getString(itemView.getContext().getContentResolver(), Settings.Secure.ANDROID_ID);
+            dbHandler.getUser(deviceId).addOnSuccessListener(userDoc -> {
+                String firstName = userDoc.getString("firstName");
+                String lastName = userDoc.getString("lastName");
+                if (firstName == null) firstName = "Organizer";
+                if (lastName == null) lastName = "";
+
+                Comment comment = new Comment(deviceId, firstName, lastName, text, new Date(), true);
+                dbHandler.addComment(eventId, comment).addOnSuccessListener(aVoid -> {
+                    commentEditText.setText("");
+                    Toast.makeText(itemView.getContext(), "Comment posted", Toast.LENGTH_SHORT).show();
+                });
+            });
+        }
+
+        private void showDeleteCommentConfirmation(String eventId, String commentId) {
+            AlertDialog.Builder builder = new AlertDialog.Builder(itemView.getContext());
+            View dialogView = LayoutInflater.from(itemView.getContext()).inflate(R.layout.dialog_cancel_confirmation, null);
+            builder.setView(dialogView);
+
+            AlertDialog dialog = builder.create();
+            if (dialog.getWindow() != null) {
+                dialog.getWindow().setBackgroundDrawableResource(android.R.color.transparent);
+            }
+
+            TextView title = dialogView.findViewById(R.id.tv_dialog_title);
+            TextView message = dialogView.findViewById(R.id.tv_dialog_message);
+            Button btnBack = dialogView.findViewById(R.id.btn_dialog_back);
+            Button btnYes = dialogView.findViewById(R.id.btn_dialog_yes);
+            ImageView ivClose = dialogView.findViewById(R.id.iv_close);
+
+            if (title != null) title.setText(R.string.delete_comment_title);
+            if (message != null) message.setText(R.string.delete_comment_message);
+            if (btnYes != null) btnYes.setText(R.string.delete_comment_confirm);
+            if (btnBack != null) btnBack.setText(R.string.delete_comment_cancel);
+
+            if (btnBack != null) btnBack.setOnClickListener(v -> dialog.dismiss());
+            if (ivClose != null) ivClose.setOnClickListener(v -> dialog.dismiss());
+            if (btnYes != null) {
+                btnYes.setOnClickListener(v -> {
+                    dbHandler.deleteComment(eventId, commentId).addOnSuccessListener(aVoid -> {
+                        Toast.makeText(itemView.getContext(), R.string.comment_deleted_toast, Toast.LENGTH_SHORT).show();
+                        dialog.dismiss();
+                    });
+                });
+            }
+
+            dialog.show();
         }
 
         /**

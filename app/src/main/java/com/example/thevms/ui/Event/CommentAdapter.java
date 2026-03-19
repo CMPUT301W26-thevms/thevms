@@ -3,6 +3,7 @@ package com.example.thevms.ui.Event;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.ImageButton;
 import android.widget.TextView;
 
 import androidx.annotation.NonNull;
@@ -19,11 +20,28 @@ import java.util.Locale;
 public class CommentAdapter extends RecyclerView.Adapter<CommentAdapter.CommentViewHolder> {
 
     private List<Comment> comments = new ArrayList<>();
+    private List<String> commentIds = new ArrayList<>();
     private final SimpleDateFormat dateFormat = new SimpleDateFormat("MMM dd, HH:mm", Locale.getDefault());
+    private boolean showDeleteButton = false;
+    private OnCommentDeleteListener deleteListener;
 
-    public void setComments(List<Comment> comments) {
+    public interface OnCommentDeleteListener {
+        void onDelete(Comment comment, String commentId);
+    }
+
+    public void setComments(List<Comment> comments, List<String> commentIds) {
         this.comments = comments;
+        this.commentIds = commentIds;
         notifyDataSetChanged();
+    }
+
+    public void setShowDeleteButton(boolean showDeleteButton) {
+        this.showDeleteButton = showDeleteButton;
+        notifyDataSetChanged();
+    }
+
+    public void setOnCommentDeleteListener(OnCommentDeleteListener listener) {
+        this.deleteListener = listener;
     }
 
     @NonNull
@@ -36,6 +54,7 @@ public class CommentAdapter extends RecyclerView.Adapter<CommentAdapter.CommentV
     @Override
     public void onBindViewHolder(@NonNull CommentViewHolder holder, int position) {
         Comment comment = comments.get(position);
+        String commentId = commentIds.get(position);
         holder.firstNameTextView.setText(comment.getFirstName());
         holder.lastNameTextView.setText(comment.getLastName());
         holder.textTextView.setText(comment.getText());
@@ -43,6 +62,23 @@ public class CommentAdapter extends RecyclerView.Adapter<CommentAdapter.CommentV
             holder.timeTextView.setText(dateFormat.format(comment.getTimestamp()));
         } else {
             holder.timeTextView.setText("");
+        }
+
+        if (comment.getIsOrganizer()) {
+            holder.organizerTag.setVisibility(View.VISIBLE);
+        } else {
+            holder.organizerTag.setVisibility(View.GONE);
+        }
+
+        if (showDeleteButton) {
+            holder.deleteButton.setVisibility(View.VISIBLE);
+            holder.deleteButton.setOnClickListener(v -> {
+                if (deleteListener != null) {
+                    deleteListener.onDelete(comment, commentId);
+                }
+            });
+        } else {
+            holder.deleteButton.setVisibility(View.GONE);
         }
     }
 
@@ -52,7 +88,8 @@ public class CommentAdapter extends RecyclerView.Adapter<CommentAdapter.CommentV
     }
 
     static class CommentViewHolder extends RecyclerView.ViewHolder {
-        TextView firstNameTextView, lastNameTextView, textTextView, timeTextView;
+        TextView firstNameTextView, lastNameTextView, textTextView, timeTextView, organizerTag;
+        ImageButton deleteButton;
 
         public CommentViewHolder(@NonNull View itemView) {
             super(itemView);
@@ -60,6 +97,8 @@ public class CommentAdapter extends RecyclerView.Adapter<CommentAdapter.CommentV
             lastNameTextView = itemView.findViewById(R.id.comment_last_name);
             textTextView = itemView.findViewById(R.id.comment_text);
             timeTextView = itemView.findViewById(R.id.comment_time);
+            deleteButton = itemView.findViewById(R.id.btn_delete_comment);
+            organizerTag = itemView.findViewById(R.id.tv_organizer_tag);
         }
     }
 }

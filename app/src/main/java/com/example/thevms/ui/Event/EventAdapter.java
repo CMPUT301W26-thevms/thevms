@@ -298,7 +298,7 @@ public class EventAdapter extends RecyclerView.Adapter<EventAdapter.EventViewHol
             }
 
             if (isCommentsExpanded) {
-                setupComments(String.valueOf(event.getEventId()), deviceId, dbHandler);
+                setupComments(String.valueOf(event.getEventId()), deviceId, dbHandler, isAdmin);
             } else {
                 if (commentsListener != null) {
                     commentsListener.remove();
@@ -307,10 +307,12 @@ public class EventAdapter extends RecyclerView.Adapter<EventAdapter.EventViewHol
             }
         }
 
-        private void setupComments(String eventId, String deviceId, DatabaseHandler dbHandler) {
+        private void setupComments(String eventId, String deviceId, DatabaseHandler dbHandler, boolean isAdmin) {
             if (commentsListener != null) {
                 commentsListener.remove();
             }
+            
+            commentAdapter.setShowDeleteButton(isAdmin);
             
             commentsListener = dbHandler.listenToComments(eventId, (value, error) -> {
                 if (error != null) {
@@ -321,14 +323,22 @@ public class EventAdapter extends RecyclerView.Adapter<EventAdapter.EventViewHol
                 if (value == null) return;
 
                 List<Comment> comments = new ArrayList<>();
+                List<String> commentIds = new ArrayList<>();
                 for (QueryDocumentSnapshot doc : value) {
                     comments.add(doc.toObject(Comment.class));
+                    commentIds.add(doc.getId());
                 }
-                commentAdapter.setComments(comments);
+                commentAdapter.setComments(comments, commentIds);
                 if (comments.size() > 0 && commentsRecyclerView.getVisibility() == View.VISIBLE) {
                     commentsRecyclerView.smoothScrollToPosition(comments.size() - 1);
                 }
             });
+
+            if (isAdmin) {
+                commentAdapter.setOnCommentDeleteListener((comment, commentId) -> {
+                    showDeleteCommentConfirmation(eventId, commentId);
+                });
+            }
 
             postCommentButton.setOnClickListener(v -> {
                 String text = commentEditText.getText().toString().trim();
@@ -349,6 +359,41 @@ public class EventAdapter extends RecyclerView.Adapter<EventAdapter.EventViewHol
                     });
                 });
             });
+        }
+
+        private void showDeleteCommentConfirmation(String eventId, String commentId) {
+            AlertDialog.Builder builder = new AlertDialog.Builder(itemView.getContext());
+            View dialogView = LayoutInflater.from(itemView.getContext()).inflate(R.layout.dialog_cancel_confirmation, null);
+            builder.setView(dialogView);
+
+            AlertDialog dialog = builder.create();
+            if (dialog.getWindow() != null) {
+                dialog.getWindow().setBackgroundDrawableResource(android.R.color.transparent);
+            }
+
+            TextView title = dialogView.findViewById(R.id.tv_dialog_title);
+            TextView message = dialogView.findViewById(R.id.tv_dialog_message);
+            Button btnBack = dialogView.findViewById(R.id.btn_dialog_back);
+            Button btnYes = dialogView.findViewById(R.id.btn_dialog_yes);
+            ImageView ivClose = dialogView.findViewById(R.id.iv_close);
+
+            if (title != null) title.setText(R.string.delete_comment_title);
+            if (message != null) message.setText(R.string.delete_comment_message);
+            if (btnYes != null) btnYes.setText(R.string.delete_comment_confirm);
+            if (btnBack != null) btnBack.setText(R.string.delete_comment_cancel);
+
+            if (btnBack != null) btnBack.setOnClickListener(v -> dialog.dismiss());
+            if (ivClose != null) ivClose.setOnClickListener(v -> dialog.dismiss());
+            if (btnYes != null) {
+                btnYes.setOnClickListener(v -> {
+                    new DatabaseHandler().deleteComment(eventId, commentId).addOnSuccessListener(aVoid -> {
+                        Toast.makeText(itemView.getContext(), R.string.comment_deleted_toast, Toast.LENGTH_SHORT).show();
+                        dialog.dismiss();
+                    });
+                });
+            }
+
+            dialog.show();
         }
 
         /**
