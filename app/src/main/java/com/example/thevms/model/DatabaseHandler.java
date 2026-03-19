@@ -23,7 +23,7 @@ import java.util.Random;
 
 /**
  * DatabaseHandler provides a clean API for interacting with Firebase Firestore.
- * It manages Events, User Profiles, and Entrant Lists.
+ * It manages Events, User Profiles, Entrant Lists, and Notifications.
  */
 public class DatabaseHandler {
     private FirebaseFirestore db;
@@ -33,6 +33,7 @@ public class DatabaseHandler {
     public static final String COLLECTION_USERS = "users";
     public static final String COLLECTION_ENTRANTS = "entrants";
     public static final String COLLECTION_COMMENTS = "comments";
+    public static final String COLLECTION_NOTIFICATIONS = "notifications";
     
     // Entrant status constants
     public static final String STATUS_WAITING = "waiting";
@@ -445,6 +446,42 @@ public class DatabaseHandler {
                 .collection(COLLECTION_COMMENTS)
                 .document(commentId)
                 .delete();
+    }
+
+    /**
+     * Sends a notification to a specific user.
+     *
+     * @param notification The notification object.
+     * @return A Task representing the operation.
+     */
+    public Task<DocumentReference> sendNotification(Notification notification) {
+        return getDb().collection(COLLECTION_NOTIFICATIONS).add(notification);
+    }
+
+    /**
+     * Listens for notifications sent to a specific user.
+     *
+     * @param userId   The receiver's user ID.
+     * @param listener Callback to handle notification updates.
+     * @return ListenerRegistration.
+     */
+    public ListenerRegistration listenToNotifications(String userId, EventListener<QuerySnapshot> listener) {
+        return getDb().collection(COLLECTION_NOTIFICATIONS)
+                .whereEqualTo("receiverId", userId)
+                .orderBy("timestamp", Query.Direction.DESCENDING)
+                .addSnapshotListener(listener);
+    }
+
+    /**
+     * Marks a notification as read.
+     *
+     * @param notificationId The ID of the notification.
+     * @return A Task representing the operation.
+     */
+    public Task<Void> markNotificationAsRead(String notificationId) {
+        return getDb().collection(COLLECTION_NOTIFICATIONS)
+                .document(notificationId)
+                .update("read", true);
     }
 
     /**
