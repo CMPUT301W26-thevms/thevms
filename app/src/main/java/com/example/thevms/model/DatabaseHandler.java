@@ -454,8 +454,10 @@ public class DatabaseHandler {
      * @param notification The notification object.
      * @return A Task representing the operation.
      */
-    public Task<DocumentReference> sendNotification(Notification notification) {
-        return getDb().collection(COLLECTION_NOTIFICATIONS).add(notification);
+    public Task<Void> sendNotification(Notification notification) {
+        DocumentReference ref = getDb().collection(COLLECTION_NOTIFICATIONS).document();
+        notification.setId(ref.getId());
+        return ref.set(notification);
     }
 
     /**
@@ -482,6 +484,16 @@ public class DatabaseHandler {
         return getDb().collection(COLLECTION_NOTIFICATIONS)
                 .document(notificationId)
                 .update("read", true);
+    }
+
+    /**
+     * Deletes a notification from the database.
+     *
+     * @param notificationId The ID of the notification to delete.
+     * @return A Task representing the operation.
+     */
+    public Task<Void> deleteNotification(String notificationId) {
+        return getDb().collection(COLLECTION_NOTIFICATIONS).document(notificationId).delete();
     }
 
     /**
