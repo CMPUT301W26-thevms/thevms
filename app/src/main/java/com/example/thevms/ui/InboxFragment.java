@@ -1,11 +1,16 @@
 package com.example.thevms.ui;
 
 import android.annotation.SuppressLint;
+import android.app.Dialog;
+import android.graphics.Color;
+import android.graphics.drawable.ColorDrawable;
 import android.os.Bundle;
 import android.provider.Settings;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.Window;
+import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
 import androidx.annotation.NonNull;
@@ -72,16 +77,44 @@ public class InboxFragment extends Fragment {
         recyclerView.setLayoutManager(new LinearLayoutManager(getContext()));
         recyclerView.setAdapter(adapter);
 
-        adapter.setOnNotificationDeleteListener(notification -> {
+        adapter.setOnNotificationDeleteListener(this::showDeleteConfirmationDialog);
+    }
+
+    /**
+     * Shows a confirmation dialog before deleting a notification.
+     *
+     * @param notification The notification to be deleted.
+     */
+    private void showDeleteConfirmationDialog(Notification notification) {
+        Dialog dialog = new Dialog(requireContext());
+        dialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
+        dialog.setContentView(R.layout.dialog_delete_notification);
+        dialog.setCancelable(true);
+
+        if (dialog.getWindow() != null) {
+            dialog.getWindow().setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
+        }
+
+        ImageView ivClose = dialog.findViewById(R.id.iv_close);
+        MaterialButton btnCancel = dialog.findViewById(R.id.btn_dialog_cancel);
+        MaterialButton btnDelete = dialog.findViewById(R.id.btn_dialog_delete);
+
+        ivClose.setOnClickListener(v -> dialog.dismiss());
+        btnCancel.setOnClickListener(v -> dialog.dismiss());
+
+        btnDelete.setOnClickListener(v -> {
             dbHandler.deleteNotification(notification.getId())
                     .addOnSuccessListener(aVoid -> {
-                        // The real-time listener will handle the UI update
                         Toast.makeText(getContext(), "Notification deleted", Toast.LENGTH_SHORT).show();
+                        dialog.dismiss();
                     })
                     .addOnFailureListener(e -> {
                         Toast.makeText(getContext(), "Failed to delete: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+                        dialog.dismiss();
                     });
         });
+
+        dialog.show();
     }
 
     private void setupTestButton() {
