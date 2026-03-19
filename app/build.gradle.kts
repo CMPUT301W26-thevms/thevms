@@ -47,6 +47,7 @@ dependencies {
     implementation(libs.espresso.intents)
     implementation(libs.espresso.contrib)
     implementation(libs.play.services.location)
+    implementation(libs.swiperefreshlayout)
     testImplementation(libs.junit)
     androidTestImplementation(libs.ext.junit)
     androidTestImplementation(libs.espresso.core)

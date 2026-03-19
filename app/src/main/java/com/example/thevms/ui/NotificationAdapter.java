@@ -73,7 +73,8 @@ public class NotificationAdapter extends RecyclerView.Adapter<NotificationAdapte
 
         public void bind(Notification notification) {
             title.setText(notification.getTitle());
-            from.setText("From: " + notification.getSenderRole().toString());
+            String senderInfo = "From: " + notification.getSenderName() + " (" + notification.getSenderRole().toString() + ")";
+            from.setText(senderInfo);
             description.setText(notification.getDescription());
             
             if (notification.getTimestamp() != null) {

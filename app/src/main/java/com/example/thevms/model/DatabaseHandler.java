@@ -470,7 +470,6 @@ public class DatabaseHandler {
     public ListenerRegistration listenToNotifications(String userId, EventListener<QuerySnapshot> listener) {
         return getDb().collection(COLLECTION_NOTIFICATIONS)
                 .whereEqualTo("receiverId", userId)
-                .orderBy("timestamp", Query.Direction.DESCENDING)
                 .addSnapshotListener(listener);
     }
 

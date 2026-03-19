@@ -9,8 +9,9 @@ public class Notification {
     private String id;
     private String title;
     private String senderId;
-    private String receiverId;
+    private String senderName;
     private UserRole senderRole;
+    private String receiverId;
     private Date timestamp;
     private String description;
     private boolean isRead;
@@ -19,10 +20,11 @@ public class Notification {
         // Required for Firebase
     }
 
-    public Notification(String id, String title, String senderId, UserRole senderRole, String receiverId, Date timestamp, String description) {
+    public Notification(String id, String title, String senderId, String senderName, UserRole senderRole, String receiverId, Date timestamp, String description) {
         this.id = id;
         this.title = title;
         this.senderId = senderId;
+        this.senderName = senderName;
         this.senderRole = senderRole;
         this.receiverId = receiverId;
         this.timestamp = timestamp;
@@ -30,67 +32,30 @@ public class Notification {
         this.isRead = false;
     }
 
-    public String getId() {
-        return id;
-    }
+    public String getId() { return id; }
+    public void setId(String id) { this.id = id; }
 
-    public void setId(String id) {
-        this.id = id;
-    }
+    public String getTitle() { return title; }
+    public void setTitle(String title) { this.title = title; }
 
-    public String getTitle() {
-        return title;
-    }
+    public String getSenderId() { return senderId; }
+    public void setSenderId(String senderId) { this.senderId = senderId; }
 
-    public void setTitle(String title) {
-        this.title = title;
-    }
+    public String getSenderName() { return senderName; }
+    public void setSenderName(String senderName) { this.senderName = senderName; }
 
-    public String getSenderId() {
-        return senderId;
-    }
+    public UserRole getSenderRole() { return senderRole; }
+    public void setSenderRole(UserRole senderRole) { this.senderRole = senderRole; }
 
-    public void setSenderId(String senderId) {
-        this.senderId = senderId;
-    }
+    public String getReceiverId() { return receiverId; }
+    public void setReceiverId(String receiverId) { this.receiverId = receiverId; }
 
-    public UserRole getSenderRole() {
-        return senderRole;
-    }
+    public Date getTimestamp() { return timestamp; }
+    public void setTimestamp(Date timestamp) { this.timestamp = timestamp; }
 
-    public void setSenderRole(UserRole senderRole) {
-        this.senderRole = senderRole;
-    }
+    public String getDescription() { return description; }
+    public void setDescription(String description) { this.description = description; }
 
-    public String getReceiverId() {
-        return receiverId;
-    }
-
-    public void setReceiverId(String receiverId) {
-        this.receiverId = receiverId;
-    }
-
-    public Date getTimestamp() {
-        return timestamp;
-    }
-
-    public void setTimestamp(Date timestamp) {
-        this.timestamp = timestamp;
-    }
-
-    public String getDescription() {
-        return description;
-    }
-
-    public void setDescription(String description) {
-        this.description = description;
-    }
-
-    public boolean isRead() {
-        return isRead;
-    }
-
-    public void setRead(boolean read) {
-        isRead = read;
-    }
+    public boolean isRead() { return isRead; }
+    public void setRead(boolean read) { isRead = read; }
 }
