@@ -450,9 +450,10 @@ public class DatabaseHandler {
 
     /**
      * Sends a notification to a specific user.
+     * Saves the notification to the Firestore "notifications" collection.
      *
-     * @param notification The notification object.
-     * @return A Task representing the operation.
+     * @param notification The notification object to send.
+     * @return A Task representing the asynchronous operation.
      */
     public Task<Void> sendNotification(Notification notification) {
         DocumentReference ref = getDb().collection(COLLECTION_NOTIFICATIONS).document();
@@ -461,11 +462,12 @@ public class DatabaseHandler {
     }
 
     /**
-     * Listens for notifications sent to a specific user.
+     * Listens for real-time notifications sent to a specific user.
+     * Queries the "notifications" collection where receiverId matches the provided userId.
      *
-     * @param userId   The receiver's user ID.
+     * @param userId   The device ID of the notification recipient.
      * @param listener Callback to handle notification updates.
-     * @return ListenerRegistration.
+     * @return ListenerRegistration to stop listening when needed.
      */
     public ListenerRegistration listenToNotifications(String userId, EventListener<QuerySnapshot> listener) {
         return getDb().collection(COLLECTION_NOTIFICATIONS)
@@ -474,10 +476,10 @@ public class DatabaseHandler {
     }
 
     /**
-     * Marks a notification as read.
+     * Marks a specific notification as read in Firestore.
      *
-     * @param notificationId The ID of the notification.
-     * @return A Task representing the operation.
+     * @param notificationId The unique ID of the notification to update.
+     * @return A Task representing the asynchronous operation.
      */
     public Task<Void> markNotificationAsRead(String notificationId) {
         return getDb().collection(COLLECTION_NOTIFICATIONS)
@@ -486,10 +488,10 @@ public class DatabaseHandler {
     }
 
     /**
-     * Deletes a notification from the database.
+     * Permanently deletes a notification from the database.
      *
-     * @param notificationId The ID of the notification to delete.
-     * @return A Task representing the operation.
+     * @param notificationId The unique ID of the notification to remove.
+     * @return A Task representing the asynchronous operation.
      */
     public Task<Void> deleteNotification(String notificationId) {
         return getDb().collection(COLLECTION_NOTIFICATIONS).document(notificationId).delete();

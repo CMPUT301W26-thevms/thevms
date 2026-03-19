@@ -4,6 +4,7 @@ import java.util.Date;
 
 /**
  * Model class representing a notification in the system.
+ * Notifications are sent by organizers or the system to users (entrants).
  */
 public class Notification {
     private String id;
@@ -16,10 +17,25 @@ public class Notification {
     private String description;
     private boolean isRead;
 
+    /**
+     * Default constructor required for Firebase Firestore deserialization.
+     */
     public Notification() {
         // Required for Firebase
     }
 
+    /**
+     * Constructs a new Notification.
+     *
+     * @param id           The unique identifier for the notification (usually Firestore document ID).
+     * @param title        The headline of the notification.
+     * @param senderId     The device ID or user ID of the sender.
+     * @param senderName   The display name of the person or system sending the notification.
+     * @param senderRole   The role of the sender (e.g., ADMIN, ORGANIZER).
+     * @param receiverId   The device ID of the user who should receive this notification.
+     * @param timestamp    The date and time the notification was generated.
+     * @param description  The main content/message of the notification.
+     */
     public Notification(String id, String title, String senderId, String senderName, UserRole senderRole, String receiverId, Date timestamp, String description) {
         this.id = id;
         this.title = title;
