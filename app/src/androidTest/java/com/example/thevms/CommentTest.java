@@ -11,9 +11,11 @@ import static androidx.test.espresso.matcher.ViewMatchers.isDisplayed;
 import static androidx.test.espresso.matcher.ViewMatchers.withId;
 import static androidx.test.espresso.matcher.ViewMatchers.withText;
 import static org.hamcrest.CoreMatchers.not;
+import static org.hamcrest.Matchers.allOf;
 
 import android.provider.Settings;
 import android.view.View;
+import android.widget.EditText;
 
 import androidx.core.widget.NestedScrollView;
 import androidx.test.core.app.ActivityScenario;
@@ -38,7 +40,9 @@ import org.junit.runner.RunWith;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 /**
  * UI tests for comment functionality across different user roles.
@@ -89,7 +93,7 @@ public class CommentTest {
                 fragment.expandBottomSheet();
             }
         });
-        Thread.sleep(1000);
+        Thread.sleep(2000); // Allow time for Firestore and UI expansion
 
         // 2. Click "View Comments" button
         onView(withId(R.id.events_recycler_view))
@@ -118,6 +122,68 @@ public class CommentTest {
                 .check(matches(hasDescendant(withText("John"))));
         onView(withId(R.id.comments_recycler_view))
                 .check(matches(hasDescendant(withText("Doe"))));
+    }
+
+    /**
+     * Test to verify that when an organizer posts a comment from their dashboard,
+     * the "ORGANIZER" tag is visible on the comment.
+     */
+    @Test
+    public void testOrganizerPostAndViewComment() throws InterruptedException, ExecutionException, TimeoutException {
+        testHelper.clearDatabase();
+        String deviceId = Settings.Secure.getString(
+                InstrumentationRegistry.getInstrumentation().getContext().getContentResolver(),
+                Settings.Secure.ANDROID_ID);
+
+        // 1. Seed exactly one event for the current organizer
+        testHelper.seedDummyEventsForOrganizer(1, deviceId);
+
+        // 2. Launch MyEventsActivity (the Organizer's events page)
+        try (ActivityScenario<MyEventsActivity> organizerScenario = ActivityScenario.launch(MyEventsActivity.class)) {
+            Thread.sleep(2500);
+
+            String organizerMessage = "Official update from the organizer";
+
+            // 3. Target the EditText inside the first RecyclerView item directly Gemini was used here, no other solution worked :\
+            onView(withId(R.id.rv_my_events))
+                    .perform(RecyclerViewActions.actionOnItemAtPosition(0, new ViewAction() {
+                        @Override
+                        public Matcher<View> getConstraints() {
+                            return isDisplayed();
+                        }
+
+                        @Override
+                        public String getDescription() {
+                            return "Set organizer comment text";
+                        }
+
+                        @Override
+                        public void perform(UiController uiController, View view) {
+                            EditText et = view.findViewById(R.id.et_organizer_comment);
+                            if (et != null) et.setText(organizerMessage);
+                        }
+                    }));
+
+            // 4. Click the post button specifically within that same recycler view item
+            onView(withId(R.id.rv_my_events))
+                    .perform(RecyclerViewActions.actionOnItemAtPosition(0,
+                            MainActivityTest.clickChildViewWithId(R.id.btn_post_organizer_comment)));
+
+            // Wait for Firestore round-trip
+            Thread.sleep(2000);
+
+            // 5. Verify the comment text is present
+            onView(withId(R.id.rv_comments))
+                    .check(matches(hasDescendant(withText(organizerMessage))));
+
+            // 6. Verify the "ORGANIZER" tag is displayed for this comment
+            onView(withId(R.id.rv_comments))
+                    .check(matches(hasDescendant(allOf(
+                            withId(R.id.tv_organizer_tag),
+                            withText("ORGANIZER"),
+                            isDisplayed()
+                    ))));
+        }
     }
 
     /**
@@ -210,6 +276,7 @@ public class CommentTest {
         // 6. Click the delete button on the comment
         onView(withId(R.id.comments_recycler_view))
                 .perform(RecyclerViewActions.actionOnItemAtPosition(0, MainActivityTest.clickChildViewWithId(R.id.btn_delete_comment)));
+
         Thread.sleep(1500);
 
         // 7. Confirm deletion in the dialog
