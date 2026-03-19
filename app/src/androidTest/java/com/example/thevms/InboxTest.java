@@ -47,11 +47,15 @@ public class InboxTest {
         Context context = ApplicationProvider.getApplicationContext();
         deviceId = Settings.Secure.getString(context.getContentResolver(), Settings.Secure.ANDROID_ID);
 
-        // Seed a basic user
-        Entrant user = new Entrant(deviceId, "test@example.com", "Test", "User", "1234567890");
-        Tasks.await(user.save(), 5, TimeUnit.SECONDS);
+        // Seed a basic user using abstract model methods
+        Entrant entrant = Tasks.await(Entrant.getOrCreate(deviceId), 5, TimeUnit.SECONDS);
+        entrant.setEmail("test@example.com");
+        entrant.setFirstName("Test");
+        entrant.setLastName("User");
+        entrant.setPhoneNumber("1234567890");
+        Tasks.await(entrant.save(), 5, TimeUnit.SECONDS);
 
-        // Seed a notification for this user
+        // Seed a notification and 'send it'
         Notification notification = new Notification(
                 "test_notif_id",
                 "Welcome Title",
@@ -62,7 +66,7 @@ public class InboxTest {
                 new Date(),
                 "This is a welcome notification message."
         );
-        Tasks.await(testHelper.getDbHandler().sendNotification(notification), 5, TimeUnit.SECONDS);
+        Tasks.await(notification.send(), 5, TimeUnit.SECONDS);
     }
 
     private void waitForView(Matcher<View> matcher, int timeoutMs) throws InterruptedException {
