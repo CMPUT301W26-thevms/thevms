@@ -74,8 +74,8 @@ public class MainActivity extends AppCompatActivity {
 
             if (id == R.id.nav_home) {
                 selectedFragment = new SearchFragment();
-            } else if (id == R.id.nav_events) {
-                selectedFragment = new EntrantEventsFragment();
+            } else if (id == R.id.nav_inbox) {
+                selectedFragment = new InboxFragment();
             } else if (id == R.id.nav_profile) {
                 selectedFragment = new ProfileFragment();
             } else if (id == R.id.nav_add) {

@@ -54,7 +54,8 @@ public class FirestoreTestHelper {
         // 1. Clear top-level collections
         String[] collections = {
                 DatabaseHandler.COLLECTION_EVENTS,
-                DatabaseHandler.COLLECTION_USERS
+                DatabaseHandler.COLLECTION_USERS,
+                DatabaseHandler.COLLECTION_NOTIFICATIONS
         };
 
         for (String collection : collections) {

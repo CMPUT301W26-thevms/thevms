@@ -23,7 +23,7 @@ import java.util.Random;
 
 /**
  * DatabaseHandler provides a clean API for interacting with Firebase Firestore.
- * It manages Events, User Profiles, and Entrant Lists.
+ * It manages Events, User Profiles, Entrant Lists, and Notifications.
  */
 public class DatabaseHandler {
     private FirebaseFirestore db;
@@ -33,6 +33,7 @@ public class DatabaseHandler {
     public static final String COLLECTION_USERS = "users";
     public static final String COLLECTION_ENTRANTS = "entrants";
     public static final String COLLECTION_COMMENTS = "comments";
+    public static final String COLLECTION_NOTIFICATIONS = "notifications";
     
     // Entrant status constants
     public static final String STATUS_WAITING = "waiting";
@@ -445,6 +446,55 @@ public class DatabaseHandler {
                 .collection(COLLECTION_COMMENTS)
                 .document(commentId)
                 .delete();
+    }
+
+    /**
+     * Sends a notification to a specific user.
+     * Saves the notification to the Firestore "notifications" collection.
+     *
+     * @param notification The notification object to send.
+     * @return A Task representing the asynchronous operation.
+     */
+    public Task<Void> sendNotification(Notification notification) {
+        DocumentReference ref = getDb().collection(COLLECTION_NOTIFICATIONS).document();
+        notification.setId(ref.getId());
+        return ref.set(notification);
+    }
+
+    /**
+     * Listens for real-time notifications sent to a specific user.
+     * Queries the "notifications" collection where receiverId matches the provided userId.
+     *
+     * @param userId   The device ID of the notification recipient.
+     * @param listener Callback to handle notification updates.
+     * @return ListenerRegistration to stop listening when needed.
+     */
+    public ListenerRegistration listenToNotifications(String userId, EventListener<QuerySnapshot> listener) {
+        return getDb().collection(COLLECTION_NOTIFICATIONS)
+                .whereEqualTo("receiverId", userId)
+                .addSnapshotListener(listener);
+    }
+
+    /**
+     * Marks a specific notification as read in Firestore.
+     *
+     * @param notificationId The unique ID of the notification to update.
+     * @return A Task representing the asynchronous operation.
+     */
+    public Task<Void> markNotificationAsRead(String notificationId) {
+        return getDb().collection(COLLECTION_NOTIFICATIONS)
+                .document(notificationId)
+                .update("read", true);
+    }
+
+    /**
+     * Permanently deletes a notification from the database.
+     *
+     * @param notificationId The unique ID of the notification to remove.
+     * @return A Task representing the asynchronous operation.
+     */
+    public Task<Void> deleteNotification(String notificationId) {
+        return getDb().collection(COLLECTION_NOTIFICATIONS).document(notificationId).delete();
     }
 
     /**

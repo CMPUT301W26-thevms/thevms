@@ -13,6 +13,12 @@
     <string name="delete_comment_cancel">Back</string>
     <string name="comment_deleted_toast">Comment deleted</string>
 
+    <!-- Notification Deletion -->
+    <string name="delete_notification_title">Delete Notification?</string>
+    <string name="delete_notification_message">Are you sure you want to delete this notification? This action cannot be undone.</string>
+    <string name="delete_notification_confirm">Delete</string>
+    <string name="delete_notification_cancel">Cancel</string>
+
     <!-- Admin Profiles Strings -->
     <string name="admin_profiles_title">Manage Profiles</string>
     <string name="admin_organizers_title">Manage Organizers</string>
