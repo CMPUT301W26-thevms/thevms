@@ -22,6 +22,7 @@ public class Notification {
     private Date timestamp;
     private String description;
     private String type;
+    private String eventId;
     private boolean isRead;
 
     @Exclude // Exclude is used so that it is not saved to the DB
@@ -49,11 +50,11 @@ public class Notification {
      * @param description The main content/message of the notification.
      */
     public Notification(String id, String title, String senderId, String senderName, UserRole senderRole, String receiverId, Date timestamp, String description) {
-        this(id, title, senderId, senderName, senderRole, receiverId, timestamp, description, TYPE_GENERAL);
+        this(id, title, senderId, senderName, senderRole, receiverId, timestamp, description, TYPE_GENERAL, null);
     }
 
     /**
-     * Constructs a new Notification with a specific type.
+     * Constructs a new Notification with a specific type and event ID.
      *
      * @param id          The unique identifier for the notification.
      * @param title       The headline of the notification.
@@ -64,8 +65,9 @@ public class Notification {
      * @param timestamp   The date and time of the notification.
      * @param description The main content of the notification.
      * @param type        The type of notification (e.g., general, invite).
+     * @param eventId     The ID of the event associated with this notification.
      */
-    public Notification(String id, String title, String senderId, String senderName, UserRole senderRole, String receiverId, Date timestamp, String description, String type) {
+    public Notification(String id, String title, String senderId, String senderName, UserRole senderRole, String receiverId, Date timestamp, String description, String type, String eventId) {
         this.dbHandler = new DatabaseHandler();
         this.id = id;
         this.title = title;
@@ -76,13 +78,14 @@ public class Notification {
         this.timestamp = timestamp;
         this.description = description;
         this.type = type;
+        this.eventId = eventId;
         this.isRead = false;
     }
 
     /**
      * Creates a notification for a lottery win.
      */
-    public static Notification createLotteryWin(String senderId, String senderName, String receiverId, String eventName) {
+    public static Notification createLotteryWin(String senderId, String senderName, String receiverId, String eventId, String eventName) {
         return new Notification(
                 null,
                 "Lottery Results",
@@ -92,14 +95,15 @@ public class Notification {
                 receiverId,
                 new Date(),
                 "Congratulations! You have been selected to participate in " + eventName + ". Please accept or decline this invitation.",
-                TYPE_INVITE
+                TYPE_INVITE,
+                eventId
         );
     }
 
     /**
      * Creates a notification for a lottery loss.
      */
-    public static Notification createLotteryLoss(String senderId, String senderName, String receiverId, String eventName) {
+    public static Notification createLotteryLoss(String senderId, String senderName, String receiverId, String eventId, String eventName) {
         return new Notification(
                 null,
                 "Lottery Results",
@@ -109,14 +113,15 @@ public class Notification {
                 receiverId,
                 new Date(),
                 "We regret to inform you that you were not selected for " + eventName + " this time. Better luck next time!",
-                TYPE_GENERAL
+                TYPE_GENERAL,
+                eventId
         );
     }
 
     /**
      * Creates a notification for a waiting list invite.
      */
-    public static Notification createWaitingListInvite(String senderId, String senderName, String receiverId, String eventName) {
+    public static Notification createWaitingListInvite(String senderId, String senderName, String receiverId, String eventId, String eventName) {
         return new Notification(
                 null,
                 "Wait List Invite",
@@ -126,14 +131,15 @@ public class Notification {
                 receiverId,
                 new Date(),
                 "You have been invited to join the waiting list for the private event: " + eventName + ".",
-                TYPE_INVITE
+                TYPE_INVITE,
+                eventId
         );
     }
 
     /**
      * Creates a notification for a co-organizer invite.
      */
-    public static Notification createCoOrganizerInvite(String senderId, String senderName, String receiverId, String eventName) {
+    public static Notification createCoOrganizerInvite(String senderId, String senderName, String receiverId, String eventId, String eventName) {
         return new Notification(
                 null,
                 "Co-Organizer Invite",
@@ -143,7 +149,8 @@ public class Notification {
                 receiverId,
                 new Date(),
                 senderName + " has invited you to be a co-organizer for " + eventName + ".",
-                TYPE_INVITE
+                TYPE_INVITE,
+                eventId
         );
     }
 
@@ -235,6 +242,14 @@ public class Notification {
 
     public void setType(String type) {
         this.type = type;
+    }
+
+    public String getEventId() {
+        return eventId;
+    }
+
+    public void setEventId(String eventId) {
+        this.eventId = eventId;
     }
 
     public boolean isRead() {

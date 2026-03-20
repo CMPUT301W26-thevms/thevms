@@ -23,6 +23,7 @@ import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
 
 import com.example.thevms.R;
 import com.example.thevms.model.DatabaseHandler;
+import com.example.thevms.model.Entrant;
 import com.example.thevms.model.Notification;
 import com.example.thevms.model.UserRole;
 import com.google.android.material.button.MaterialButton;
@@ -87,16 +88,81 @@ public class InboxFragment extends Fragment {
         adapter.setOnInviteActionListener(new NotificationAdapter.OnInviteActionListener() {
             @Override
             public void onAccept(Notification notification) {
-                Toast.makeText(getContext(), "Accepted Invite: " + notification.getTitle(), Toast.LENGTH_SHORT).show();
-                // Logic for accepting invite (e.g. updating entrant status) will be added later
+                handleInviteAction(notification, true);
             }
 
             @Override
             public void onReject(Notification notification) {
-                Toast.makeText(getContext(), "Rejected Invite: " + notification.getTitle(), Toast.LENGTH_SHORT).show();
-                // Logic for rejecting invite will be added later
+                handleInviteAction(notification, false);
             }
         });
+    }
+
+    /**
+     * Handles the accept/reject logic for an invite notification.
+     *
+     * @param notification The notification being acted upon.
+     * @param isAccepted   True if the user clicked Accept, false for Reject.
+     */
+    private void handleInviteAction(Notification notification, boolean isAccepted) {
+        String eventId = notification.getEventId();
+        if (eventId == null) {
+            Toast.makeText(getContext(), "Error: Event ID missing", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        if (isAccepted) {
+            if ("Wait List Invite".equals(notification.getTitle())) {
+                // For private waitlist invites, we add the entrant to the event's waitlist
+                Entrant.getOrCreate(deviceId).addOnSuccessListener(entrant -> {
+                    dbHandler.getDb().collection(DatabaseHandler.COLLECTION_EVENTS)
+                            .document(eventId).get().addOnSuccessListener(doc -> {
+                                if (doc.exists()) {
+                                    // Manually add to waitlist bypassing registration time checks for direct invites
+                                    java.util.Map<String, Object> registrationData = new java.util.HashMap<>();
+                                    registrationData.put("entrantId", deviceId);
+                                    registrationData.put("status", DatabaseHandler.STATUS_WAITING);
+                                    registrationData.put("registrationTime", new Date());
+
+                                    dbHandler.updateEntrantStatus(eventId, deviceId, registrationData)
+                                            .addOnSuccessListener(aVoid -> {
+                                                Toast.makeText(getContext(), "Joined waiting list!", Toast.LENGTH_SHORT).show();
+                                                notification.delete();
+                                            })
+                                            .addOnFailureListener(e -> Toast.makeText(getContext(), "Failed to join: " + e.getMessage(), Toast.LENGTH_SHORT).show());
+                                }
+                            });
+                });
+            } else if ("Lottery Results".equals(notification.getTitle())) {
+                // For lottery wins, update status from 'selected' to 'accepted'
+                java.util.Map<String, Object> data = new java.util.HashMap<>();
+                data.put("status", DatabaseHandler.STATUS_ACCEPTED);
+                dbHandler.updateEntrantStatus(eventId, deviceId, data)
+                        .addOnSuccessListener(aVoid -> {
+                            Toast.makeText(getContext(), "Invitation accepted!", Toast.LENGTH_SHORT).show();
+                            notification.delete();
+                        });
+            } else {
+                // Generic accept
+                Toast.makeText(getContext(), "Accepted: " + notification.getTitle(), Toast.LENGTH_SHORT).show();
+                notification.delete();
+            }
+        } else {
+            // Reject logic
+            if ("Lottery Results".equals(notification.getTitle())) {
+                // Update status to 'declined' (so organizer can redraw)
+                java.util.Map<String, Object> data = new java.util.HashMap<>();
+                data.put("status", DatabaseHandler.STATUS_DECLINED);
+                dbHandler.updateEntrantStatus(eventId, deviceId, data)
+                        .addOnSuccessListener(aVoid -> {
+                            Toast.makeText(getContext(), "Invitation declined.", Toast.LENGTH_SHORT).show();
+                            notification.delete();
+                        });
+            } else {
+                Toast.makeText(getContext(), "Rejected: " + notification.getTitle(), Toast.LENGTH_SHORT).show();
+                notification.delete();
+            }
+        }
     }
 
     /**
@@ -159,16 +225,9 @@ public class InboxFragment extends Fragment {
         });
 
         btnTestInvite.setOnClickListener(v -> {
-            Notification testInvite = new Notification(
-                    null,
-                    "Event Invitation",
-                    deviceId,
-                    "Event Organizer",
-                    UserRole.ORGANIZER,
-                    deviceId,
-                    new Date(),
-                    "You have been selected for the upcoming event! Would you like to attend?",
-                    Notification.TYPE_INVITE
+            // Using a dummy event ID for testing
+            Notification testInvite = Notification.createWaitingListInvite(
+                    deviceId, "Test Organizer", deviceId, "123", "Secret Gala"
             );
 
             testInvite.send()
