@@ -80,6 +80,74 @@ public class Notification {
     }
 
     /**
+     * Creates a notification for a lottery win.
+     */
+    public static Notification createLotteryWin(String senderId, String senderName, String receiverId, String eventName) {
+        return new Notification(
+                null,
+                "Lottery Results",
+                senderId,
+                senderName,
+                UserRole.ORGANIZER,
+                receiverId,
+                new Date(),
+                "Congratulations! You have been selected to participate in " + eventName + ". Please accept or decline this invitation.",
+                TYPE_INVITE
+        );
+    }
+
+    /**
+     * Creates a notification for a lottery loss.
+     */
+    public static Notification createLotteryLoss(String senderId, String senderName, String receiverId, String eventName) {
+        return new Notification(
+                null,
+                "Lottery Results",
+                senderId,
+                senderName,
+                UserRole.ORGANIZER,
+                receiverId,
+                new Date(),
+                "We regret to inform you that you were not selected for " + eventName + " this time. Better luck next time!",
+                TYPE_GENERAL
+        );
+    }
+
+    /**
+     * Creates a notification for a waiting list invite.
+     */
+    public static Notification createWaitingListInvite(String senderId, String senderName, String receiverId, String eventName) {
+        return new Notification(
+                null,
+                "Wait List Invite",
+                senderId,
+                senderName,
+                UserRole.ORGANIZER,
+                receiverId,
+                new Date(),
+                "You have been invited to join the waiting list for the private event: " + eventName + ".",
+                TYPE_INVITE
+        );
+    }
+
+    /**
+     * Creates a notification for a co-organizer invite.
+     */
+    public static Notification createCoOrganizerInvite(String senderId, String senderName, String receiverId, String eventName) {
+        return new Notification(
+                null,
+                "Co-Organizer Invite",
+                senderId,
+                senderName,
+                UserRole.ORGANIZER,
+                receiverId,
+                new Date(),
+                senderName + " has invited you to be a co-organizer for " + eventName + ".",
+                TYPE_INVITE
+        );
+    }
+
+    /**
      * Sends this notification using the internal DatabaseHandler.
      *
      * @return A Task representing the asynchronous send operation.
