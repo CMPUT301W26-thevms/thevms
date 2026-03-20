@@ -34,6 +34,8 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 
 import java.util.Date;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -272,6 +274,44 @@ public class InboxTest {
             // 6. Verify Database state: Entrant should NOT be in the event waitlist
             String status = Tasks.await(testHelper.getDbHandler().getEntrantStatus(eventId, deviceId), 5, TimeUnit.SECONDS);
             assertEquals(null, status);
+        }
+    }
+
+    @Test
+    public void testWaitListInviteAcceptFlow() throws Exception {
+        String eventId = "999";
+        String eventName = "Waitlist Accept Event";
+
+        // 1. Seed the event in the database so the fragment can find it
+        Map<String, Object> eventData = new HashMap<>();
+        eventData.put("eventId", 999L);
+        eventData.put("name", eventName);
+        Tasks.await(testHelper.getDbHandler().getDb().collection(DatabaseHandler.COLLECTION_EVENTS)
+                .document(eventId).set(eventData), 5, TimeUnit.SECONDS);
+
+        // 2. Seed 'Wait List Invite' notification
+        Notification invite = Notification.createWaitingListInvite("org_1", "Organizer", deviceId, eventId, eventName);
+        seedNotification(invite);
+
+        try (ActivityScenario<MainActivity> scenario = ActivityScenario.launch(MainActivity.class)) {
+            // 3. Navigate to Inbox
+            waitForView(withId(R.id.nav_inbox), 5000);
+            onView(withId(R.id.nav_inbox)).perform(click());
+
+            // 4. Verify notification and buttons are visible
+            waitForView(withText("Wait List Invite"), 5000);
+            onView(withText("Accept")).check(matches(isDisplayed()));
+
+            // 5. Click Accept
+            onView(withText("Accept")).perform(click());
+
+            // 6. Verify notification is removed from UI
+            waitForView(withText("No Notifications"), 5000);
+            onView(withText("Wait List Invite")).check(matches(not(isDisplayed())));
+
+            // 7. Verify Database state: Entrant status should be 'waiting'
+            String status = Tasks.await(testHelper.getDbHandler().getEntrantStatus(eventId, deviceId), 5, TimeUnit.SECONDS);
+            assertEquals(DatabaseHandler.STATUS_WAITING, status);
         }
     }
 }
