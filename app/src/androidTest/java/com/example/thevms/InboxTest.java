@@ -243,4 +243,35 @@ public class InboxTest {
             assertEquals(DatabaseHandler.STATUS_ACCEPTED, status);
         }
     }
+
+    @Test
+    public void testWaitListInviteRejectionFlow() throws Exception {
+        String eventId = "test_event_waitlist_reject";
+        String eventName = "Waitlist Reject Event";
+
+        // 1. Seed 'Wait List Invite' notification
+        Notification invite = Notification.createWaitingListInvite("org_1", "Organizer", deviceId, eventId, eventName);
+        seedNotification(invite);
+
+        try (ActivityScenario<MainActivity> scenario = ActivityScenario.launch(MainActivity.class)) {
+            // 2. Navigate to Inbox
+            waitForView(withId(R.id.nav_inbox), 5000);
+            onView(withId(R.id.nav_inbox)).perform(click());
+
+            // 3. Verify notification and buttons are visible
+            waitForView(withText("Wait List Invite"), 5000);
+            onView(withText("Reject")).check(matches(isDisplayed()));
+
+            // 4. Click Reject
+            onView(withText("Reject")).perform(click());
+
+            // 5. Verify notification is removed from UI
+            waitForView(withText("No Notifications"), 5000);
+            onView(withText("Wait List Invite")).check(matches(not(isDisplayed())));
+
+            // 6. Verify Database state: Entrant should NOT be in the event waitlist
+            String status = Tasks.await(testHelper.getDbHandler().getEntrantStatus(eventId, deviceId), 5, TimeUnit.SECONDS);
+            assertEquals(null, status);
+        }
+    }
 }
