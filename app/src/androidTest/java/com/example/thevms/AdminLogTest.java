@@ -116,10 +116,62 @@ public class AdminLogTest {
             onView(withText(description)).check(matches(isDisplayed()));
 
             // Verify buttons are hidden (Admin Logs are read-only)
-            // Use not(isDisplayed()) because the views exist in the hierarchy but are set to GONE
             onView(withId(R.id.btn_delete_notification)).check(matches(not(isDisplayed())));
             onView(withId(R.id.btn_accept)).check(matches(not(isDisplayed())));
             onView(withId(R.id.btn_reject)).check(matches(not(isDisplayed())));
+        }
+    }
+
+    @Test
+    public void testMultipleLogsDisplay() throws Exception {
+        // Seed first notification for User 1
+        Notification log1 = new Notification(
+                null,
+                "User 1 Title",
+                "sender_id",
+                "Organizer 1",
+                UserRole.ORGANIZER,
+                "user1_id",
+                "Recipient 1",
+                new Date(System.currentTimeMillis() - 1000),
+                "Message 1",
+                Notification.TYPE_GENERAL,
+                null
+        );
+        seedNotification(log1);
+
+        // Seed second notification for User 2
+        Notification log2 = new Notification(
+                null,
+                "User 2 Title",
+                "sender_id",
+                "Organizer 2",
+                UserRole.ORGANIZER,
+                "user2_id",
+                "Recipient 2",
+                new Date(),
+                "Message 2",
+                Notification.TYPE_GENERAL,
+                null
+        );
+        seedNotification(log2);
+
+        try (ActivityScenario<MainActivity> scenario = ActivityScenario.launch(MainActivity.class)) {
+            // Navigate to Admin Panel
+            waitForView(withId(R.id.nav_admin_settings), 5000);
+            onView(withId(R.id.nav_admin_settings)).perform(click());
+
+            // Click View Logs
+            waitForView(withText("View Logs"), 2000);
+            onView(withText("View Logs")).perform(click());
+
+            // Verify both logs are displayed
+            waitForView(withText("User 1 Title"), 5000);
+            onView(withText("User 1 Title")).check(matches(isDisplayed()));
+            onView(withText(containsString("Recipient 1"))).check(matches(isDisplayed()));
+
+            onView(withText("User 2 Title")).check(matches(isDisplayed()));
+            onView(withText(containsString("Recipient 2"))).check(matches(isDisplayed()));
         }
     }
 }
