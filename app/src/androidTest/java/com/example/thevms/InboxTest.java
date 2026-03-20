@@ -130,6 +130,9 @@ public class InboxTest {
             onView(withText(containsString("ADMIN"))).check(matches(isDisplayed()));
             onView(withText("This is a welcome notification message.")).check(matches(isDisplayed()));
 
+            // Verify the 'To' field is HIDDEN in the Inbox
+            onView(withId(R.id.notification_to)).check(matches(not(isDisplayed())));
+
             // Check for the presence of the delete button
             onView(withId(R.id.btn_delete_notification)).check(matches(isDisplayed()));
         }
