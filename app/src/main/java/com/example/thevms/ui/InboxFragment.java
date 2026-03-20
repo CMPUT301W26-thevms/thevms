@@ -150,20 +150,29 @@ public class InboxFragment extends Fragment {
                 notification.delete();
             }
         } else {
-            // Reject logic
-            if ("Lottery Results".equals(notification.getTitle())) {
-                // Update status to 'declined' (so organizer can redraw)
-                java.util.Map<String, Object> data = new java.util.HashMap<>();
-                data.put("status", DatabaseHandler.STATUS_DECLINED);
-                dbHandler.updateEntrantStatus(eventId, deviceId, data)
-                        .addOnSuccessListener(aVoid -> {
-                            Toast.makeText(getContext(), "Invitation declined.", Toast.LENGTH_SHORT).show();
-                            notification.delete();
-                        });
-            } else {
-                Toast.makeText(getContext(), "Rejected: " + notification.getTitle(), Toast.LENGTH_SHORT).show();
-                notification.delete();
-            }
+            performRejectLogic(notification);
+        }
+    }
+
+    /**
+     * Performs the common rejection logic for a notification.
+     *
+     * @param notification The notification to reject.
+     */
+    private void performRejectLogic(Notification notification) {
+        String eventId = notification.getEventId();
+        if (eventId != null && "Lottery Results".equals(notification.getTitle())) {
+            // Update status to 'declined' (so organizer can redraw)
+            java.util.Map<String, Object> data = new java.util.HashMap<>();
+            data.put("status", DatabaseHandler.STATUS_DECLINED);
+            dbHandler.updateEntrantStatus(eventId, deviceId, data)
+                    .addOnSuccessListener(aVoid -> {
+                        Toast.makeText(getContext(), "Invitation declined.", Toast.LENGTH_SHORT).show();
+                        notification.delete();
+                    });
+        } else {
+            Toast.makeText(getContext(), "Notification removed.", Toast.LENGTH_SHORT).show();
+            notification.delete();
         }
     }
 
@@ -190,15 +199,19 @@ public class InboxFragment extends Fragment {
         btnCancel.setOnClickListener(v -> dialog.dismiss());
 
         btnDelete.setOnClickListener(v -> {
-            notification.delete()
-                    .addOnSuccessListener(aVoid -> {
-                        Toast.makeText(getContext(), "Notification deleted", Toast.LENGTH_SHORT).show();
-                        dialog.dismiss();
-                    })
-                    .addOnFailureListener(e -> {
-                        Toast.makeText(getContext(), "Failed to delete: " + e.getMessage(), Toast.LENGTH_SHORT).show();
-                        dialog.dismiss();
-                    });
+            if (Notification.TYPE_INVITE.equals(notification.getType())) {
+                // If deleting an invite, treat it as a rejection
+                performRejectLogic(notification);
+            } else {
+                notification.delete()
+                        .addOnSuccessListener(aVoid -> {
+                            Toast.makeText(getContext(), "Notification deleted", Toast.LENGTH_SHORT).show();
+                        })
+                        .addOnFailureListener(e -> {
+                            Toast.makeText(getContext(), "Failed to delete: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+                        });
+            }
+            dialog.dismiss();
         });
 
         dialog.show();
