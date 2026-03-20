@@ -23,7 +23,6 @@ public class Notification {
     private String description;
     private String type;
     private String eventId;
-    private boolean isRead;
 
     @Exclude // Exclude is used so that it is not saved to the DB
     private final DatabaseHandler dbHandler;
@@ -33,7 +32,6 @@ public class Notification {
      */
     public Notification() {
         this.dbHandler = new DatabaseHandler();
-        this.isRead = false;
         this.type = TYPE_GENERAL;
     }
 
@@ -79,7 +77,6 @@ public class Notification {
         this.description = description;
         this.type = type;
         this.eventId = eventId;
-        this.isRead = false;
     }
 
     /**
@@ -250,13 +247,5 @@ public class Notification {
 
     public void setEventId(String eventId) {
         this.eventId = eventId;
-    }
-
-    public boolean isRead() {
-        return isRead;
-    }
-
-    public void setRead(boolean read) {
-        isRead = read;
     }
 }
