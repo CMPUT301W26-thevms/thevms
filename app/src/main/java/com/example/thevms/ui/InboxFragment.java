@@ -47,8 +47,8 @@ public class InboxFragment extends Fragment {
     private DatabaseHandler dbHandler;
     private ListenerRegistration notificationsListener;
     private String deviceId;
-    private MaterialButton btnTestNotification;
-    private MaterialButton btnTestInvite;
+    private MaterialButton btnCycleTestNotifications;
+    private int testCycleIndex = 0;
     private boolean isInitialLoad = true;
 
     public InboxFragment() {
@@ -65,8 +65,7 @@ public class InboxFragment extends Fragment {
         recyclerView = view.findViewById(R.id.notifications_recycler_view);
         emptyInboxText = view.findViewById(R.id.empty_inbox_text);
         swipeRefreshLayout = view.findViewById(R.id.swipe_refresh_layout);
-        btnTestNotification = view.findViewById(R.id.btn_test_notification);
-        btnTestInvite = view.findViewById(R.id.btn_test_invite);
+        btnCycleTestNotifications = view.findViewById(R.id.btn_test_notification);
 
         dbHandler = new DatabaseHandler();
         deviceId = Settings.Secure.getString(requireContext().getContentResolver(), Settings.Secure.ANDROID_ID);
@@ -142,6 +141,9 @@ public class InboxFragment extends Fragment {
                             Toast.makeText(getContext(), "Invitation accepted!", Toast.LENGTH_SHORT).show();
                             notification.delete();
                         });
+            } else if ("Co-Organizer Invite".equals(notification.getTitle())) {
+                Toast.makeText(getContext(), "Accepted Co-Organizer Invite!", Toast.LENGTH_SHORT).show();
+                notification.delete();
             } else {
                 // Generic accept
                 Toast.makeText(getContext(), "Accepted: " + notification.getTitle(), Toast.LENGTH_SHORT).show();
@@ -203,36 +205,33 @@ public class InboxFragment extends Fragment {
     }
 
     private void setupTestButtons() {
-        btnTestNotification.setOnClickListener(v -> {
-            Notification testNotif = new Notification(
-                    null,
-                    "Test Notification",
-                    deviceId,
-                    "Test System",
-                    UserRole.ADMIN,
-                    deviceId,
-                    new Date(),
-                    "This is a test notification sent to yourself to verify the inbox functionality."
-            );
+        btnCycleTestNotifications.setOnClickListener(v -> {
+            Notification testNotif;
+            String eventName = "Summer Gala";
+            String eventId = "123";
+
+            switch (testCycleIndex % 5) {
+                case 0:
+                    testNotif = Notification.createLotteryWin(deviceId, "Organizer", deviceId, eventId, eventName);
+                    break;
+                case 1:
+                    testNotif = Notification.createLotteryLoss(deviceId, "Organizer", deviceId, eventId, eventName);
+                    break;
+                case 2:
+                    testNotif = Notification.createWaitingListInvite(deviceId, "Organizer", deviceId, eventId, eventName);
+                    break;
+                case 3:
+                    testNotif = Notification.createCoOrganizerInvite(deviceId, "Organizer", deviceId, eventId, eventName);
+                    break;
+                default:
+                    testNotif = new Notification(null, "General Update", deviceId, "System", UserRole.ADMIN, deviceId, new Date(), "This is a simple system update.");
+                    break;
+            }
 
             testNotif.send()
                     .addOnSuccessListener(aVoid -> {
-                        Toast.makeText(getContext(), "Test notification sent!", Toast.LENGTH_SHORT).show();
-                    })
-                    .addOnFailureListener(e -> {
-                        Toast.makeText(getContext(), "Failed to send: " + e.getMessage(), Toast.LENGTH_SHORT).show();
-                    });
-        });
-
-        btnTestInvite.setOnClickListener(v -> {
-            // Using a dummy event ID for testing
-            Notification testInvite = Notification.createWaitingListInvite(
-                    deviceId, "Test Organizer", deviceId, "123", "Secret Gala"
-            );
-
-            testInvite.send()
-                    .addOnSuccessListener(aVoid -> {
-                        Toast.makeText(getContext(), "Test invite sent!", Toast.LENGTH_SHORT).show();
+                        Toast.makeText(getContext(), "Sent test notif type: " + testCycleIndex % 5, Toast.LENGTH_SHORT).show();
+                        testCycleIndex++;
                     })
                     .addOnFailureListener(e -> {
                         Toast.makeText(getContext(), "Failed to send: " + e.getMessage(), Toast.LENGTH_SHORT).show();
