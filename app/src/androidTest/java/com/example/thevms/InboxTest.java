@@ -212,4 +212,35 @@ public class InboxTest {
             assertEquals(DatabaseHandler.STATUS_DECLINED, status);
         }
     }
+
+    @Test
+    public void testLotteryAcceptFlow() throws Exception {
+        String eventId = "test_event_456";
+        String eventName = "Accepted Event";
+        
+        // 1. Seed 'Lottery Results' notification
+        Notification invite = Notification.createLotteryWin("org_1", "Organizer", deviceId, eventId, eventName);
+        seedNotification(invite);
+
+        try (ActivityScenario<MainActivity> scenario = ActivityScenario.launch(MainActivity.class)) {
+            // 2. Navigate to Inbox
+            waitForView(withId(R.id.nav_inbox), 5000);
+            onView(withId(R.id.nav_inbox)).perform(click());
+
+            // 3. Verify notification and buttons are visible
+            waitForView(withText("Lottery Results"), 5000);
+            onView(withText("Accept")).check(matches(isDisplayed()));
+
+            // 4. Click Accept
+            onView(withText("Accept")).perform(click());
+
+            // 5. Verify notification is removed from UI
+            waitForView(withText("No Notifications"), 5000);
+            onView(withText("Lottery Results")).check(matches(not(isDisplayed())));
+
+            // 6. Verify Database state: Entrant status should be 'accepted'
+            String status = Tasks.await(testHelper.getDbHandler().getEntrantStatus(eventId, deviceId), 5, TimeUnit.SECONDS);
+            assertEquals(DatabaseHandler.STATUS_ACCEPTED, status);
+        }
+    }
 }
