@@ -46,6 +46,7 @@ public class InboxTest {
 
     private FirestoreTestHelper testHelper;
     private String deviceId;
+    private final String TEST_USER_NAME = "Test User";
 
     @Before
     public void setUp() throws Exception {
@@ -103,14 +104,17 @@ public class InboxTest {
     @Test
     public void testNotificationFieldsDisplayCorrectly() throws Exception {
         Notification notification = new Notification(
-                "test_notif_id",
+                null,
                 "Welcome Title",
                 "system_id",
                 "System Admin",
                 UserRole.ADMIN,
                 deviceId,
+                TEST_USER_NAME,
                 new Date(),
-                "This is a welcome notification message."
+                "This is a welcome notification message.",
+                Notification.TYPE_GENERAL,
+                null
         );
         seedNotification(notification);
 
@@ -134,14 +138,17 @@ public class InboxTest {
     @Test
     public void testDeleteNotificationConfirmationAndExecution() throws Exception {
         Notification notification = new Notification(
-                "test_notif_id",
+                null,
                 "Welcome Title",
                 "system_id",
                 "System Admin",
                 UserRole.ADMIN,
                 deviceId,
+                TEST_USER_NAME,
                 new Date(),
-                "This is a welcome notification message."
+                "This is a welcome notification message.",
+                Notification.TYPE_GENERAL,
+                null
         );
         seedNotification(notification);
 
@@ -189,7 +196,7 @@ public class InboxTest {
         String eventName = "Test Event";
         
         // 1. Seed 'Lottery Results' notification (Win type to get buttons)
-        Notification invite = Notification.createLotteryWin("org_1", "Organizer", deviceId, eventId, eventName);
+        Notification invite = Notification.createLotteryWin("org_1", "Organizer", deviceId, TEST_USER_NAME, eventId, eventName);
         seedNotification(invite);
 
         try (ActivityScenario<MainActivity> scenario = ActivityScenario.launch(MainActivity.class)) {
@@ -221,7 +228,7 @@ public class InboxTest {
         String eventName = "Accepted Event";
         
         // 1. Seed 'Lottery Results' notification
-        Notification invite = Notification.createLotteryWin("org_1", "Organizer", deviceId, eventId, eventName);
+        Notification invite = Notification.createLotteryWin("org_1", "Organizer", deviceId, TEST_USER_NAME, eventId, eventName);
         seedNotification(invite);
 
         try (ActivityScenario<MainActivity> scenario = ActivityScenario.launch(MainActivity.class)) {
@@ -252,7 +259,7 @@ public class InboxTest {
         String eventName = "Waitlist Reject Event";
 
         // 1. Seed 'Wait List Invite' notification
-        Notification invite = Notification.createWaitingListInvite("org_1", "Organizer", deviceId, eventId, eventName);
+        Notification invite = Notification.createWaitingListInvite("org_1", "Organizer", deviceId, TEST_USER_NAME, eventId, eventName);
         seedNotification(invite);
 
         try (ActivityScenario<MainActivity> scenario = ActivityScenario.launch(MainActivity.class)) {
@@ -290,7 +297,7 @@ public class InboxTest {
                 .document(eventId).set(eventData), 5, TimeUnit.SECONDS);
 
         // 2. Seed 'Wait List Invite' notification
-        Notification invite = Notification.createWaitingListInvite("org_1", "Organizer", deviceId, eventId, eventName);
+        Notification invite = Notification.createWaitingListInvite("org_1", "Organizer", deviceId, TEST_USER_NAME, eventId, eventName);
         seedNotification(invite);
 
         try (ActivityScenario<MainActivity> scenario = ActivityScenario.launch(MainActivity.class)) {
