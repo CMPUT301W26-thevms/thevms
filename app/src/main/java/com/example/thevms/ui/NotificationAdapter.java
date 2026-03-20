@@ -74,7 +74,7 @@ public class NotificationAdapter extends RecyclerView.Adapter<NotificationAdapte
     }
 
     class NotificationViewHolder extends RecyclerView.ViewHolder {
-        TextView title, from, description, time;
+        TextView title, from, to, description, time;
         ImageButton btnDelete;
         LinearLayout inviteActionsContainer;
         MaterialButton btnAccept, btnReject;
@@ -83,6 +83,7 @@ public class NotificationAdapter extends RecyclerView.Adapter<NotificationAdapte
             super(itemView);
             title = itemView.findViewById(R.id.notification_title);
             from = itemView.findViewById(R.id.notification_from);
+            to = itemView.findViewById(R.id.notification_to);
             description = itemView.findViewById(R.id.notification_description);
             time = itemView.findViewById(R.id.notification_time);
             btnDelete = itemView.findViewById(R.id.btn_delete_notification);
@@ -104,8 +105,18 @@ public class NotificationAdapter extends RecyclerView.Adapter<NotificationAdapte
             if (isReadOnly) {
                 btnDelete.setVisibility(View.GONE);
                 inviteActionsContainer.setVisibility(View.GONE);
+                
+                // Admin logs view: show who the notification was sent to
+                if (notification.getReceiverName() != null) {
+                    to.setVisibility(View.VISIBLE);
+                    to.setText("To: " + notification.getReceiverName());
+                } else {
+                    to.setVisibility(View.GONE);
+                }
             } else {
                 btnDelete.setVisibility(View.VISIBLE);
+                to.setVisibility(View.GONE); // Inbox view: don't show recipient
+
                 btnDelete.setOnClickListener(v -> {
                     if (deleteListener != null) {
                         deleteListener.onDelete(notification);
