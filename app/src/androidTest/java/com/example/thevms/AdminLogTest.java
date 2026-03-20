@@ -174,4 +174,25 @@ public class AdminLogTest {
             onView(withText(containsString("Recipient 2"))).check(matches(isDisplayed()));
         }
     }
+
+    @Test
+    public void testNoLogsDisplay() throws Exception {
+        try (ActivityScenario<MainActivity> scenario = ActivityScenario.launch(MainActivity.class)) {
+            // Navigate to Admin Panel
+            waitForView(withId(R.id.nav_admin_settings), 5000);
+            onView(withId(R.id.nav_admin_settings)).perform(click());
+
+            // Click View Logs
+            waitForView(withText("View Logs"), 2000);
+            onView(withText("View Logs")).perform(click());
+
+            // Verify empty state is shown
+            waitForView(withId(R.id.empty_logs_text), 5000);
+            onView(withId(R.id.empty_logs_text)).check(matches(isDisplayed()));
+            onView(withText("No logs found")).check(matches(isDisplayed()));
+
+            // Verify recycler view is hidden
+            onView(withId(R.id.logs_recycler_view)).check(matches(not(isDisplayed())));
+        }
+    }
 }
