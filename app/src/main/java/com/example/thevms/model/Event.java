@@ -16,7 +16,7 @@ import java.util.Map;
  *
  * <p><b>Creation Workflow:</b></p>
  * <ol>
- *     <li>Call the static {@link #create(String, String, Organizer, String, String, Date, Date, Date, Date, boolean, Double, Location)} method.</li>
+ *     <li>Call the static {@link #create(String, String, Organizer, String, String, Date, Date, Date, Date, boolean, Double, Location, boolean)} method.</li>
  *     <li>This method asynchronously fetches a unique ID from the database.</li>
  *     <li>It then returns a {@code Task<Event>}. You use an {@code .addOnSuccessListener} to get the in-memory Event object.</li>
  *     <li>The created object does NOT yet exist in the database.</li>
@@ -32,7 +32,7 @@ import java.util.Map;
  * <pre>
  * {@code
  * // 1. Create the event in memory (gets a unique ID async)
- * Event.create(name, desc, org, loc, imgUrl, date, date, date, date, geolocationRequired, radius, geoLocation)
+ * Event.create(name, desc, org, loc, imgUrl, date, date, date, date, geolocationRequired, radius, geoLocation, isPrivate)
  *      .addOnSuccessListener(event -> {
  *          // 2. Save the event to the database
  *          event.save()
@@ -71,6 +71,7 @@ public class Event {
     private HashMap<Entrant, Boolean> entrantList;
     private long entrantCount = 0;
     private Double radius = 0.0;
+    private boolean isPrivate;
 
     /**
      * Private constructor for the Event class.
@@ -89,8 +90,9 @@ public class Event {
      * @param geolocationRequired   Whether joining requires being within a certain distance.
      * @param radius                The allowed distance radius (in kilometers).
      * @param geoLocation           The actual GPS coordinates (Latitude/Longitude) of the event.
+     * @param isPrivate             Whether the event is private and hidden from search.
      */
-    private Event(Long eventId, String name, String description, Organizer organizer, String location, String imageUrl, Date registrationStartTime, Date registrationEndTime, Date eventStartTime, Date eventEndTime, boolean geolocationRequired, Double radius, Location geoLocation) {
+    private Event(Long eventId, String name, String description, Organizer organizer, String location, String imageUrl, Date registrationStartTime, Date registrationEndTime, Date eventStartTime, Date eventEndTime, boolean geolocationRequired, Double radius, Location geoLocation, boolean isPrivate) {
         this.dbHandler = new DatabaseHandler();
         this.eventId = eventId;
         this.name = name;
@@ -108,6 +110,7 @@ public class Event {
         this.geolocationRequired = geolocationRequired;
         this.radius = radius;
         this.geoLocation = geoLocation;
+        this.isPrivate = isPrivate;
     }
 
     /**
@@ -132,14 +135,15 @@ public class Event {
      * @param geolocationRequired   Boolean flag for geofencing.
      * @param radius                The radius limit for joining (in km).
      * @param geoLocation           The {@link Location} object containing coordinates.
+     * @param isPrivate             Boolean flag for event privacy.
      * @return A {@code Task<Event>} that, upon completion, will contain the fully initialized Event object.
      */
-    public static Task<Event> create(String name, String description, Organizer organizer, String location, String imageUrl, Date registrationStartTime, Date registrationEndTime, Date eventStartTime, Date eventEndTime, boolean geolocationRequired, Double radius, Location geoLocation) {
+    public static Task<Event> create(String name, String description, Organizer organizer, String location, String imageUrl, Date registrationStartTime, Date registrationEndTime, Date eventStartTime, Date eventEndTime, boolean geolocationRequired, Double radius, Location geoLocation, boolean isPrivate) {
         DatabaseHandler dbHandler = new DatabaseHandler();
         return dbHandler.getNextEventId().continueWith(task -> {
             if (task.isSuccessful()) {
                 Long eventId = task.getResult();
-                return new Event(eventId, name, description, organizer, location, imageUrl, registrationStartTime, registrationEndTime, eventStartTime, eventEndTime, geolocationRequired, radius, geoLocation);
+                return new Event(eventId, name, description, organizer, location, imageUrl, registrationStartTime, registrationEndTime, eventStartTime, eventEndTime, geolocationRequired, radius, geoLocation, isPrivate);
             } else {
                 throw task.getException();
             }
@@ -187,6 +191,7 @@ public class Event {
         Date eventEnd = toDate(data.get("eventEndTime"));
         Boolean geoRequired = data.get("geolocationRequired") instanceof Boolean ? (Boolean) data.get("geolocationRequired") : false;
         Double radius = data.get("radius") instanceof Double ? (Double) data.get("radius") : 0.0;
+        Boolean isPrivate = data.get("isPrivate") instanceof Boolean ? (Boolean) data.get("isPrivate") : false;
         
         Location geoLocation = null;
         if (data.containsKey("latitude") && data.get("latitude") != null && data.containsKey("longitude") && data.get("longitude") != null) {
@@ -195,7 +200,7 @@ public class Event {
             geoLocation.setLongitude((Double) data.get("longitude"));
         }
 
-        Event event = new Event(id, name, desc, organizer, location, img, regStart, regEnd, eventStart, eventEnd, geoRequired != null && geoRequired, radius, geoLocation);
+        Event event = new Event(id, name, desc, organizer, location, img, regStart, regEnd, eventStart, eventEnd, geoRequired != null && geoRequired, radius, geoLocation, isPrivate != null && isPrivate);
 
         if (data.containsKey("maxAttendees") && data.get("maxAttendees") != null) {
             event.setMaxAttendees(((Long) data.get("maxAttendees")).intValue());
@@ -264,6 +269,7 @@ public class Event {
         }
         map.put("maxAttendees", maxAttendees);
         map.put("limitDistance", limitDistance);
+        map.put("isPrivate", isPrivate);
         return map;
     }
 
@@ -531,4 +537,16 @@ public class Event {
      * @param limitDistance The new limit distance.
      */
     public void setLimitDistance(Double limitDistance) { this.limitDistance = limitDistance; }
+
+    /**
+     * Checks if the event is private.
+     * @return True if private, false otherwise.
+     */
+    public boolean isPrivate() { return isPrivate; }
+
+    /**
+     * Sets the privacy of the event.
+     * @param isPrivate True to make private, false otherwise.
+     */
+    public void setPrivate(boolean isPrivate) { this.isPrivate = isPrivate; }
 }
