@@ -9,6 +9,7 @@ import static androidx.test.espresso.matcher.ViewMatchers.withId;
 import static androidx.test.espresso.matcher.ViewMatchers.withText;
 import static org.hamcrest.Matchers.allOf;
 import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.not;
 
 import android.content.Context;
 import android.provider.Settings;
@@ -84,22 +85,22 @@ public class HistoryTabTest {
     /**
      * Sets up the database with a specific user role and an event they have joined.
      */
-    private void setupTestEnvironment(UserRole role) throws Exception {
+    private void setupTestEnvironment(UserRole role, String status) throws Exception {
         // Seed the user with the given role
         Entrant user = new Entrant(deviceId, "test@example.com", "Test", "User", "1234567890", true, role);
         Tasks.await(user.save(), 10, TimeUnit.SECONDS);
 
-        // Seed an event and add this user to it with 'selected' status
+        // Seed an event and add this user to it with specific status
         Organizer org = new Organizer("org_id", "org@test.com", "Event", "Creator", null);
         Event event = Tasks.await(Event.create(
-                "Joined Event", "Desc", org, null, null,
+                "Joined Event", "This is a detailed description of the event.", org, null, null,
                 new Date(), new Date(System.currentTimeMillis() + 86400000),
                 new Date(), new Date(System.currentTimeMillis() + 3600000), false, null, null));
         Tasks.await(event.save(), 10, TimeUnit.SECONDS);
 
         Map<String, Object> regData = new HashMap<>();
         regData.put("entrantId", deviceId);
-        regData.put("status", "selected");
+        regData.put("status", status);
         Tasks.await(testHelper.getDbHandler().updateEntrantStatus(
                 String.valueOf(event.getEventId()), deviceId, regData), 10, TimeUnit.SECONDS);
 
@@ -111,19 +112,19 @@ public class HistoryTabTest {
 
     @Test
     public void testHistoryTab_Entrant_ShowsJoinedEvents() throws Exception {
-        setupTestEnvironment(UserRole.ENTRANT);
+        setupTestEnvironment(UserRole.ENTRANT, "waiting");
         verifyJoinedEventVisible();
     }
 
     @Test
     public void testHistoryTab_Organizer_ShowsJoinedEvents() throws Exception {
-        setupTestEnvironment(UserRole.ORGANIZER);
+        setupTestEnvironment(UserRole.ORGANIZER, "waiting");
         verifyJoinedEventVisible();
     }
 
     @Test
     public void testHistoryTab_Admin_ShowsJoinedEvents() throws Exception {
-        setupTestEnvironment(UserRole.ADMIN);
+        setupTestEnvironment(UserRole.ADMIN, "waiting");
         verifyJoinedEventVisible();
     }
 
@@ -138,19 +139,19 @@ public class HistoryTabTest {
 
     @Test
     public void testHistoryTab_Entrant_AcceptInvitation() throws Exception {
-        setupTestEnvironment(UserRole.ENTRANT);
+        setupTestEnvironment(UserRole.ENTRANT, "selected");
         performAcceptAction();
     }
 
     @Test
     public void testHistoryTab_Organizer_AcceptInvitation() throws Exception {
-        setupTestEnvironment(UserRole.ORGANIZER);
+        setupTestEnvironment(UserRole.ORGANIZER, "selected");
         performAcceptAction();
     }
 
     @Test
     public void testHistoryTab_Admin_AcceptInvitation() throws Exception {
-        setupTestEnvironment(UserRole.ADMIN);
+        setupTestEnvironment(UserRole.ADMIN, "selected");
         performAcceptAction();
     }
 
@@ -174,19 +175,19 @@ public class HistoryTabTest {
 
     @Test
     public void testHistoryTab_Entrant_DeclineInvitation() throws Exception {
-        setupTestEnvironment(UserRole.ENTRANT);
+        setupTestEnvironment(UserRole.ENTRANT, "selected");
         performDeclineAction();
     }
 
     @Test
     public void testHistoryTab_Organizer_DeclineInvitation() throws Exception {
-        setupTestEnvironment(UserRole.ORGANIZER);
+        setupTestEnvironment(UserRole.ORGANIZER, "selected");
         performDeclineAction();
     }
 
     @Test
     public void testHistoryTab_Admin_DeclineInvitation() throws Exception {
-        setupTestEnvironment(UserRole.ADMIN);
+        setupTestEnvironment(UserRole.ADMIN, "selected");
         performDeclineAction();
     }
 
@@ -201,5 +202,76 @@ public class HistoryTabTest {
 
         onView(withId(R.id.rv_my_events))
                 .check(matches(hasDescendant(allOf(withId(R.id.event_status_info), withText(containsString("Declined"))))));
+    }
+
+    // --- Base Test 4: LeaveEvent ---
+
+    @Test
+    public void testHistoryTab_Entrant_LeaveEvent() throws Exception {
+        setupTestEnvironment(UserRole.ENTRANT, "waiting");
+        performLeaveAction();
+    }
+
+    @Test
+    public void testHistoryTab_Organizer_LeaveEvent() throws Exception {
+        setupTestEnvironment(UserRole.ORGANIZER, "waiting");
+        performLeaveAction();
+    }
+
+    @Test
+    public void testHistoryTab_Admin_LeaveEvent() throws Exception {
+        setupTestEnvironment(UserRole.ADMIN, "waiting");
+        performLeaveAction();
+    }
+
+    private void performLeaveAction() throws InterruptedException {
+        onView(withId(R.id.nav_favorites)).perform(click());
+        Thread.sleep(2000);
+
+        onView(withId(R.id.rv_my_events))
+                .perform(RecyclerViewActions.actionOnItemAtPosition(0, clickChildViewWithId(R.id.btn_leave_event)));
+
+        Thread.sleep(2000);
+
+        // Verification: The status should update to "Not joined"
+        onView(withId(R.id.rv_my_events))
+                .check(matches(hasDescendant(allOf(withId(R.id.event_status_info), withText(containsString("Not joined"))))));
+    }
+
+    // --- Base Test 5: ExpandDetails ---
+
+    @Test
+    public void testHistoryTab_Entrant_ExpandDetails() throws Exception {
+        setupTestEnvironment(UserRole.ENTRANT, "waiting");
+        performExpandAction();
+    }
+
+    @Test
+    public void testHistoryTab_Organizer_ExpandDetails() throws Exception {
+        setupTestEnvironment(UserRole.ORGANIZER, "waiting");
+        performExpandAction();
+    }
+
+    @Test
+    public void testHistoryTab_Admin_ExpandDetails() throws Exception {
+        setupTestEnvironment(UserRole.ADMIN, "waiting");
+        performExpandAction();
+    }
+
+    private void performExpandAction() throws InterruptedException {
+        onView(withId(R.id.nav_favorites)).perform(click());
+        Thread.sleep(2000);
+
+        // Initially description should not be visible (hidden in expandable layout)
+        onView(withId(R.id.event_description)).check(matches(not(isDisplayed())));
+
+        onView(withId(R.id.rv_my_events))
+                .perform(RecyclerViewActions.actionOnItemAtPosition(0, clickChildViewWithId(R.id.btn_expand_details)));
+
+        Thread.sleep(1000);
+
+        // After clicking expand, the description should be visible
+        onView(withId(R.id.event_description)).check(matches(isDisplayed()));
+        onView(withText("This is a detailed description of the event.")).check(matches(isDisplayed()));
     }
 }
