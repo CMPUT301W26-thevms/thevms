@@ -24,8 +24,7 @@ public class EventTest {
                 com.example.thevms.model.Organizer.class, 
                 String.class, String.class,
                 Date.class, Date.class, Date.class, Date.class,
-                boolean.class, Double.class, android.location.Location.class,
-                boolean.class
+                boolean.class, Double.class, android.location.Location.class
         );
         constructor.setAccessible(true);
 
@@ -35,7 +34,7 @@ public class EventTest {
 
         Event event = constructor.newInstance(
                 1L, "Test Event", "Description", null, null, null,
-                futureStart, futureEnd, null, null, false, null, null, false
+                futureStart, futureEnd, null, null, false, null, null
         );
 
         Entrant entrant = new Entrant("device123", "test@example.com", "First", "Last", null);
@@ -57,8 +56,7 @@ public class EventTest {
                 com.example.thevms.model.Organizer.class,
                 String.class, String.class,
                 Date.class, Date.class, Date.class, Date.class,
-                boolean.class, Double.class, android.location.Location.class,
-                boolean.class
+                boolean.class, Double.class, android.location.Location.class
         );
         constructor.setAccessible(true);
 
@@ -68,7 +66,7 @@ public class EventTest {
 
         Event event = constructor.newInstance(
                 1L, "Test Event", "Description", null, null, null,
-                pastStart, pastEnd, null, null, false, null, null, false
+                pastStart, pastEnd, null, null, false, null, null
         );
 
 
