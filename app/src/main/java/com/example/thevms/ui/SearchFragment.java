@@ -272,11 +272,6 @@ public class SearchFragment extends Fragment {
         long oneDayMillis = 86400000L;
 
         for (Event event : allEvents) {
-            // US 02.03.01: Private events should NEVER be visible through search features
-            if (event.isPrivate()) {
-                continue;
-            }
-
             // 1. Don't show if registration start is more than a day away
             if (event.getRegistrationStartTime() != null) {
                 if (event.getRegistrationStartTime().getTime() - now > oneDayMillis) {

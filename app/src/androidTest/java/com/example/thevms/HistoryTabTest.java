@@ -101,7 +101,7 @@ public class HistoryTabTest {
         Event event = Tasks.await(Event.create(
                 "Joined Event", "This is a detailed description of the event.", org, null, null,
                 new Date(), new Date(System.currentTimeMillis() + 86400000),
-                new Date(), new Date(System.currentTimeMillis() + 3600000), false, null, null, false));
+                new Date(), new Date(System.currentTimeMillis() + 3600000), false, null, null));
         Tasks.await(event.save(), 10, TimeUnit.SECONDS);
 
         Map<String, Object> regData = new HashMap<>();
