@@ -22,9 +22,10 @@ import androidx.test.ext.junit.runners.AndroidJUnit4;
 import androidx.test.filters.LargeTest;
 import androidx.test.platform.app.InstrumentationRegistry;
 
-import com.example.thevms.model.DatabaseHandler;
+import com.example.thevms.model.Entrant;
 import com.example.thevms.model.Event;
 import com.example.thevms.model.Organizer;
+import com.example.thevms.model.UserRole;
 import com.example.thevms.ui.MainActivity;
 import com.google.android.gms.tasks.Tasks;
 
@@ -71,10 +72,6 @@ public class HistoryTabTest {
 
         Context context = InstrumentationRegistry.getInstrumentation().getTargetContext();
         deviceId = Settings.Secure.getString(context.getContentResolver(), Settings.Secure.ANDROID_ID);
-
-        seedTestData();
-
-        scenario = ActivityScenario.launch(MainActivity.class);
     }
 
     @After
@@ -84,9 +81,16 @@ public class HistoryTabTest {
         }
     }
 
-    private void seedTestData() throws Exception {
+    /**
+     * Sets up the database with a specific user role and an event they have joined.
+     */
+    private void setupTestEnvironment(UserRole role) throws Exception {
+        // Seed the user with the given role
+        Entrant user = new Entrant(deviceId, "test@example.com", "Test", "User", "1234567890", true, role);
+        Tasks.await(user.save(), 10, TimeUnit.SECONDS);
+
+        // Seed an event and add this user to it with 'selected' status
         Organizer org = new Organizer("org_id", "org@test.com", "Event", "Creator", null);
-        
         Event event = Tasks.await(Event.create(
                 "Joined Event", "Desc", org, null, null,
                 new Date(), new Date(System.currentTimeMillis() + 86400000),
@@ -98,17 +102,59 @@ public class HistoryTabTest {
         regData.put("status", "selected");
         Tasks.await(testHelper.getDbHandler().updateEntrantStatus(
                 String.valueOf(event.getEventId()), deviceId, regData), 10, TimeUnit.SECONDS);
+
+        // Launch the activity after database is prepared
+        scenario = ActivityScenario.launch(MainActivity.class);
+    }
+
+    // --- Base Test 1: ShowsJoinedEvents ---
+
+    @Test
+    public void testHistoryTab_Entrant_ShowsJoinedEvents() throws Exception {
+        setupTestEnvironment(UserRole.ENTRANT);
+        verifyJoinedEventVisible();
     }
 
     @Test
-    public void testHistoryTab_ShowsJoinedEvents() throws InterruptedException {
+    public void testHistoryTab_Organizer_ShowsJoinedEvents() throws Exception {
+        setupTestEnvironment(UserRole.ORGANIZER);
+        verifyJoinedEventVisible();
+    }
+
+    @Test
+    public void testHistoryTab_Admin_ShowsJoinedEvents() throws Exception {
+        setupTestEnvironment(UserRole.ADMIN);
+        verifyJoinedEventVisible();
+    }
+
+    private void verifyJoinedEventVisible() throws InterruptedException {
         onView(withId(R.id.nav_favorites)).perform(click());
         Thread.sleep(2000);
         onView(withText("Joined Event")).check(matches(isDisplayed()));
+        onView(withId(R.id.history_title)).check(matches(withText("Event History")));
+    }
+
+    // --- Base Test 2: AcceptInvitation ---
+
+    @Test
+    public void testHistoryTab_Entrant_AcceptInvitation() throws Exception {
+        setupTestEnvironment(UserRole.ENTRANT);
+        performAcceptAction();
     }
 
     @Test
-    public void testHistoryTab_AcceptInvitation() throws InterruptedException {
+    public void testHistoryTab_Organizer_AcceptInvitation() throws Exception {
+        setupTestEnvironment(UserRole.ORGANIZER);
+        performAcceptAction();
+    }
+
+    @Test
+    public void testHistoryTab_Admin_AcceptInvitation() throws Exception {
+        setupTestEnvironment(UserRole.ADMIN);
+        performAcceptAction();
+    }
+
+    private void performAcceptAction() throws InterruptedException {
         onView(withId(R.id.nav_favorites)).perform(click());
         Thread.sleep(2000);
 
@@ -124,8 +170,27 @@ public class HistoryTabTest {
                 .check(matches(hasDescendant(allOf(withId(R.id.event_status_info), withText(containsString("Accepted"))))));
     }
 
+    // --- Base Test 3: DeclineInvitation ---
+
     @Test
-    public void testHistoryTab_DeclineInvitation() throws InterruptedException {
+    public void testHistoryTab_Entrant_DeclineInvitation() throws Exception {
+        setupTestEnvironment(UserRole.ENTRANT);
+        performDeclineAction();
+    }
+
+    @Test
+    public void testHistoryTab_Organizer_DeclineInvitation() throws Exception {
+        setupTestEnvironment(UserRole.ORGANIZER);
+        performDeclineAction();
+    }
+
+    @Test
+    public void testHistoryTab_Admin_DeclineInvitation() throws Exception {
+        setupTestEnvironment(UserRole.ADMIN);
+        performDeclineAction();
+    }
+
+    private void performDeclineAction() throws InterruptedException {
         onView(withId(R.id.nav_favorites)).perform(click());
         Thread.sleep(2000);
 
