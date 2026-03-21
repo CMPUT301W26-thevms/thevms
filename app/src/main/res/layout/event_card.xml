@@ -56,16 +56,6 @@
                 android:textSize="16sp" />
 
             <TextView
-                android:id="@+id/event_waitlist_info"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="16dp"
-                android:text="Waitlist: 0/0"
-                android:textColor="@android:color/darker_gray"
-                android:textSize="16sp"
-                android:visibility="gone" />
-
-            <TextView
                 android:id="@+id/event_location_info"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
@@ -74,6 +64,16 @@
                 android:textColor="@android:color/darker_gray"
                 android:textSize="16sp" />
         </LinearLayout>
+
+        <TextView
+            android:id="@+id/event_waitlist_info"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:text="Waitlist: 0/0"
+            android:textColor="@android:color/darker_gray"
+            android:textSize="16sp"
+            android:visibility="gone" />
 
         <androidx.constraintlayout.widget.ConstraintLayout
             android:layout_width="match_parent"
