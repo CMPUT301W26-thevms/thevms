@@ -68,10 +68,10 @@ public class AdminEventTest {
         Date pastStart = new Date(System.currentTimeMillis() - 3600000);
         Date futureEnd = new Date(System.currentTimeMillis() + 3600000);
 
-        Event event1 = Tasks.await(Event.create("Event One", "Description One", organizer, null, null, pastStart, futureEnd, new Date(), new Date(), false, null, null), 5, TimeUnit.SECONDS);
+        Event event1 = Tasks.await(Event.create("Event One", "Description One", organizer, null, null, pastStart, futureEnd, new Date(), new Date(), false, null, null, false), 5, TimeUnit.SECONDS);
         Tasks.await(event1.save(), 5, TimeUnit.SECONDS);
 
-        Event event2 = Tasks.await(Event.create("Event Two", "Description Two", organizer, null, null, pastStart, futureEnd, new Date(), new Date(), false, null, null), 5, TimeUnit.SECONDS);
+        Event event2 = Tasks.await(Event.create("Event Two", "Description Two", organizer, null, null, pastStart, futureEnd, new Date(), new Date(), false, null, null, false), 5, TimeUnit.SECONDS);
         Tasks.await(event2.save(), 5, TimeUnit.SECONDS);
     }
 
@@ -253,7 +253,7 @@ public class AdminEventTest {
         Date eventStart = new Date(now - ninetyDaysMs + 7200000); // 2 hours later
         Date eventEnd = new Date(now - ninetyDaysMs + 10800000); // 3 hours later
 
-        Event closedEvent = Tasks.await(Event.create("Closed Event", "Registration and Event Ended Long Ago", organizer, null, null, regStart, regEnd, eventStart, eventEnd, false, null, null), 5, TimeUnit.SECONDS);
+        Event closedEvent = Tasks.await(Event.create("Closed Event", "Registration and Event Ended Long Ago", organizer, null, null, regStart, regEnd, eventStart, eventEnd, false, null, null, false), 5, TimeUnit.SECONDS);
         Tasks.await(closedEvent.save(), 5, TimeUnit.SECONDS);
 
         try (ActivityScenario<MainActivity> scenario = ActivityScenario.launch(MainActivity.class)) {
