@@ -183,21 +183,26 @@ public class SearchFragment extends Fragment {
      * @param startMin  Integer start minute.
      * @param endHour   Integer end hour.
      * @param endMin    Integer end minute.
+     * @param capacity  Integer target capacity.
      */
     @VisibleForTesting
-    public void setTestingFilters(Long startDate, Long endDate, Integer startHour, Integer startMin, Integer endHour, Integer endMin) {
+    public void setTestingFilters(Long startDate, Long endDate, Integer startHour, Integer startMin, Integer endHour, Integer endMin, Integer capacity) {
         this.startDateFilter = startDate;
         this.endDateFilter = endDate;
         this.startTimeHour = startHour;
         this.startTimeMinute = startMin;
         this.endTimeHour = endHour;
         this.endTimeMinute = endMin;
+        this.targetCapacityFilter = capacity;
 
         if (startDate != null && endDate != null) {
             filterDateRangeBtn.setText(dateFormat.format(new Date(startDate)) + " - " + dateFormat.format(new Date(endDate)));
         }
         if (startHour != null && endHour != null) {
             filterTimeRangeBtn.setText(String.format(Locale.getDefault(), "%02d:%02d - %02d:%02d", startHour, startMin, endHour, endMin));
+        }
+        if (capacity != null) {
+            filterCapacityBtn.setText("Cap: " + capacity + "±5");
         }
 
         clearFiltersBtn.setVisibility(View.VISIBLE);
