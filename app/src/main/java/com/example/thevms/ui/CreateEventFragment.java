@@ -38,7 +38,7 @@ import java.util.TimeZone;
  */
 public class CreateEventFragment extends Fragment {
 
-    private EditText etName, etLocation, etDescription;
+    private EditText etName, etLocation, etDescription, etMaxAttendees;
     private Button btnConfirm, btnCancel;
     private Button btnRegStartDate, btnRegEndDate, btnEventStartDate, btnEventEndDate;
     private Date regStartDate, regEndDate, eventStartDate, eventEndDate;
@@ -61,6 +61,7 @@ public class CreateEventFragment extends Fragment {
         etName = view.findViewById(R.id.et_event_name);
         etLocation = view.findViewById(R.id.et_event_location);
         etDescription = view.findViewById(R.id.et_event_description);
+        etMaxAttendees = view.findViewById(R.id.et_max_attendees);
         btnConfirm = view.findViewById(R.id.btn_confirm);
         btnCancel = view.findViewById(R.id.btn_cancel);
         
@@ -191,6 +192,7 @@ public class CreateEventFragment extends Fragment {
         String name = etName.getText().toString().trim();
         String locationStr = etLocation.getText().toString().trim();
         String description = etDescription.getText().toString().trim();
+        String maxAttendeesStr = etMaxAttendees.getText().toString().trim();
         boolean isGeoRequired = switchGeo.isChecked();
 
         if (name.isEmpty()) {
@@ -262,6 +264,11 @@ public class CreateEventFragment extends Fragment {
             // Updated: location is now the coordinates of the event, not the location string.
             Event.create(name, description, organizer, locationStr, null, regStartDate, regEndDate, eventStartDate, eventEndDate, isGeoRequired, radius, eventLocation)
                     .addOnSuccessListener(event -> {
+                        if (!maxAttendeesStr.isEmpty()) {
+                            try {
+                                event.setMaxAttendees(Integer.parseInt(maxAttendeesStr));
+                            } catch (NumberFormatException ignored) {}
+                        }
                         event.save().addOnSuccessListener(aVoid -> {
                             Toast.makeText(requireContext(), "Event created successfully!", Toast.LENGTH_SHORT).show();
                             try {

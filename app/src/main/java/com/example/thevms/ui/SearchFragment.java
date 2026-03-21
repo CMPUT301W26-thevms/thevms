@@ -1,10 +1,12 @@
 package com.example.thevms.ui;
 
 import android.annotation.SuppressLint;
+import android.app.AlertDialog;
 import android.app.TimePickerDialog;
 import android.os.Bundle;
 import android.provider.Settings;
 import android.text.Editable;
+import android.text.InputType;
 import android.text.TextWatcher;
 import android.util.Log;
 import android.view.LayoutInflater;
@@ -42,7 +44,7 @@ import java.util.Locale;
 
 /**
  * Fragment for the main search/event listing screen.
- * Allows users to browse and filter events by name, date range, and time range.
+ * Allows users to browse and filter events by name, date range, time range, and capacity.
  */
 public class SearchFragment extends Fragment {
 
@@ -50,6 +52,7 @@ public class SearchFragment extends Fragment {
     private ImageView clearSearchIcon;
     private Button filterDateRangeBtn;
     private Button filterTimeRangeBtn;
+    private Button filterCapacityBtn;
     private Button clearFiltersBtn;
     private TextView resultsCountText;
     private RecyclerView eventsRecyclerView;
@@ -66,6 +69,7 @@ public class SearchFragment extends Fragment {
     private Integer startTimeMinute = null;
     private Integer endTimeHour = null;
     private Integer endTimeMinute = null;
+    private Integer targetCapacityFilter = null;
 
     private boolean isAdmin = false;
 
@@ -80,6 +84,7 @@ public class SearchFragment extends Fragment {
         clearSearchIcon = view.findViewById(R.id.clear_search);
         filterDateRangeBtn = view.findViewById(R.id.filter_date_range_btn);
         filterTimeRangeBtn = view.findViewById(R.id.filter_time_range_btn);
+        filterCapacityBtn = view.findViewById(R.id.filter_capacity_btn);
         clearFiltersBtn = view.findViewById(R.id.clear_filters_btn);
         resultsCountText = view.findViewById(R.id.results_count_text);
         eventsRecyclerView = view.findViewById(R.id.events_recycler_view);
@@ -119,6 +124,7 @@ public class SearchFragment extends Fragment {
 
         filterDateRangeBtn.setOnClickListener(v -> showDateRangePicker());
         filterTimeRangeBtn.setOnClickListener(v -> showTimeRangePicker());
+        filterCapacityBtn.setOnClickListener(v -> showCapacityPickerDialog());
 
         clearFiltersBtn.setOnClickListener(v -> {
             startDateFilter = null;
@@ -127,11 +133,45 @@ public class SearchFragment extends Fragment {
             startTimeMinute = null;
             endTimeHour = null;
             endTimeMinute = null;
+            targetCapacityFilter = null;
             filterDateRangeBtn.setText("Date Range");
             filterTimeRangeBtn.setText("Time Range");
+            filterCapacityBtn.setText("Capacity");
             clearFiltersBtn.setVisibility(View.GONE);
             applyFilters();
         });
+    }
+
+    /**
+     * Displays a dialog to input the target event capacity for filtering (+/- 5).
+     */
+    private void showCapacityPickerDialog() {
+        AlertDialog.Builder builder = new AlertDialog.Builder(getContext());
+        builder.setTitle("Target Capacity (+/- 5)");
+
+        final EditText input = new EditText(getContext());
+        input.setInputType(InputType.TYPE_CLASS_NUMBER);
+        if (targetCapacityFilter != null) {
+            input.setText(String.valueOf(targetCapacityFilter));
+        }
+        builder.setView(input);
+
+        builder.setPositiveButton("OK", (dialog, which) -> {
+            String value = input.getText().toString();
+            if (!value.isEmpty()) {
+                targetCapacityFilter = Integer.parseInt(value);
+                filterCapacityBtn.setText("Cap: " + targetCapacityFilter + "±5");
+                clearFiltersBtn.setVisibility(View.VISIBLE);
+                applyFilters();
+            } else {
+                targetCapacityFilter = null;
+                filterCapacityBtn.setText("Capacity");
+                applyFilters();
+            }
+        });
+        builder.setNegativeButton("Cancel", (dialog, which) -> dialog.cancel());
+
+        builder.show();
     }
 
     /**
@@ -263,7 +303,7 @@ public class SearchFragment extends Fragment {
     }
 
     /**
-     * Applies the current filters (name, date range, time range) to the list of all events.
+     * Applies the current filters (name, date range, time range, capacity) to the list of all events.
      * Also handles visibility of events based on registration window.
      */
     private void applyFilters() {
@@ -308,7 +348,15 @@ public class SearchFragment extends Fragment {
                 matchesTime = evTotal >= startTotal && evTotal <= endTotal;
             }
 
-            if (matchesName && matchesDate && matchesTime) {
+            boolean matchesCapacity = true;
+            if (targetCapacityFilter != null) {
+                Integer maxAttendees = event.getMaxAttendees();
+                if (maxAttendees == null || maxAttendees < targetCapacityFilter - 5 || maxAttendees > targetCapacityFilter + 5) {
+                    matchesCapacity = false;
+                }
+            }
+
+            if (matchesName && matchesDate && matchesTime && matchesCapacity) {
                 filteredEvents.add(event);
             }
         }
