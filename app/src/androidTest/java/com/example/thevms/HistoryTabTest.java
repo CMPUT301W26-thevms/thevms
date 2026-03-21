@@ -55,9 +55,15 @@ public class HistoryTabTest {
     public static ViewAction clickChildViewWithId(final int id) {
         return new ViewAction() {
             @Override
-            public Matcher<View> getConstraints() { return null; }
+            public Matcher<View> getConstraints() {
+                return null;
+            }
+
             @Override
-            public String getDescription() { return "Click on a child view with specified id."; }
+            public String getDescription() {
+                return "Click on a child view with specified id.";
+            }
+
             @Override
             public void perform(UiController uiController, View view) {
                 View v = view.findViewById(id);
@@ -108,34 +114,35 @@ public class HistoryTabTest {
         scenario = ActivityScenario.launch(MainActivity.class);
     }
 
-    // --- Base Test 1: ShowsJoinedEvents ---
+    // --- Base Test 1: ShowsJoinedEvents (Covers Joined Waitlist) ---
 
     @Test
     public void testHistoryTab_Entrant_ShowsJoinedEvents() throws Exception {
         setupTestEnvironment(UserRole.ENTRANT, "waiting");
-        verifyJoinedEventVisible();
+        verifyJoinedEventVisible("Waiting List");
     }
 
     @Test
     public void testHistoryTab_Organizer_ShowsJoinedEvents() throws Exception {
         setupTestEnvironment(UserRole.ORGANIZER, "waiting");
-        verifyJoinedEventVisible();
+        verifyJoinedEventVisible("Waiting List");
     }
 
     @Test
     public void testHistoryTab_Admin_ShowsJoinedEvents() throws Exception {
         setupTestEnvironment(UserRole.ADMIN, "waiting");
-        verifyJoinedEventVisible();
+        verifyJoinedEventVisible("Waiting List");
     }
 
-    private void verifyJoinedEventVisible() throws InterruptedException {
+    private void verifyJoinedEventVisible(String expectedStatus) throws InterruptedException {
         onView(withId(R.id.nav_favorites)).perform(click());
         Thread.sleep(2000);
         onView(withText("Joined Event")).check(matches(isDisplayed()));
+        onView(withId(R.id.event_status_info)).check(matches(withText(containsString(expectedStatus))));
         onView(withId(R.id.history_title)).check(matches(withText("Event History")));
     }
 
-    // --- Base Test 2: AcceptInvitation ---
+    // --- Base Test 2: AcceptInvitation (Covers Selected -> Accepted) ---
 
     @Test
     public void testHistoryTab_Entrant_AcceptInvitation() throws Exception {
@@ -171,7 +178,7 @@ public class HistoryTabTest {
                 .check(matches(hasDescendant(allOf(withId(R.id.event_status_info), withText(containsString("Accepted"))))));
     }
 
-    // --- Base Test 3: DeclineInvitation ---
+    // --- Base Test 3: DeclineInvitation (Covers Selected -> Declined) ---
 
     @Test
     public void testHistoryTab_Entrant_DeclineInvitation() throws Exception {
@@ -204,7 +211,7 @@ public class HistoryTabTest {
                 .check(matches(hasDescendant(allOf(withId(R.id.event_status_info), withText(containsString("Declined"))))));
     }
 
-    // --- Base Test 4: LeaveEvent ---
+    // --- Base Test 4: LeaveEvent (Covers Withdrawal) ---
 
     @Test
     public void testHistoryTab_Entrant_LeaveEvent() throws Exception {
@@ -233,12 +240,31 @@ public class HistoryTabTest {
 
         Thread.sleep(2000);
 
-        // Verification: The status should update to "Not joined"
         onView(withId(R.id.rv_my_events))
                 .check(matches(hasDescendant(allOf(withId(R.id.event_status_info), withText(containsString("Not joined"))))));
     }
 
-    // --- Base Test 5: ExpandDetails ---
+    // --- Base Test 5: Not Selected Status ---
+
+    @Test
+    public void testHistoryTab_Entrant_NotSelected() throws Exception {
+        setupTestEnvironment(UserRole.ENTRANT, "rejected");
+        verifyJoinedEventVisible("Not Selected");
+    }
+
+    @Test
+    public void testHistoryTab_Organizer_NotSelected() throws Exception {
+        setupTestEnvironment(UserRole.ORGANIZER, "rejected");
+        verifyJoinedEventVisible("Not Selected");
+    }
+
+    @Test
+    public void testHistoryTab_Admin_NotSelected() throws Exception {
+        setupTestEnvironment(UserRole.ADMIN, "rejected");
+        verifyJoinedEventVisible("Not Selected");
+    }
+
+    // --- Base Test 6: ExpandDetails ---
 
     @Test
     public void testHistoryTab_Entrant_ExpandDetails() throws Exception {
