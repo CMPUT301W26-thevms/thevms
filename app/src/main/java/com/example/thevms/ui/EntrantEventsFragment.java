@@ -20,24 +20,20 @@ import com.example.thevms.R;
 import com.example.thevms.model.DatabaseHandler;
 import com.example.thevms.model.Entrant;
 import com.example.thevms.model.Event;
-import com.example.thevms.model.UserRole;
 import com.example.thevms.ui.Event.EventAdapter;
-import com.example.thevms.ui.Event.OrganizerEventAdapter;
-import com.google.firebase.firestore.DocumentSnapshot;
 
-import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Fragment for displaying events relevant to the current user.
- * Shows registered events for entrants, created events for organizers, and all events for admins.
+ * Fragment for displaying events the current user has registered for.
+ * This view is the same for all users (Entrants, Organizers, Admins)
+ * and focuses on their history as an event participant.
  */
 public class EntrantEventsFragment extends Fragment {
 
     private RecyclerView recyclerView;
     private ProgressBar loadingBar;
     private TextView emptyText;
-    private DatabaseHandler dbHandler;
 
     @Nullable
     @Override
@@ -47,19 +43,18 @@ public class EntrantEventsFragment extends Fragment {
         recyclerView = view.findViewById(R.id.rv_my_events);
         loadingBar = view.findViewById(R.id.pb_loading);
         emptyText = view.findViewById(R.id.tv_no_events);
-        dbHandler = new DatabaseHandler();
 
         recyclerView.setLayoutManager(new LinearLayoutManager(getContext()));
 
-        loadDashboardBasedOnRole();
+        loadRegisteredEvents();
 
         return view;
     }
 
     /**
-     * Determines the user's role and sets up the corresponding view for their event dashboard.
+     * Loads the events the current device user has registered for.
      */
-    private void loadDashboardBasedOnRole() {
+    private void loadRegisteredEvents() {
         if (loadingBar != null) loadingBar.setVisibility(View.VISIBLE);
         if (emptyText != null) emptyText.setVisibility(View.GONE);
 
@@ -67,21 +62,13 @@ public class EntrantEventsFragment extends Fragment {
         String deviceId = Settings.Secure.getString(requireContext().getContentResolver(), Settings.Secure.ANDROID_ID);
 
         Entrant.getOrCreate(deviceId).addOnSuccessListener(entrant -> {
-            UserRole role = entrant.getRole();
-            Log.d("HistoryTab", "Loading view for role: " + role);
-            
-            if (role == UserRole.ADMIN) {
-                setupAdminView();
-            } else if (role == UserRole.ORGANIZER) {
-                setupOrganizerView(deviceId);
-            } else {
-                setupEntrantView(entrant);
-            }
+            Log.d("HistoryTab", "Loading registered events for: " + deviceId);
+            setupEntrantView(entrant);
         }).addOnFailureListener(e -> handleFailure("Error identifying user profile."));
     }
 
     /**
-     * Sets up the view for a regular entrant, showing events they have registered for.
+     * Sets up the view showing events the user has registered for.
      *
      * @param entrant The current entrant.
      */
@@ -94,43 +81,6 @@ public class EntrantEventsFragment extends Fragment {
             updateUI(events, "You haven't joined any events yet.");
             adapter.setEvents(events);
         }).addOnFailureListener(e -> handleFailure("Query failed. You might need to create a Firestore Index. Check Logcat."));
-    }
-
-    /**
-     * Sets up the view for an organizer, showing events they have created.
-     *
-     * @param deviceId The device ID of the organizer.
-     */
-    private void setupOrganizerView(String deviceId) {
-        OrganizerEventAdapter adapter = new OrganizerEventAdapter();
-        recyclerView.setAdapter(adapter);
-
-        dbHandler.getEventsByOrganizer(deviceId).addOnSuccessListener(queryDocumentSnapshots -> {
-            List<Event> events = new ArrayList<>();
-            for (DocumentSnapshot doc : queryDocumentSnapshots) {
-                events.add(Event.fromDoc(doc));
-            }
-            updateUI(events, "You haven't created any events yet.");
-            adapter.setEvents(events);
-        }).addOnFailureListener(e -> handleFailure("Error fetching your events."));
-    }
-
-    /**
-     * Sets up the view for an administrator, showing all events in the system.
-     */
-    private void setupAdminView() {
-        EventAdapter adapter = new EventAdapter();
-        adapter.setAdmin(true);
-        recyclerView.setAdapter(adapter);
-
-        dbHandler.getAllEvents().addOnSuccessListener(queryDocumentSnapshots -> {
-            List<Event> events = new ArrayList<>();
-            for (DocumentSnapshot doc : queryDocumentSnapshots) {
-                events.add(Event.fromDoc(doc));
-            }
-            updateUI(events, "No events exist in the system.");
-            adapter.setEvents(events);
-        }).addOnFailureListener(e -> handleFailure("Admin access failed."));
     }
 
     /**
