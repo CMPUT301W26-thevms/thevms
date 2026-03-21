@@ -153,7 +153,7 @@ public class EventAdapter extends RecyclerView.Adapter<EventAdapter.EventViewHol
      */
     static class EventViewHolder extends RecyclerView.ViewHolder {
         private final com.google.android.gms.location.FusedLocationProviderClient fusedLocationClient;
-        TextView nameTextView, statusTextView, timeTextView, locationTextView;
+        TextView nameTextView, statusTextView, timeTextView, locationTextView, waitlistTextView;
         Button joinButton, removeButton, leaveButton, acceptButton, declineButton, expandButton, viewCommentsButton, postCommentButton;
         ImageView eventImageView;
         TextView regStatusMessage, descriptionTextView, regStartTextView, regEndTextView, eventStartTextView, eventEndTextView;
@@ -173,6 +173,7 @@ public class EventAdapter extends RecyclerView.Adapter<EventAdapter.EventViewHol
             super(itemView);
             nameTextView = itemView.findViewById(R.id.event_name);
             statusTextView = itemView.findViewById(R.id.event_status_info);
+            waitlistTextView = itemView.findViewById(R.id.event_waitlist_info);
             timeTextView = itemView.findViewById(R.id.event_time_info);
             locationTextView = itemView.findViewById(R.id.event_location_info);
             joinButton = itemView.findViewById(R.id.btn_join_event);
@@ -257,7 +258,7 @@ public class EventAdapter extends RecyclerView.Adapter<EventAdapter.EventViewHol
             if (locationTextView != null) {
                 locationTextView.setText(event.getLocation());
             }
-            updateEntrantCount(event, null);
+
             dbHandler.getEntrantStatus(String.valueOf(event.getEventId()), deviceId).addOnSuccessListener(status -> {
                 updateUIBasedOnStatus(status, event, deviceId, dbHandler);
             });
@@ -397,12 +398,12 @@ public class EventAdapter extends RecyclerView.Adapter<EventAdapter.EventViewHol
         }
 
         /**
-         * Updates the entrant count text with an optional status prefix.
+         * Updates the entrant count text and waitlist information.
          *
-         * @param event        The event to fetch the count for.
+         * @param event        The event to fetch information for.
          * @param statusPrefix An optional status message to display before the count.
          */
-        private void updateEntrantCount(Event event, String statusPrefix) {
+        private void updateEntrantInfo(Event event, String statusPrefix) {
             if (statusTextView == null) return;
             event.fetchEntrantCount().addOnSuccessListener(count -> {
                 String text = String.format(Locale.getDefault(), "☆ %d people joined", count);
@@ -410,6 +411,32 @@ public class EventAdapter extends RecyclerView.Adapter<EventAdapter.EventViewHol
                     text = statusPrefix + " (" + text + ")";
                 }
                 statusTextView.setText(text);
+
+                if (waitlistTextView != null) {
+                    Integer maxWaitlist = event.getMaxWaitlist();
+                    if (maxWaitlist != null) {
+                        waitlistTextView.setVisibility(View.VISIBLE);
+                        waitlistTextView.setText(String.format(Locale.getDefault(), "Waitlist: %d/%d", count, maxWaitlist));
+                        
+                        // Grey out join button if waitlist is full
+                        if (count >= maxWaitlist && joinButton.getVisibility() == View.VISIBLE) {
+                            joinButton.setEnabled(false);
+                            joinButton.setAlpha(0.5f);
+                            joinButton.setText("Waitlist Full");
+                        } else {
+                            joinButton.setEnabled(true);
+                            joinButton.setAlpha(1.0f);
+                            joinButton.setText("Join");
+                        }
+                    } else {
+                        waitlistTextView.setVisibility(View.GONE);
+                        joinButton.setEnabled(true);
+                        joinButton.setAlpha(1.0f);
+                        joinButton.setText("Join");
+                    }
+                }
+            }).addOnFailureListener(e -> {
+                statusTextView.setText("☆ -- people joined");
             });
         }
 
@@ -459,7 +486,7 @@ public class EventAdapter extends RecyclerView.Adapter<EventAdapter.EventViewHol
                         break;
                 }
             }
-            updateEntrantCount(event, statusPrefix);
+            updateEntrantInfo(event, statusPrefix);
         }
 
         /**
@@ -556,7 +583,7 @@ public class EventAdapter extends RecyclerView.Adapter<EventAdapter.EventViewHol
             Entrant.getOrCreate(deviceId).addOnSuccessListener(entrant -> {
                 event.addEntrant(entrant).addOnSuccessListener(aVoid -> {
                     Toast.makeText(itemView.getContext(), "Successfully joined " + event.getName(), Toast.LENGTH_SHORT).show();
-                    updateEntrantCount(event);
+                    updateEntrantInfo(event, null);
                     joinButton.setVisibility(View.GONE);
                     leaveButton.setVisibility(View.VISIBLE);
                     if (regStatusMessage != null) {
@@ -670,20 +697,6 @@ public class EventAdapter extends RecyclerView.Adapter<EventAdapter.EventViewHol
                     locationCallback,
                     android.os.Looper.getMainLooper()
             );
-        }
-
-        /**
-         * Updates the entrant count for an event.
-         *
-         * @param event The event to fetch the count for.
-         */
-        private void updateEntrantCount(Event event) {
-            if (statusTextView == null) return;
-            event.fetchEntrantCount().addOnSuccessListener(count -> {
-                statusTextView.setText(String.format(Locale.getDefault(), "☆ %d people joined", count));
-            }).addOnFailureListener(e -> {
-                statusTextView.setText("☆ -- people joined");
-            });
         }
 
         /**
