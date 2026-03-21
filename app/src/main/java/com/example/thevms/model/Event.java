@@ -65,6 +65,7 @@ public class Event {
     private Date eventEndTime;
 
     private Integer maxAttendees; // US 01.01.01
+    private Integer maxWaitlist; // US 01.02.01
     private boolean geolocationRequired; // US 01.08.01
     private Double limitDistance;
 
@@ -198,12 +199,20 @@ public class Event {
         Event event = new Event(id, name, desc, organizer, location, img, regStart, regEnd, eventStart, eventEnd, geoRequired != null && geoRequired, radius, geoLocation);
 
         if (data.containsKey("maxAttendees") && data.get("maxAttendees") != null) {
-            event.setMaxAttendees(((Long) data.get("maxAttendees")).intValue());
+            Object val = data.get("maxAttendees");
+            if (val instanceof Long) event.setMaxAttendees(((Long) val).intValue());
+            else if (val instanceof Integer) event.setMaxAttendees((Integer) val);
+        }
+        if (data.containsKey("maxWaitlist") && data.get("maxWaitlist") != null) {
+            Object val = data.get("maxWaitlist");
+            if (val instanceof Long) event.setMaxWaitlist(((Long) val).intValue());
+            else if (val instanceof Integer) event.setMaxWaitlist((Integer) val);
         }
         if (data.containsKey("limitDistance") && data.get("limitDistance") != null) {
             Object dist = data.get("limitDistance");
             if (dist instanceof Double) event.setLimitDistance((Double) dist);
             else if (dist instanceof Long) event.setLimitDistance(((Long) dist).doubleValue());
+            else if (dist instanceof Integer) event.setLimitDistance(((Integer) dist).doubleValue());
         }
         if (data.containsKey("locationName")) {
             event.setLocationName((String) data.get("locationName"));
@@ -263,6 +272,7 @@ public class Event {
             map.put("longitude", geoLocation.getLongitude());
         }
         map.put("maxAttendees", maxAttendees);
+        map.put("maxWaitlist", maxWaitlist);
         map.put("limitDistance", limitDistance);
         return map;
     }
@@ -283,7 +293,7 @@ public class Event {
     }
 
     /**
-     * Adds an entrant to the event's waiting list if registration is open.
+     * Adds an entrant to the event's waiting list if registration is open and waitlist is not full.
      *
      * @param entrant The entrant to add.
      * @return A Task representing the operation.
@@ -297,12 +307,20 @@ public class Event {
             return Tasks.forException(new IllegalStateException("Registration has ended."));
         }
 
-        Map<String, Object> registrationData = new HashMap<>();
-        registrationData.put("entrantId", entrant.getDeviceId());
-        registrationData.put("status", DatabaseHandler.STATUS_WAITING);
-        registrationData.put("registrationTime", now);
+        return fetchEntrantCount().continueWithTask(task -> {
+            if (!task.isSuccessful()) throw task.getException();
+            long count = task.getResult();
+            if (maxWaitlist != null && count >= maxWaitlist) {
+                return Tasks.forException(new IllegalStateException("Waitlist is full."));
+            }
 
-        return dbHandler.updateEntrantStatus(String.valueOf(this.eventId), entrant.getDeviceId(), registrationData);
+            Map<String, Object> registrationData = new HashMap<>();
+            registrationData.put("entrantId", entrant.getDeviceId());
+            registrationData.put("status", DatabaseHandler.STATUS_WAITING);
+            registrationData.put("registrationTime", now);
+
+            return dbHandler.updateEntrantStatus(String.valueOf(this.eventId), entrant.getDeviceId(), registrationData);
+        });
     }
 
     /**
@@ -483,6 +501,18 @@ public class Event {
      * @param maxAttendees The new maximum attendees.
      */
     public void setMaxAttendees(Integer maxAttendees) { this.maxAttendees = maxAttendees; }
+
+    /**
+     * Gets the maximum number of people allowed on the waitlist.
+     * @return The maximum waitlist size, or null if no limit.
+     */
+    public Integer getMaxWaitlist() { return maxWaitlist; }
+
+    /**
+     * Sets the maximum number of people allowed on the waitlist.
+     * @param maxWaitlist The new maximum waitlist size.
+     */
+    public void setMaxWaitlist(Integer maxWaitlist) { this.maxWaitlist = maxWaitlist; }
 
     /**
      * Checks if geolocation is required to join the event.
