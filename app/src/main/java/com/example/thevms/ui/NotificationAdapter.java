@@ -23,6 +23,7 @@ public class NotificationAdapter extends RecyclerView.Adapter<NotificationAdapte
     private List<Notification> notifications = new ArrayList<>();
     private OnNotificationDeleteListener deleteListener;
     private OnInviteActionListener inviteActionListener;
+    private boolean isReadOnly = false;
 
     public interface OnNotificationDeleteListener {
         void onDelete(Notification notification);
@@ -31,6 +32,14 @@ public class NotificationAdapter extends RecyclerView.Adapter<NotificationAdapte
     public interface OnInviteActionListener {
         void onAccept(Notification notification);
         void onReject(Notification notification);
+    }
+
+    public NotificationAdapter() {
+        this(false);
+    }
+
+    public NotificationAdapter(boolean isReadOnly) {
+        this.isReadOnly = isReadOnly;
     }
 
     public void setNotifications(List<Notification> notifications) {
@@ -65,7 +74,7 @@ public class NotificationAdapter extends RecyclerView.Adapter<NotificationAdapte
     }
 
     class NotificationViewHolder extends RecyclerView.ViewHolder {
-        TextView title, from, description, time;
+        TextView title, from, to, description, time;
         ImageButton btnDelete;
         LinearLayout inviteActionsContainer;
         MaterialButton btnAccept, btnReject;
@@ -74,6 +83,7 @@ public class NotificationAdapter extends RecyclerView.Adapter<NotificationAdapte
             super(itemView);
             title = itemView.findViewById(R.id.notification_title);
             from = itemView.findViewById(R.id.notification_from);
+            to = itemView.findViewById(R.id.notification_to);
             description = itemView.findViewById(R.id.notification_description);
             time = itemView.findViewById(R.id.notification_time);
             btnDelete = itemView.findViewById(R.id.btn_delete_notification);
@@ -92,27 +102,43 @@ public class NotificationAdapter extends RecyclerView.Adapter<NotificationAdapte
                 time.setText(DateFormat.format("MMM dd, h:mm a", notification.getTimestamp()));
             }
 
-            btnDelete.setOnClickListener(v -> {
-                if (deleteListener != null) {
-                    deleteListener.onDelete(notification);
-                }
-            });
-
-            // Handle invite actions visibility
-            if (Notification.TYPE_INVITE.equals(notification.getType())) {
-                inviteActionsContainer.setVisibility(View.VISIBLE);
-                btnAccept.setOnClickListener(v -> {
-                    if (inviteActionListener != null) {
-                        inviteActionListener.onAccept(notification);
-                    }
-                });
-                btnReject.setOnClickListener(v -> {
-                    if (inviteActionListener != null) {
-                        inviteActionListener.onReject(notification);
-                    }
-                });
-            } else {
+            if (isReadOnly) {
+                btnDelete.setVisibility(View.GONE);
                 inviteActionsContainer.setVisibility(View.GONE);
+                
+                // Admin logs view: show who the notification was sent to
+                if (notification.getReceiverName() != null) {
+                    to.setVisibility(View.VISIBLE);
+                    to.setText("To: " + notification.getReceiverName());
+                } else {
+                    to.setVisibility(View.GONE);
+                }
+            } else {
+                btnDelete.setVisibility(View.VISIBLE);
+                to.setVisibility(View.GONE); // Inbox view: don't show recipient
+
+                btnDelete.setOnClickListener(v -> {
+                    if (deleteListener != null) {
+                        deleteListener.onDelete(notification);
+                    }
+                });
+
+                // Handle invite actions visibility
+                if (Notification.TYPE_INVITE.equals(notification.getType())) {
+                    inviteActionsContainer.setVisibility(View.VISIBLE);
+                    btnAccept.setOnClickListener(v -> {
+                        if (inviteActionListener != null) {
+                            inviteActionListener.onAccept(notification);
+                        }
+                    });
+                    btnReject.setOnClickListener(v -> {
+                        if (inviteActionListener != null) {
+                            inviteActionListener.onReject(notification);
+                        }
+                    });
+                } else {
+                    inviteActionsContainer.setVisibility(View.GONE);
+                }
             }
         }
     }

@@ -10,7 +10,6 @@ import androidx.drawerlayout.widget.DrawerLayout;
 
 import com.example.thevms.R;
 import com.example.thevms.ui.MainActivity;
-import com.example.thevms.ui.SearchFragment;
 
 /**
  * Controller class for handling Admin Panel logic and navigation.
@@ -75,6 +74,8 @@ public class AdminActivity {
                 mainActivity.navigateToFragment(AdminProfilesFragment.newInstance(false), R.id.nav_admin_settings);
             } else if ("Manage Organizers".equals(actionName)) {
                 mainActivity.navigateToFragment(AdminProfilesFragment.newInstance(true), R.id.nav_admin_settings);
+            } else if ("View Logs".equals(actionName)) {
+                mainActivity.navigateToFragment(new AdminLogsFragment(), R.id.nav_admin_settings);
             } else {
                 Toast.makeText(activity, actionName + " coming soon", Toast.LENGTH_SHORT).show();
             }

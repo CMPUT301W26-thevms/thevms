@@ -222,22 +222,23 @@ public class InboxFragment extends Fragment {
             Notification testNotif;
             String eventName = "Summer Gala";
             String eventId = "123";
+            String receiverName = "Test User";
 
             switch (testCycleIndex % 5) {
                 case 0:
-                    testNotif = Notification.createLotteryWin(deviceId, "Organizer", deviceId, eventId, eventName);
+                    testNotif = Notification.createLotteryWin(deviceId, "Organizer", deviceId, receiverName, eventId, eventName);
                     break;
                 case 1:
-                    testNotif = Notification.createLotteryLoss(deviceId, "Organizer", deviceId, eventId, eventName);
+                    testNotif = Notification.createLotteryLoss(deviceId, "Organizer", deviceId, receiverName, eventId, eventName);
                     break;
                 case 2:
-                    testNotif = Notification.createWaitingListInvite(deviceId, "Organizer", deviceId, eventId, eventName);
+                    testNotif = Notification.createWaitingListInvite(deviceId, "Organizer", deviceId, receiverName, eventId, eventName);
                     break;
                 case 3:
-                    testNotif = Notification.createCoOrganizerInvite(deviceId, "Organizer", deviceId, eventId, eventName);
+                    testNotif = Notification.createCoOrganizerInvite(deviceId, "Organizer", deviceId, receiverName, eventId, eventName);
                     break;
                 default:
-                    testNotif = new Notification(null, "General Update", deviceId, "System", UserRole.ADMIN, deviceId, new Date(), "This is a simple system update.");
+                    testNotif = new Notification(null, "General Update", deviceId, "System", UserRole.ADMIN, deviceId, receiverName, new Date(), "This is a simple system update.", Notification.TYPE_GENERAL, null);
                     break;
             }
 

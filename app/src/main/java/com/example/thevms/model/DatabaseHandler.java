@@ -476,6 +476,19 @@ public class DatabaseHandler {
     }
 
     /**
+     * Listens for real-time updates to all notifications in the system.
+     * Used for administrative logging.
+     *
+     * @param listener Callback to handle notification updates.
+     * @return ListenerRegistration.
+     */
+    public ListenerRegistration listenToAllNotifications(EventListener<QuerySnapshot> listener) {
+        return getDb().collection(COLLECTION_NOTIFICATIONS)
+                .orderBy("timestamp", Query.Direction.DESCENDING)
+                .addSnapshotListener(listener);
+    }
+
+    /**
      * Marks a specific notification as read in Firestore.
      *
      * @param notificationId The unique ID of the notification to update.
