@@ -55,6 +55,17 @@
             android:textStyle="italic"
             android:text="From: System Admin" />
 
+        <TextView
+            android:id="@+id/notification_to"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
+            android:textColor="#757575"
+            android:textSize="13sp"
+            android:textStyle="italic"
+            android:text="To: Recipient Name"
+            android:visibility="gone" />
+
         <View
             android:layout_width="match_parent"
             android:layout_height="1dp"
