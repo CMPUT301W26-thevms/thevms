@@ -288,7 +288,7 @@ public class AdminProfilesTest {
         Date pastStart = new Date(System.currentTimeMillis() - 3600000);
         Date futureEnd = new Date(System.currentTimeMillis() + 3600000);
 
-        Event event = Tasks.await(Event.create("Target Event", "Description", targetOrg, "University of Alberta", null, pastStart, futureEnd, new Date(), new Date(), false, 0.0, null), 5, TimeUnit.SECONDS);
+        Event event = Tasks.await(Event.create("Target Event", "Description", targetOrg, "University of Alberta", null, pastStart, futureEnd, new Date(), new Date(), false, 0.0, null, false), 5, TimeUnit.SECONDS);
         Tasks.await(event.save(), 5, TimeUnit.SECONDS);
 
         // Verify initial state in DB
@@ -339,7 +339,7 @@ public class AdminProfilesTest {
         Date pastStart = new Date(System.currentTimeMillis() - 3600000);
         Date futureEnd = new Date(System.currentTimeMillis() + 3600000);
 
-        Event event = Tasks.await(Event.create("Persistent Event", "Desc", organizer, "University of Alberta", null, pastStart, futureEnd, new Date(), new Date(), false, 0.0, null), 5, TimeUnit.SECONDS);
+        Event event = Tasks.await(Event.create("Persistent Event", "Desc", organizer, "University of Alberta", null, pastStart, futureEnd, new Date(), new Date(), false, 0.0, null, false), 5, TimeUnit.SECONDS);
         Tasks.await(event.save(), 5, TimeUnit.SECONDS);
 
         // User A (on waitlist)
