@@ -67,17 +67,17 @@ public class SearchFragmentCapacityTest {
         Date eventEnd = cal.getTime();
 
         // Event 1: Capacity 50
-        Event event50 = Tasks.await(Event.create("Event 50", "Desc", organizer, "Loc", null, regStart, regEnd, eventStart, eventEnd, false, 0.0, null), 5, TimeUnit.SECONDS);
+        Event event50 = Tasks.await(Event.create("Event 50", "Desc", organizer, "Loc", null, regStart, regEnd, eventStart, eventEnd, false, 0.0, null, false), 5, TimeUnit.SECONDS);
         event50.setMaxAttendees(50);
         Tasks.await(event50.save(), 5, TimeUnit.SECONDS);
 
         // Event 2: Capacity 100
-        Event event100 = Tasks.await(Event.create("Event 100", "Desc", organizer, "Loc", null, regStart, regEnd, eventStart, eventEnd, false, 0.0, null), 5, TimeUnit.SECONDS);
+        Event event100 = Tasks.await(Event.create("Event 100", "Desc", organizer, "Loc", null, regStart, regEnd, eventStart, eventEnd, false, 0.0, null, false), 5, TimeUnit.SECONDS);
         event100.setMaxAttendees(100);
         Tasks.await(event100.save(), 5, TimeUnit.SECONDS);
         
         // Event 3: Capacity 54 (Within range of 50±5)
-        Event event54 = Tasks.await(Event.create("Event 54", "Desc", organizer, "Loc", null, regStart, regEnd, eventStart, eventEnd, false, 0.0, null), 5, TimeUnit.SECONDS);
+        Event event54 = Tasks.await(Event.create("Event 54", "Desc", organizer, "Loc", null, regStart, regEnd, eventStart, eventEnd, false, 0.0, null, false), 5, TimeUnit.SECONDS);
         event54.setMaxAttendees(54);
         Tasks.await(event54.save(), 5, TimeUnit.SECONDS);
     }
