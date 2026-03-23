@@ -382,7 +382,7 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
                             Toast.makeText(itemView.getContext(), "Invited " + entrant.getFirstName(), Toast.LENGTH_SHORT).show();
                             // Trigger notification
                             String organizerId = Settings.Secure.getString(itemView.getContext().getContentResolver(), Settings.Secure.ANDROID_ID);
-                            Notification.createWaitingListInvite(organizerId, "Organizer", entrant.getDeviceId(), String.valueOf(event.getEventId()), event.getName()).send();
+                            Notification.createWaitingListInvite(organizerId, "Organizer", entrant.getDeviceId(), String.valueOf(event.getEventId()), String.valueOf(event.getEventId()), event.getName()).send();
                         });
             });
 
