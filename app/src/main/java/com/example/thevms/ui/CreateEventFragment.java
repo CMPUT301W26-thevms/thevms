@@ -1,6 +1,8 @@
 package com.example.thevms.ui;
 
 import android.annotation.SuppressLint;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.net.Uri;
 import android.os.Bundle;
 import android.provider.Settings;
@@ -30,6 +32,8 @@ import com.google.android.material.datepicker.MaterialDatePicker;
 import com.google.android.material.timepicker.MaterialTimePicker;
 import com.google.android.material.timepicker.TimeFormat;
 
+import java.io.ByteArrayOutputStream;
+import java.io.InputStream;
 import java.text.SimpleDateFormat;
 import java.util.Calendar;
 import java.util.Date;
@@ -85,7 +89,7 @@ public class CreateEventFragment extends Fragment {
         etMaxWaitlist = view.findViewById(R.id.et_max_waitlist);
         btnConfirm = view.findViewById(R.id.btn_confirm);
         btnCancel = view.findViewById(R.id.btn_cancel);
-        
+
         btnRegStartDate = view.findViewById(R.id.btn_reg_start_date);
         btnRegEndDate = view.findViewById(R.id.btn_reg_end_date);
         btnEventStartDate = view.findViewById(R.id.btn_event_start_date);
@@ -144,7 +148,7 @@ public class CreateEventFragment extends Fragment {
         this.regEndDate = re;
         this.eventStartDate = es;
         this.eventEndDate = ee;
-        
+
         if (btnRegStartDate != null) btnRegStartDate.setText(dateTimeFormat.format(rs));
         if (btnRegEndDate != null) btnRegEndDate.setText(dateTimeFormat.format(re));
         if (btnEventStartDate != null) btnEventStartDate.setText(dateTimeFormat.format(es));
@@ -159,10 +163,18 @@ public class CreateEventFragment extends Fragment {
     private void showDateTimePicker(int type) {
         String title = "";
         switch (type) {
-            case 1: title = "Select Registration Start Date"; break;
-            case 2: title = "Select Registration End Date"; break;
-            case 3: title = "Select Event Start Date"; break;
-            case 4: title = "Select Event End Date"; break;
+            case 1:
+                title = "Select Registration Start Date";
+                break;
+            case 2:
+                title = "Select Registration End Date";
+                break;
+            case 3:
+                title = "Select Event Start Date";
+                break;
+            case 4:
+                title = "Select Event End Date";
+                break;
         }
 
         MaterialDatePicker<Long> datePicker = MaterialDatePicker.Builder.datePicker()
@@ -174,10 +186,10 @@ public class CreateEventFragment extends Fragment {
             Calendar calendar = Calendar.getInstance();
             Calendar utcCalendar = Calendar.getInstance(TimeZone.getTimeZone("UTC"));
             utcCalendar.setTimeInMillis(selection);
-            
-            calendar.set(utcCalendar.get(Calendar.YEAR), 
-                         utcCalendar.get(Calendar.MONTH), 
-                         utcCalendar.get(Calendar.DAY_OF_MONTH));
+
+            calendar.set(utcCalendar.get(Calendar.YEAR),
+                    utcCalendar.get(Calendar.MONTH),
+                    utcCalendar.get(Calendar.DAY_OF_MONTH));
 
             MaterialTimePicker timePicker = new MaterialTimePicker.Builder()
                     .setTimeFormat(TimeFormat.CLOCK_24H)
@@ -317,14 +329,20 @@ public class CreateEventFragment extends Fragment {
         Entrant.getOrCreate(deviceId).addOnSuccessListener(user -> {
             Organizer organizer = new Organizer(user.getDeviceId(), user.getEmail(), user.getFirstName(), user.getLastName(), user.getPhoneNumber());
 
+            byte[] photoBytes = null;
+            if (posterUri != null) {
+                photoBytes = uriToBytes(posterUri);
+            }
+
             // Note: Currently locationStr is a String, but Event model expects android.location.Location.
             // Updated: location is now the coordinates of the event, not the location string.
-            Event.create(name, description, organizer, locationStr, null, regStartDate, regEndDate, eventStartDate, eventEndDate, isGeoRequired, radius, eventLocation)
+            Event.create(name, description, organizer, locationStr, null, photoBytes, regStartDate, regEndDate, eventStartDate, eventEndDate, isGeoRequired, radius, eventLocation)
                     .addOnSuccessListener(event -> {
                         if (!maxAttendeesStr.isEmpty()) {
                             try {
                                 event.setMaxAttendees(Integer.parseInt(maxAttendeesStr));
-                            } catch (NumberFormatException ignored) {}
+                            } catch (NumberFormatException ignored) {
+                            }
                         }
                         event.setMaxAttendees(finalMaxAttendees);
                         event.setMaxWaitlist(finalMaxWaitlist);
@@ -342,6 +360,26 @@ public class CreateEventFragment extends Fragment {
                         Toast.makeText(requireContext(), "Failed to create event object", Toast.LENGTH_SHORT).show();
                     });
         });
+    }
+
+    /**
+     * Converts a Uri to a byte array.
+     *
+     * @param uri The Uri of the image.
+     * @return The byte array of the image, or null if conversion fails.
+     */
+    private byte[] uriToBytes(Uri uri) {
+        try {
+            InputStream inputStream = requireContext().getContentResolver().openInputStream(uri);
+            Bitmap bitmap = BitmapFactory.decodeStream(inputStream);
+            ByteArrayOutputStream baos = new ByteArrayOutputStream();
+            // Compress to JPEG to reduce size, ensuring it fits in Firestore (1MB limit)
+            bitmap.compress(Bitmap.CompressFormat.JPEG, 70, baos);
+            return baos.toByteArray();
+        } catch (Exception e) {
+            Log.e("CreateEventFragment", "Error converting Uri to bytes", e);
+            return null;
+        }
     }
 
     /**
