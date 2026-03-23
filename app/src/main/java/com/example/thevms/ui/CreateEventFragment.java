@@ -37,8 +37,7 @@ import java.util.TimeZone;
  * Handles event details input, date-time selection, and geolocation settings.
  */
 public class CreateEventFragment extends Fragment {
-
-    private EditText etName, etLocation, etDescription, etMaxAttendees;
+    private EditText etName, etLocation, etDescription, etMaxAttendees, etMaxWaitlist;
     private Button btnConfirm, btnCancel;
     private Button btnRegStartDate, btnRegEndDate, btnEventStartDate, btnEventEndDate;
     private Date regStartDate, regEndDate, eventStartDate, eventEndDate;
@@ -62,6 +61,7 @@ public class CreateEventFragment extends Fragment {
         etLocation = view.findViewById(R.id.et_event_location);
         etDescription = view.findViewById(R.id.et_event_description);
         etMaxAttendees = view.findViewById(R.id.et_max_attendees);
+        etMaxWaitlist = view.findViewById(R.id.et_max_waitlist);
         btnConfirm = view.findViewById(R.id.btn_confirm);
         btnCancel = view.findViewById(R.id.btn_cancel);
         
@@ -248,6 +248,27 @@ public class CreateEventFragment extends Fragment {
             radius = 0.0;
         }
 
+        Integer maxAttendees = null;
+        if (!maxAttendeesStr.isEmpty()) {
+            try {
+                maxAttendees = Integer.parseInt(maxAttendeesStr);
+            } catch (NumberFormatException e) {
+                etMaxAttendees.setError("Invalid number");
+                return;
+            }
+        }
+
+        Integer maxWaitlist = null;
+        String maxWaitlistStr = etMaxWaitlist.getText().toString().trim();
+        if (!maxWaitlistStr.isEmpty()) {
+            try {
+                maxWaitlist = Integer.parseInt(maxWaitlistStr);
+            } catch (NumberFormatException e) {
+                etMaxWaitlist.setError("Invalid number");
+                return;
+            }
+        }
+
         android.location.Location eventLocation = getLocationFromAddress(locationStr);
         if (eventLocation == null) {
             Toast.makeText(requireContext(), "Please enter a valid location", Toast.LENGTH_SHORT).show();
@@ -257,6 +278,8 @@ public class CreateEventFragment extends Fragment {
         @SuppressLint("HardwareIds")
         String deviceId = Settings.Secure.getString(requireContext().getContentResolver(), Settings.Secure.ANDROID_ID);
 
+        Integer finalMaxAttendees = maxAttendees;
+        Integer finalMaxWaitlist = maxWaitlist;
         Entrant.getOrCreate(deviceId).addOnSuccessListener(user -> {
             Organizer organizer = new Organizer(user.getDeviceId(), user.getEmail(), user.getFirstName(), user.getLastName(), user.getPhoneNumber());
 
@@ -269,6 +292,8 @@ public class CreateEventFragment extends Fragment {
                                 event.setMaxAttendees(Integer.parseInt(maxAttendeesStr));
                             } catch (NumberFormatException ignored) {}
                         }
+                        event.setMaxAttendees(finalMaxAttendees);
+                        event.setMaxWaitlist(finalMaxWaitlist);
                         event.save().addOnSuccessListener(aVoid -> {
                             Toast.makeText(requireContext(), "Event created successfully!", Toast.LENGTH_SHORT).show();
                             try {
