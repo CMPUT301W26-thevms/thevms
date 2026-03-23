@@ -4,6 +4,8 @@ import android.app.AlertDialog;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.provider.Settings;
+import android.text.Editable;
+import android.text.TextWatcher;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -27,6 +29,7 @@ import com.example.thevms.model.Comment;
 import com.example.thevms.model.DatabaseHandler;
 import com.example.thevms.model.Entrant;
 import com.example.thevms.model.Event;
+import com.example.thevms.model.Notification;
 import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.ListenerRegistration;
@@ -137,7 +140,7 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
      */
     static class ViewHolder extends RecyclerView.ViewHolder {
         TextView nameText, distanceText, waitlistText, dateText, descriptionText, exportCsvText;
-        Button cancelBtn, lotteryBtn, postCommentBtn, updatePosterBtn;
+        Button cancelBtn, lotteryBtn, postCommentBtn, updatePosterBtn, inviteBtn;
         RecyclerView attendeesRv, commentsRv;
         ImageView posterImage;
         Spinner statusSpinner;
@@ -166,6 +169,7 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
             cancelBtn = itemView.findViewById(R.id.btn_cancel_event);
             lotteryBtn = itemView.findViewById(R.id.btn_run_lottery);
             updatePosterBtn = itemView.findViewById(R.id.btn_update_poster);
+            inviteBtn = itemView.findViewById(R.id.btn_invite_entrants);
             attendeesRv = itemView.findViewById(R.id.rv_attendees);
             commentsRv = itemView.findViewById(R.id.rv_comments);
             posterImage = itemView.findViewById(R.id.iv_event_poster);
@@ -308,6 +312,9 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
                 if (updatePosterListener != null) updatePosterListener.onUpdatePoster(event);
             });
 
+            inviteBtn.setVisibility(event.isPrivate() ? View.VISIBLE : View.GONE);
+            inviteBtn.setOnClickListener(v -> showInviteDialog(event));
+
             postCommentBtn.setOnClickListener(v -> postOrganizerComment(eventId));
 
             // Reset spinner to "Waiting" each time a card is bound
@@ -353,6 +360,80 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
             });
 
             setupComments(eventId);
+        }
+
+        private void showInviteDialog(Event event) {
+            AlertDialog.Builder builder = new AlertDialog.Builder(itemView.getContext());
+            View dialogView = LayoutInflater.from(itemView.getContext()).inflate(R.layout.dialog_invite_entrants, null);
+            builder.setView(dialogView);
+
+            EditText searchEt = dialogView.findViewById(R.id.et_search_entrants);
+            RecyclerView resultsRv = dialogView.findViewById(R.id.rv_search_results);
+            Button closeBtn = dialogView.findViewById(R.id.btn_close_invite);
+
+            InviteEntrantAdapter inviteAdapter = new InviteEntrantAdapter();
+            resultsRv.setLayoutManager(new LinearLayoutManager(itemView.getContext()));
+            resultsRv.setAdapter(inviteAdapter);
+
+            AlertDialog dialog = builder.create();
+
+            List<Entrant> allUsers = new ArrayList<>();
+            dbHandler.getAllUsers().addOnSuccessListener(queryDocumentSnapshots -> {
+                for (QueryDocumentSnapshot doc : queryDocumentSnapshots) {
+                    Entrant u = Entrant.fromMap(doc.getId(), doc.getData());
+                    if (u != null) allUsers.add(u);
+                }
+            });
+
+            searchEt.addTextChangedListener(new TextWatcher() {
+                @Override
+                public void beforeTextChanged(CharSequence s, int start, int count, int after) {
+                }
+
+                @Override
+                public void onTextChanged(CharSequence s, int start, int before, int count) {
+                    String query = s.toString().toLowerCase();
+                    if (query.isEmpty()) {
+                        inviteAdapter.setEntrants(new ArrayList<>());
+                        return;
+                    }
+                    List<Entrant> filtered = new ArrayList<>();
+                    for (Entrant u : allUsers) {
+                        boolean matchesName = (u.getFirstName() != null && u.getFirstName().toLowerCase().contains(query))
+                                || (u.getLastName() != null && u.getLastName().toLowerCase().contains(query));
+                        boolean matchesEmail = u.getEmail() != null && u.getEmail().toLowerCase().contains(query);
+                        boolean matchesPhone = u.getPhoneNumber() != null && u.getPhoneNumber().contains(query);
+
+                        if (matchesName || matchesEmail || matchesPhone) {
+                            filtered.add(u);
+                        }
+                    }
+                    inviteAdapter.setEntrants(filtered);
+                }
+
+                @Override
+                public void afterTextChanged(Editable s) {
+                }
+            });
+
+            inviteAdapter.setOnInviteClickListener(entrant -> {
+                // Invite logic
+                Map<String, Object> registrationData = new HashMap<>();
+                registrationData.put("entrantId", entrant.getDeviceId());
+                registrationData.put("status", DatabaseHandler.STATUS_WAITING);
+                registrationData.put("registrationTime", new Date());
+
+                dbHandler.updateEntrantStatus(String.valueOf(event.getEventId()), entrant.getDeviceId(), registrationData)
+                        .addOnSuccessListener(aVoid -> {
+                            Toast.makeText(itemView.getContext(), "Invited " + entrant.getFirstName(), Toast.LENGTH_SHORT).show();
+                            // Trigger notification
+                            String organizerId = Settings.Secure.getString(itemView.getContext().getContentResolver(), Settings.Secure.ANDROID_ID);
+                            Notification.createWaitingListInvite(organizerId, "Organizer", entrant.getDeviceId(), String.valueOf(event.getEventId()), String.valueOf(event.getEventId()), event.getName()).send();
+                        });
+            });
+
+            closeBtn.setOnClickListener(v -> dialog.dismiss());
+            dialog.show();
         }
 
         private void setupComments(String eventId) {

@@ -50,7 +50,7 @@ public class CreateEventFragment extends Fragment {
     private Button btnRegStartDate, btnRegEndDate, btnEventStartDate, btnEventEndDate;
     private Date regStartDate, regEndDate, eventStartDate, eventEndDate;
     private final SimpleDateFormat dateTimeFormat = new SimpleDateFormat("MMM dd, yyyy HH:mm", Locale.getDefault());
-    private com.google.android.material.materialswitch.MaterialSwitch switchGeo;
+    private com.google.android.material.materialswitch.MaterialSwitch switchGeo, switchPrivate;
     private View layoutLimitDistance;
     private EditText etLimitDistance;
 
@@ -115,6 +115,7 @@ public class CreateEventFragment extends Fragment {
         btnEventEndDate.setOnClickListener(v -> showDateTimePicker(4));
 
         switchGeo = view.findViewById(R.id.switch_geolocation);
+        switchPrivate = view.findViewById(R.id.switch_private_event);
         layoutLimitDistance = view.findViewById(R.id.layout_limit_distance);
         etLimitDistance = view.findViewById(R.id.et_limit_distance);
         layoutLimitDistance.setVisibility(View.GONE);
@@ -240,6 +241,7 @@ public class CreateEventFragment extends Fragment {
         String description = etDescription.getText().toString().trim();
         String maxAttendeesStr = etMaxAttendees.getText().toString().trim();
         boolean isGeoRequired = switchGeo.isChecked();
+        boolean isPrivate = switchPrivate.isChecked();
 
         if (name.isEmpty()) {
             etName.setError("Name is required");
@@ -336,7 +338,7 @@ public class CreateEventFragment extends Fragment {
 
             // Note: Currently locationStr is a String, but Event model expects android.location.Location.
             // Updated: location is now the coordinates of the event, not the location string.
-            Event.create(name, description, organizer, locationStr, null, photoBytes, regStartDate, regEndDate, eventStartDate, eventEndDate, isGeoRequired, radius, eventLocation)
+            Event.create(name, description, organizer, locationStr, null, photoBytes, regStartDate, regEndDate, eventStartDate, eventEndDate, isGeoRequired, radius, eventLocation, isPrivate)
                     .addOnSuccessListener(event -> {
                         if (!maxAttendeesStr.isEmpty()) {
                             try {
