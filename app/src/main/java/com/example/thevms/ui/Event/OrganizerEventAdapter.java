@@ -58,6 +58,7 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
     private List<Event> events = new ArrayList<>();
     private static final SimpleDateFormat dateFormat = new SimpleDateFormat("MMM d", Locale.getDefault());
     private OnEventCancelListener cancelListener;
+    private OnEventUpdatePosterListener updatePosterListener;
 
     /**
      * Interface for listening to event cancellation actions.
@@ -69,6 +70,18 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
          * @param event The event being cancelled.
          */
         void onCancel(Event event);
+    }
+
+    /**
+     * Interface for listening to update poster actions.
+     */
+    public interface OnEventUpdatePosterListener {
+        /**
+         * Called when the organizer wants to update the event poster.
+         *
+         * @param event The event whose poster is being updated.
+         */
+        void onUpdatePoster(Event event);
     }
 
     /**
@@ -90,6 +103,15 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
         this.cancelListener = cancelListener;
     }
 
+    /**
+     * Sets the listener for update poster actions.
+     *
+     * @param updatePosterListener The listener to set.
+     */
+    public void setOnEventUpdatePosterListener(OnEventUpdatePosterListener updatePosterListener) {
+        this.updatePosterListener = updatePosterListener;
+    }
+
     @NonNull
     @Override
     public ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
@@ -101,7 +123,7 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
     @Override
     public void onBindViewHolder(@NonNull ViewHolder holder, int position) {
         Event event = events.get(position);
-        holder.bind(event, dateFormat, cancelListener);
+        holder.bind(event, dateFormat, cancelListener, updatePosterListener);
     }
 
     @Override
@@ -115,7 +137,7 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
      */
     static class ViewHolder extends RecyclerView.ViewHolder {
         TextView nameText, distanceText, waitlistText, dateText, descriptionText, exportCsvText;
-        Button cancelBtn, lotteryBtn, postCommentBtn;
+        Button cancelBtn, lotteryBtn, postCommentBtn, updatePosterBtn;
         RecyclerView attendeesRv, commentsRv;
         ImageView posterImage;
         Spinner statusSpinner;
@@ -143,6 +165,7 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
             descriptionText = itemView.findViewById(R.id.tv_description);
             cancelBtn = itemView.findViewById(R.id.btn_cancel_event);
             lotteryBtn = itemView.findViewById(R.id.btn_run_lottery);
+            updatePosterBtn = itemView.findViewById(R.id.btn_update_poster);
             attendeesRv = itemView.findViewById(R.id.rv_attendees);
             commentsRv = itemView.findViewById(R.id.rv_comments);
             posterImage = itemView.findViewById(R.id.iv_event_poster);
@@ -234,18 +257,19 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
                         }
 
                         Toast.makeText(itemView.getContext(), "Selected " + winnersCount + " entrants!", Toast.LENGTH_SHORT).show();
-                        bind(event, dateFormat, null); // Refresh list
+                        bind(event, dateFormat, null, null); // Refresh list
                     });
         }
 
         /**
          * Binds an event's data to the ViewHolder and fetches the list of entrants.
          *
-         * @param event          The event to bind.
-         * @param dateFormat     The date format for the event date.
-         * @param cancelListener The listener for event cancellation.
+         * @param event                The event to bind.
+         * @param dateFormat           The date format for the event date.
+         * @param cancelListener       The listener for event cancellation.
+         * @param updatePosterListener The listener for poster update.
          */
-        public void bind(Event event, SimpleDateFormat dateFormat, OnEventCancelListener cancelListener) {
+        public void bind(Event event, SimpleDateFormat dateFormat, OnEventCancelListener cancelListener, OnEventUpdatePosterListener updatePosterListener) {
             String eventId = String.valueOf(event.getEventId());
             itemView.setTag(eventId);
 
@@ -279,6 +303,10 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
             });
 
             lotteryBtn.setOnClickListener(v -> runLottery(event));
+
+            updatePosterBtn.setOnClickListener(v -> {
+                if (updatePosterListener != null) updatePosterListener.onUpdatePoster(event);
+            });
 
             postCommentBtn.setOnClickListener(v -> postOrganizerComment(eventId));
 
