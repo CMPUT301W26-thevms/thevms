@@ -34,10 +34,12 @@ import java.util.TimeZone;
 
 /**
  * Fragment for creating a new event.
+ * Handles event details input, date-time selection, and geolocation settings.
  */
 public class CreateEventFragment extends Fragment {
 
     private EditText etName, etLocation, etDescription;
+    private EditText etMaxAttendees, etMaxWaitlist;
     private Button btnConfirm, btnCancel;
     private Button btnRegStartDate, btnRegEndDate, btnEventStartDate, btnEventEndDate;
     private Date regStartDate, regEndDate, eventStartDate, eventEndDate;
@@ -60,6 +62,8 @@ public class CreateEventFragment extends Fragment {
         etName = view.findViewById(R.id.et_event_name);
         etLocation = view.findViewById(R.id.et_event_location);
         etDescription = view.findViewById(R.id.et_event_description);
+        etMaxAttendees = view.findViewById(R.id.et_max_attendees);
+        etMaxWaitlist = view.findViewById(R.id.et_max_waitlist);
         btnConfirm = view.findViewById(R.id.btn_confirm);
         btnCancel = view.findViewById(R.id.btn_cancel);
         
@@ -96,6 +100,11 @@ public class CreateEventFragment extends Fragment {
 
     /**
      * Testing helper to manually set dates and bypass picker UI.
+     *
+     * @param rs Registration start date.
+     * @param re Registration end date.
+     * @param es Event start date.
+     * @param ee Event end date.
      */
     @VisibleForTesting
     public void setTestingDates(Date rs, Date re, Date es, Date ee) {
@@ -112,6 +121,7 @@ public class CreateEventFragment extends Fragment {
 
     /**
      * Shows a Material Date Picker followed by a Time Picker and updates the selected date-time.
+     *
      * @param type 1: RegStart, 2: RegEnd, 3: EventStart, 4: EventEnd
      */
     private void showDateTimePicker(int type) {
@@ -239,6 +249,28 @@ public class CreateEventFragment extends Fragment {
             radius = 0.0;
         }
 
+        Integer maxAttendees = null;
+        String maxAttendeesStr = etMaxAttendees.getText().toString().trim();
+        if (!maxAttendeesStr.isEmpty()) {
+            try {
+                maxAttendees = Integer.parseInt(maxAttendeesStr);
+            } catch (NumberFormatException e) {
+                etMaxAttendees.setError("Invalid number");
+                return;
+            }
+        }
+
+        Integer maxWaitlist = null;
+        String maxWaitlistStr = etMaxWaitlist.getText().toString().trim();
+        if (!maxWaitlistStr.isEmpty()) {
+            try {
+                maxWaitlist = Integer.parseInt(maxWaitlistStr);
+            } catch (NumberFormatException e) {
+                etMaxWaitlist.setError("Invalid number");
+                return;
+            }
+        }
+
         android.location.Location eventLocation = getLocationFromAddress(locationStr);
         if (eventLocation == null) {
             Toast.makeText(requireContext(), "Please enter a valid location", Toast.LENGTH_SHORT).show();
@@ -248,6 +280,8 @@ public class CreateEventFragment extends Fragment {
         @SuppressLint("HardwareIds")
         String deviceId = Settings.Secure.getString(requireContext().getContentResolver(), Settings.Secure.ANDROID_ID);
 
+        Integer finalMaxAttendees = maxAttendees;
+        Integer finalMaxWaitlist = maxWaitlist;
         Entrant.getOrCreate(deviceId).addOnSuccessListener(user -> {
             Organizer organizer = new Organizer(user.getDeviceId(), user.getEmail(), user.getFirstName(), user.getLastName(), user.getPhoneNumber());
 
@@ -255,6 +289,8 @@ public class CreateEventFragment extends Fragment {
             // Updated: location is now the coordinates of the event, not the location string.
             Event.create(name, description, organizer, locationStr, null, regStartDate, regEndDate, eventStartDate, eventEndDate, isGeoRequired, radius, eventLocation)
                     .addOnSuccessListener(event -> {
+                        event.setMaxAttendees(finalMaxAttendees);
+                        event.setMaxWaitlist(finalMaxWaitlist);
                         event.save().addOnSuccessListener(aVoid -> {
                             Toast.makeText(requireContext(), "Event created successfully!", Toast.LENGTH_SHORT).show();
                             try {
@@ -271,6 +307,9 @@ public class CreateEventFragment extends Fragment {
         });
     }
 
+    /**
+     * Shows a confirmation dialog when the user attempts to cancel event creation.
+     */
     private void showCancelConfirmationDialog() {
         View dialogView = LayoutInflater.from(requireContext()).inflate(R.layout.dialog_cancel_confirmation, null);
 
@@ -297,6 +336,12 @@ public class CreateEventFragment extends Fragment {
         dialog.show();
     }
 
+    /**
+     * Converts a location name (address) string into GPS coordinates.
+     *
+     * @param strAddress The location name to geocode.
+     * @return An android.location.Location object with latitude and longitude, or null if geocoding fails.
+     */
     private android.location.Location getLocationFromAddress(String strAddress) {
         android.location.Geocoder geocoder = new android.location.Geocoder(requireContext(), Locale.getDefault());
         try {

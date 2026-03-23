@@ -8,6 +8,7 @@ import android.util.Patterns;
 import android.view.View;
 import android.widget.Button;
 import android.widget.ImageView;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.activity.EdgeToEdge;
@@ -24,6 +25,10 @@ import com.google.android.material.textfield.TextInputEditText;
 
 import java.util.Objects;
 
+/**
+ * Activity for managing user settings and profile updates.
+ * Allows users to edit their personal information and toggle notification preferences.
+ */
 public class SettingsActivity extends AppCompatActivity {
 
     private TextInputEditText firstNameEdit, lastNameEdit, emailEdit, phoneEdit;
@@ -64,12 +69,71 @@ public class SettingsActivity extends AppCompatActivity {
 
         Button deleteAccountButton = findViewById(R.id.btn_delete_account);
         deleteAccountButton.setOnClickListener(v -> {
-            // Logic for deleting account will go here
+            showDeleteAccountConfirmation(deviceId);
         });
 
         loadUserSettings(deviceId);
     }
 
+    /**
+     * Shows a confirmation dialog before deleting the user account.
+     * Uses the existing dialog_delete_event layout for consistency.
+     *
+     * @param deviceId The unique ID of the device.
+     */
+    private void showDeleteAccountConfirmation(String deviceId) {
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        View dialogView = getLayoutInflater().inflate(R.layout.dialog_delete_event, null);
+        builder.setView(dialogView);
+
+        AlertDialog dialog = builder.create();
+        if (dialog.getWindow() != null) {
+            dialog.getWindow().setBackgroundDrawableResource(android.R.color.transparent);
+        }
+
+        TextView title = dialogView.findViewById(R.id.tv_dialog_title);
+        TextView message = dialogView.findViewById(R.id.tv_dialog_message);
+        Button btnCancel = dialogView.findViewById(R.id.btn_dialog_cancel);
+        Button btnDelete = dialogView.findViewById(R.id.btn_dialog_delete);
+        ImageView ivClose = dialogView.findViewById(R.id.iv_close);
+
+        if (title != null) title.setText("Delete Account");
+        if (message != null) message.setText("Are you sure you want to delete your profile? This will remove you from all event waitlists and delete any events you have organized. This action cannot be undone.");
+
+        if (btnDelete != null) {
+            btnDelete.setText("Delete");
+            btnDelete.setOnClickListener(v -> {
+                handleDeleteAccount(deviceId);
+                dialog.dismiss();
+            });
+        }
+
+        if (btnCancel != null) btnCancel.setOnClickListener(v -> dialog.dismiss());
+        if (ivClose != null) ivClose.setOnClickListener(v -> dialog.dismiss());
+
+        dialog.show();
+    }
+
+    /**
+     * Handles the process of deleting the user account from the database.
+     *
+     * @param deviceId The unique ID of the device.
+     */
+    private void handleDeleteAccount(String deviceId) {
+        Entrant.deleteAccount(deviceId).addOnSuccessListener(aVoid -> {
+            Toast.makeText(SettingsActivity.this, "Account deleted successfully", Toast.LENGTH_SHORT).show();
+            // Close all activities and exit the app
+            finishAffinity();
+        }).addOnFailureListener(e -> {
+            Toast.makeText(SettingsActivity.this, "Failed to delete account: " + e.getMessage(), Toast.LENGTH_LONG).show();
+        });
+    }
+
+    /**
+     * Validates the user input fields for correctness.
+     *
+     * @return True if all inputs are valid, false otherwise.
+     */
     private boolean validateInputs() {
         String firstName = Objects.requireNonNull(firstNameEdit.getText()).toString().trim();
         String lastName = Objects.requireNonNull(lastNameEdit.getText()).toString().trim();
@@ -102,6 +166,11 @@ public class SettingsActivity extends AppCompatActivity {
         return isValid;
     }
 
+    /**
+     * Shows a confirmation dialog before saving profile changes.
+     *
+     * @param deviceId The unique ID of the device.
+     */
     private void showConfirmDialog(String deviceId) {
         new AlertDialog.Builder(this)
                 .setTitle("Save Changes")
@@ -111,6 +180,11 @@ public class SettingsActivity extends AppCompatActivity {
                 .show();
     }
 
+    /**
+     * Handles the process of updating the user profile in the database.
+     *
+     * @param deviceId The unique ID of the device.
+     */
     private void handleUpdate(String deviceId) {
         String firstName = Objects.requireNonNull(firstNameEdit.getText()).toString().trim();
         String lastName = Objects.requireNonNull(lastNameEdit.getText()).toString().trim();
@@ -133,6 +207,11 @@ public class SettingsActivity extends AppCompatActivity {
         });
     }
 
+    /**
+     * Loads the current user settings from the database and populates the UI.
+     *
+     * @param deviceId The unique ID of the device.
+     */
     private void loadUserSettings(String deviceId) {
         Entrant.getOrCreate(deviceId).addOnSuccessListener(entrant -> {
             firstNameEdit.setText(entrant.getFirstName());

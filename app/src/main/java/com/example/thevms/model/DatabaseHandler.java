@@ -2,6 +2,7 @@ package com.example.thevms.model;
 
 import com.google.android.gms.tasks.Task;
 import com.google.android.gms.tasks.Tasks;
+import com.google.firebase.firestore.DocumentReference;
 import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.EventListener;
 import com.google.firebase.firestore.FirebaseFirestore;
@@ -22,7 +23,7 @@ import java.util.Random;
 
 /**
  * DatabaseHandler provides a clean API for interacting with Firebase Firestore.
- * It manages Events, User Profiles, and Entrant Lists.
+ * It manages Events, User Profiles, Entrant Lists, and Notifications.
  */
 public class DatabaseHandler {
     private FirebaseFirestore db;
@@ -31,8 +32,9 @@ public class DatabaseHandler {
     public static final String COLLECTION_EVENTS = "events";
     public static final String COLLECTION_USERS = "users";
     public static final String COLLECTION_ENTRANTS = "entrants";
+    public static final String COLLECTION_COMMENTS = "comments";
     public static final String COLLECTION_NOTIFICATIONS = "notifications";
-
+    
     // Entrant status constants
     public static final String STATUS_WAITING = "waiting";
     public static final String STATUS_SELECTED = "selected";
@@ -42,6 +44,10 @@ public class DatabaseHandler {
     public static final String STATUS_DECLINED = "declined";
     public static final String STATUS_CANCELLED = "cancelled";
 
+    /**
+     * Default constructor for DatabaseHandler.
+     * Lazy initializes the Firestore instance when needed.
+     */
     public DatabaseHandler() {
         // Lazy initialization to avoid crashes in unit tests where Firebase is not available
     }
@@ -75,7 +81,7 @@ public class DatabaseHandler {
     }
 
     /**
-     * Gets the next available event ID.
+     * Gets the next available event ID by querying the highest existing ID.
      *
      * @return A Task that will resolve to the next available event ID.
      */
@@ -100,7 +106,7 @@ public class DatabaseHandler {
     }
 
     /**
-     * Stores or updates an event's details.
+     * Stores or updates an event's details in Firestore.
      *
      * @param eventId   Unique identifier for the event.
      * @param eventData Map containing event attributes.
@@ -143,9 +149,9 @@ public class DatabaseHandler {
     }
 
     /**
-     * Stores or updates a user profile.
+     * Stores or updates a user profile in Firestore.
      *
-     * @param userId   Unique identifier for the user.
+     * @param userId   Unique identifier for the user (device ID).
      * @param userData Map containing user profile attributes.
      * @return Task representing the async operation.
      */
@@ -154,9 +160,9 @@ public class DatabaseHandler {
     }
 
     /**
-     * Retrieves a specific user's profile.
+     * Retrieves a specific user's profile from Firestore.
      *
-     * @param userId The user ID.
+     * @param userId The user ID (device ID).
      * @return Task containing DocumentSnapshot of the user.
      */
     public Task<DocumentSnapshot> getUser(String userId) {
@@ -164,7 +170,7 @@ public class DatabaseHandler {
     }
 
     /**
-     * Retrieves all user profiles.
+     * Retrieves all user profiles from the database.
      *
      * @return Task containing QuerySnapshot of all users.
      */
@@ -271,7 +277,7 @@ public class DatabaseHandler {
     }
 
     /**
-     * Retrieves an entrant's status within an event.
+     * Retrieves an entrant's current status for a specific event.
      *
      * @param eventId The event ID.
      * @param userId  The user ID.
@@ -425,16 +431,126 @@ public class DatabaseHandler {
      * @return A Task representing the operation.
      */
     public Task<Void> sendNotification(String userId, String eventId, String message) {
-        Map<String, Object> notification = new HashMap<>();
-        notification.put("userId", userId);
-        notification.put("eventId", eventId);
-        notification.put("message", message);
-        notification.put("timestamp", com.google.firebase.Timestamp.now());
-        notification.put("read", false);
+      Notification notification = new Notification();
+      notification.setReceiverId(userId);
+      notification.setEventId(eventId);
+      notification.setMessage(message);
+      notification.setTimestamp(com.google.firebase.Timestamp.now());
+      notification.setRead(false);
 
-        return getDb().collection(COLLECTION_NOTIFICATIONS).add(notification).continueWith(task -> null);
+      return sendNotification(notification);
+   }
+
+     * Adds a comment to an event.
+     *
+     * @param eventId The event ID.
+     * @param comment The comment object.
+     * @return A Task representing the operation.
+     */
+    public Task<DocumentReference> addComment(String eventId, Comment comment) {
+        return getDb().collection(COLLECTION_EVENTS)
+                .document(eventId)
+                .collection(COLLECTION_COMMENTS)
+                .add(comment);
     }
 
+    /**
+     * Listens for real-time updates to comments for a specific event.
+     *
+     * @param eventId  The event ID.
+     * @param listener Callback to handle comment updates.
+     * @return ListenerRegistration.
+     */
+    public ListenerRegistration listenToComments(String eventId, EventListener<QuerySnapshot> listener) {
+        return getDb().collection(COLLECTION_EVENTS)
+                .document(eventId)
+                .collection(COLLECTION_COMMENTS)
+                .orderBy("timestamp", Query.Direction.ASCENDING)
+                .addSnapshotListener(listener);
+    }
+
+    /**
+     * Deletes a comment from an event.
+     *
+     * @param eventId   The event ID.
+     * @param commentId The comment ID.
+     * @return A Task representing the operation.
+     */
+    public Task<Void> deleteComment(String eventId, String commentId) {
+        return getDb().collection(COLLECTION_EVENTS)
+                .document(eventId)
+                .collection(COLLECTION_COMMENTS)
+                .document(commentId)
+                .delete();
+    }
+
+    /**
+     * Sends a notification to a specific user.
+     * Saves the notification to the Firestore "notifications" collection.
+     *
+     * @param notification The notification object to send.
+     * @return A Task representing the asynchronous operation.
+     */
+    public Task<Void> sendNotification(Notification notification) {
+        DocumentReference ref = getDb().collection(COLLECTION_NOTIFICATIONS).document();
+        notification.setId(ref.getId());
+        return ref.set(notification);
+    }
+
+    /**
+     * Listens for real-time notifications sent to a specific user.
+     * Queries the "notifications" collection where receiverId matches the provided userId.
+     *
+     * @param userId   The device ID of the notification recipient.
+     * @param listener Callback to handle notification updates.
+     * @return ListenerRegistration to stop listening when needed.
+     */
+    public ListenerRegistration listenToNotifications(String userId, EventListener<QuerySnapshot> listener) {
+        return getDb().collection(COLLECTION_NOTIFICATIONS)
+                .whereEqualTo("receiverId", userId)
+                .addSnapshotListener(listener);
+    }
+
+    /**
+     * Listens for real-time updates to all notifications in the system.
+     * Used for administrative logging.
+     *
+     * @param listener Callback to handle notification updates.
+     * @return ListenerRegistration.
+     */
+    public ListenerRegistration listenToAllNotifications(EventListener<QuerySnapshot> listener) {
+        return getDb().collection(COLLECTION_NOTIFICATIONS)
+                .orderBy("timestamp", Query.Direction.DESCENDING)
+                .addSnapshotListener(listener);
+    }
+
+    /**
+     * Marks a specific notification as read in Firestore.
+     *
+     * @param notificationId The unique ID of the notification to update.
+     * @return A Task representing the asynchronous operation.
+     */
+    public Task<Void> markNotificationAsRead(String notificationId) {
+        return getDb().collection(COLLECTION_NOTIFICATIONS)
+                .document(notificationId)
+                .update("read", true);
+    }
+
+    /**
+     * Permanently deletes a notification from the database.
+     *
+     * @param notificationId The unique ID of the notification to remove.
+     * @return A Task representing the asynchronous operation.
+     */
+    public Task<Void> deleteNotification(String notificationId) {
+        return getDb().collection(COLLECTION_NOTIFICATIONS).document(notificationId).delete();
+    }
+
+    /**
+     * Gets the current Firestore instance, initializing it if necessary.
+     *
+     * @return The FirebaseFirestore instance.
+     */
     public FirebaseFirestore getDb() {
         if (db == null) {
             db = FirebaseFirestore.getInstance();

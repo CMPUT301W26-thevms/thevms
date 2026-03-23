@@ -25,6 +25,10 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * Adapter for displaying a list of attendees (entrants) in a RecyclerView.
+ * Provides filtering by status and CSV export functionality.
+ */
 public class AttendeeAdapter extends RecyclerView.Adapter<AttendeeAdapter.ViewHolder> {
 
     // Full unfiltered list — never modified after set
@@ -36,10 +40,23 @@ public class AttendeeAdapter extends RecyclerView.Adapter<AttendeeAdapter.ViewHo
 
     private OnCancelEntrantListener cancelListener;
 
+    /**
+     * Interface for listening to cancellation events for an entrant.
+     */
     public interface OnCancelEntrantListener {
+        /**
+         * Called when an entrant is cancelled.
+         *
+         * @param item The AttendeeItem representing the cancelled entrant.
+         */
         void onCancel(AttendeeItem item);
     }
 
+    /**
+     * Sets the listener for cancellation events.
+     *
+     * @param listener The listener to set.
+     */
     public void setOnCancelEntrantListener(OnCancelEntrantListener listener) {
         this.cancelListener = listener;
     }
@@ -47,6 +64,8 @@ public class AttendeeAdapter extends RecyclerView.Adapter<AttendeeAdapter.ViewHo
     /**
      * Called when Firestore data loads.
      * Stores the full list and applies the current active filter.
+     *
+     * @param attendees The new list of attendees.
      */
     public void setAttendees(List<AttendeeItem> attendees) {
         this.allAttendees = attendees;
@@ -56,12 +75,19 @@ public class AttendeeAdapter extends RecyclerView.Adapter<AttendeeAdapter.ViewHo
     /**
      * Called when the organizer picks a status from the dropdown.
      * Filters the displayed list instantly.
+     *
+     * @param status The status to filter by (e.g., "waiting", "selected", "accepted", "rejected", "cancelled").
      */
     public void filterByStatus(String status) {
         this.activeStatus = status;
         applyFilter(status);
     }
 
+    /**
+     * Applies the given status filter to the full attendee list.
+     *
+     * @param status The status to filter by.
+     */
     private void applyFilter(String status) {
         filteredAttendees = new ArrayList<>();
         for (AttendeeItem item : allAttendees) {
@@ -133,6 +159,9 @@ public class AttendeeAdapter extends RecyclerView.Adapter<AttendeeAdapter.ViewHo
     /**
      * Wraps a CSV field in quotes and escapes any internal quotes.
      * Handles nulls safely.
+     *
+     * @param value The value to escape.
+     * @return The escaped CSV field string.
      */
     private String escapeCsv(String value) {
         if (value == null) return "";
@@ -208,11 +237,19 @@ public class AttendeeAdapter extends RecyclerView.Adapter<AttendeeAdapter.ViewHo
         return filteredAttendees.size();
     }
 
+    /**
+     * ViewHolder class for attendee items in the RecyclerView.
+     */
     static class ViewHolder extends RecyclerView.ViewHolder {
         TextView nameText;
         ImageView statusIcon;
         Button cancelBtn;
 
+        /**
+         * Initializes the ViewHolder with the item view and finds subviews.
+         *
+         * @param itemView The view for a single attendee item.
+         */
         public ViewHolder(@NonNull View itemView) {
             super(itemView);
             nameText = itemView.findViewById(R.id.tv_attendee_name);

@@ -14,6 +14,7 @@ firebaseAnalytics = "23.0.0"
 firebaseFirestoreVersion = "26.1.1"
 firebaseBom = "34.9.0"
 playServicesLocation = "21.3.0"
+swiperefreshlayout = "1.2.0"
 
 [libraries]
 junit = { group = "junit", name = "junit", version.ref = "junit" }
@@ -30,6 +31,7 @@ firebase-analytics = { group = "com.google.firebase", name = "firebase-analytics
 google-firebase-firestore = { group = "com.google.firebase", name = "firebase-firestore", version.ref = "firebaseFirestoreVersion" }
 firebase-bom = { group = "platform(", name = "firebase-bom", version.ref = "firebaseBom" }
 play-services-location = { group = "com.google.android.gms", name = "play-services-location", version.ref = "playServicesLocation" }
+swiperefreshlayout = { group = "androidx.swiperefreshlayout", name = "swiperefreshlayout", version.ref = "swiperefreshlayout" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

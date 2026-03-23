@@ -1,11 +1,16 @@
 package com.example.thevms.ui.Event;
 
+import android.app.AlertDialog;
+import android.provider.Settings;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
+import android.widget.EditText;
+import android.widget.ImageView;
 import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -16,21 +21,27 @@ import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.thevms.R;
 import com.example.thevms.model.AttendeeItem;
+import com.example.thevms.model.Comment;
 import com.example.thevms.model.DatabaseHandler;
 import com.example.thevms.model.Entrant;
 import com.example.thevms.model.Event;
 import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FirebaseFirestore;
+import com.google.firebase.firestore.ListenerRegistration;
 import com.google.firebase.firestore.QueryDocumentSnapshot;
 
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.Random;
 
+/**
+ * Adapter for organizers to manage their events.
+ * Displays event details, attendee lists with status filtering, and controls for running a lottery or cancelling events.
+ */
 public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAdapter.ViewHolder> {
 
     // Display labels shown in the dropdown — matching the required terminology
@@ -46,15 +57,33 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
     private static final SimpleDateFormat dateFormat = new SimpleDateFormat("MMM d", Locale.getDefault());
     private OnEventCancelListener cancelListener;
 
+    /**
+     * Interface for listening to event cancellation actions.
+     */
     public interface OnEventCancelListener {
+        /**
+         * Called when an event is cancelled by the organizer.
+         *
+         * @param event The event being cancelled.
+         */
         void onCancel(Event event);
     }
 
+    /**
+     * Updates the list of events to be displayed.
+     *
+     * @param events The new list of events.
+     */
     public void setEvents(List<Event> events) {
         this.events = events;
         notifyDataSetChanged();
     }
 
+    /**
+     * Sets the listener for event cancellation actions.
+     *
+     * @param cancelListener The listener to set.
+     */
     public void setOnEventCancelListener(OnEventCancelListener cancelListener) {
         this.cancelListener = cancelListener;
     }
@@ -78,18 +107,30 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
         return events.size();
     }
 
+    /**
+     * ViewHolder class for organizer event cards.
+     * Manages nested RecyclerView for attendees and event management controls.
+     */
     static class ViewHolder extends RecyclerView.ViewHolder {
         TextView nameText, distanceText, waitlistText, dateText, descriptionText, exportCsvText;
-        Button cancelBtn, lotteryBtn;
-        RecyclerView attendeesRv;
+        Button cancelBtn, lotteryBtn, postCommentBtn;
+        RecyclerView attendeesRv, commentsRv;
         Spinner statusSpinner;
+        EditText commentEditText;
         AttendeeAdapter attendeeAdapter;
+        CommentAdapter commentAdapter;
         DatabaseHandler dbHandler;
         FirebaseFirestore db;
+        ListenerRegistration commentsListener;
 
         // Stored so the CSV export can use it for the filename
         String currentEventName = "";
 
+        /**
+         * Initializes the ViewHolder and sets up nested UI components like the attendee list and status spinner.
+         *
+         * @param itemView The view representing a single organizer event card.
+         */
         public ViewHolder(@NonNull View itemView) {
             super(itemView);
             nameText = itemView.findViewById(R.id.tv_event_name);
@@ -100,12 +141,21 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
             cancelBtn = itemView.findViewById(R.id.btn_cancel_event);
             lotteryBtn = itemView.findViewById(R.id.btn_run_lottery);
             attendeesRv = itemView.findViewById(R.id.rv_attendees);
+            commentsRv = itemView.findViewById(R.id.rv_comments);
             statusSpinner = itemView.findViewById(R.id.spinner_attendee_status);
             exportCsvText = itemView.findViewById(R.id.tv_export_csv);
+            commentEditText = itemView.findViewById(R.id.et_organizer_comment);
+            postCommentBtn = itemView.findViewById(R.id.btn_post_organizer_comment);
 
             attendeesRv.setLayoutManager(new LinearLayoutManager(itemView.getContext()));
             attendeeAdapter = new AttendeeAdapter();
             attendeesRv.setAdapter(attendeeAdapter);
+
+            commentsRv.setLayoutManager(new LinearLayoutManager(itemView.getContext()));
+            commentAdapter = new CommentAdapter();
+            commentAdapter.setShowDeleteButton(true);
+            commentsRv.setAdapter(commentAdapter);
+
             dbHandler = new DatabaseHandler();
             db = FirebaseFirestore.getInstance();
 
@@ -131,8 +181,10 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
                 public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
                     attendeeAdapter.filterByStatus(STATUS_VALUES[position]);
                 }
+
                 @Override
-                public void onNothingSelected(AdapterView<?> parent) {}
+                public void onNothingSelected(AdapterView<?> parent) {
+                }
             });
 
             // Wire export CSV button — exports whatever is currently filtered in the list
@@ -144,6 +196,11 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
             );
         }
 
+        /**
+         * Executes the lottery for an event, randomly selecting winners from the waiting list.
+         *
+         * @param event The event for which to run the lottery.
+         */
         private void runLottery(Event event) {
             dbHandler.getEntrantsForEvent(String.valueOf(event.getEventId()))
                     .addOnSuccessListener(queryDocumentSnapshots -> {
@@ -191,6 +248,13 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
                     });
         }
 
+        /**
+         * Binds an event's data to the ViewHolder and fetches the list of entrants.
+         *
+         * @param event          The event to bind.
+         * @param dateFormat     The date format for the event date.
+         * @param cancelListener The listener for event cancellation.
+         */
         public void bind(Event event, SimpleDateFormat dateFormat, OnEventCancelListener cancelListener) {
             String eventId = String.valueOf(event.getEventId());
             itemView.setTag(eventId);
@@ -213,6 +277,8 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
             });
 
             lotteryBtn.setOnClickListener(v -> runLottery(event));
+
+            postCommentBtn.setOnClickListener(v -> postOrganizerComment(eventId));
 
             // Reset spinner to "Waiting" each time a card is bound
             statusSpinner.setSelection(0);
@@ -255,8 +321,97 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
                     attendeeAdapter.setAttendees(new ArrayList<>());
                 }
             });
+
+            setupComments(eventId);
         }
 
+        private void setupComments(String eventId) {
+            if (commentsListener != null) {
+                commentsListener.remove();
+            }
+
+            commentsListener = dbHandler.listenToComments(eventId, (value, error) -> {
+                if (error != null) {
+                    Log.w("OrganizerEventAdapter", "Listen failed.", error);
+                    return;
+                }
+
+                if (value == null) return;
+
+                List<Comment> comments = new ArrayList<>();
+                List<String> commentIds = new ArrayList<>();
+                for (QueryDocumentSnapshot doc : value) {
+                    comments.add(doc.toObject(Comment.class));
+                    commentIds.add(doc.getId());
+                }
+                commentAdapter.setComments(comments, commentIds);
+            });
+
+            commentAdapter.setOnCommentDeleteListener((comment, commentId) -> {
+                showDeleteCommentConfirmation(eventId, commentId);
+            });
+        }
+
+        private void postOrganizerComment(String eventId) {
+            String text = commentEditText.getText().toString().trim();
+            if (text.isEmpty()) return;
+
+            String deviceId = Settings.Secure.getString(itemView.getContext().getContentResolver(), Settings.Secure.ANDROID_ID);
+            dbHandler.getUser(deviceId).addOnSuccessListener(userDoc -> {
+                String firstName = userDoc.getString("firstName");
+                String lastName = userDoc.getString("lastName");
+                if (firstName == null) firstName = "Organizer";
+                if (lastName == null) lastName = "";
+
+                Comment comment = new Comment(deviceId, firstName, lastName, text, new Date(), true);
+                dbHandler.addComment(eventId, comment).addOnSuccessListener(aVoid -> {
+                    commentEditText.setText("");
+                    Toast.makeText(itemView.getContext(), "Comment posted", Toast.LENGTH_SHORT).show();
+                });
+            });
+        }
+
+        private void showDeleteCommentConfirmation(String eventId, String commentId) {
+            AlertDialog.Builder builder = new AlertDialog.Builder(itemView.getContext());
+            View dialogView = LayoutInflater.from(itemView.getContext()).inflate(R.layout.dialog_cancel_confirmation, null);
+            builder.setView(dialogView);
+
+            AlertDialog dialog = builder.create();
+            if (dialog.getWindow() != null) {
+                dialog.getWindow().setBackgroundDrawableResource(android.R.color.transparent);
+            }
+
+            TextView title = dialogView.findViewById(R.id.tv_dialog_title);
+            TextView message = dialogView.findViewById(R.id.tv_dialog_message);
+            Button btnBack = dialogView.findViewById(R.id.btn_dialog_back);
+            Button btnYes = dialogView.findViewById(R.id.btn_dialog_yes);
+            ImageView ivClose = dialogView.findViewById(R.id.iv_close);
+
+            if (title != null) title.setText(R.string.delete_comment_title);
+            if (message != null) message.setText(R.string.delete_comment_message);
+            if (btnYes != null) btnYes.setText(R.string.delete_comment_confirm);
+            if (btnBack != null) btnBack.setText(R.string.delete_comment_cancel);
+
+            if (btnBack != null) btnBack.setOnClickListener(v -> dialog.dismiss());
+            if (ivClose != null) ivClose.setOnClickListener(v -> dialog.dismiss());
+            if (btnYes != null) {
+                btnYes.setOnClickListener(v -> {
+                    dbHandler.deleteComment(eventId, commentId).addOnSuccessListener(aVoid -> {
+                        Toast.makeText(itemView.getContext(), R.string.comment_deleted_toast, Toast.LENGTH_SHORT).show();
+                        dialog.dismiss();
+                    });
+                });
+            }
+
+            dialog.show();
+        }
+
+        /**
+         * Cancels a specific entrant's selection and automatically invites the next person from the waiting list.
+         *
+         * @param eventId            The ID of the event.
+         * @param cancelledEntrantId The ID of the entrant to cancel.
+         */
         private void cancelEntrantAndSelectNext(String eventId, String cancelledEntrantId) {
             Map<String, Object> cancelData = new HashMap<>();
             cancelData.put("status", DatabaseHandler.STATUS_CANCELLED);
