@@ -1,6 +1,7 @@
 package com.example.thevms.ui;
 
 import android.annotation.SuppressLint;
+import android.net.Uri;
 import android.os.Bundle;
 import android.provider.Settings;
 import android.util.Log;
@@ -10,8 +11,11 @@ import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ImageView;
+import android.widget.TextView;
 import android.widget.Toast;
 
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.annotation.VisibleForTesting;
@@ -46,6 +50,23 @@ public class CreateEventFragment extends Fragment {
     private View layoutLimitDistance;
     private EditText etLimitDistance;
 
+    private ImageView ivEventPoster;
+    private TextView tvUploadPlaceholder;
+    private Button btnReplacePoster;
+    private Uri posterUri;
+
+    private final ActivityResultLauncher<String> imagePickerLauncher = registerForActivityResult(
+            new ActivityResultContracts.GetContent(),
+            uri -> {
+                if (uri != null) {
+                    posterUri = uri;
+                    ivEventPoster.setImageURI(uri);
+                    tvUploadPlaceholder.setVisibility(View.GONE);
+                    btnReplacePoster.setVisibility(View.VISIBLE);
+                }
+            }
+    );
+
     @Nullable
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
@@ -69,6 +90,19 @@ public class CreateEventFragment extends Fragment {
         btnRegEndDate = view.findViewById(R.id.btn_reg_end_date);
         btnEventStartDate = view.findViewById(R.id.btn_event_start_date);
         btnEventEndDate = view.findViewById(R.id.btn_event_end_date);
+
+        ivEventPoster = view.findViewById(R.id.iv_event_poster);
+        tvUploadPlaceholder = view.findViewById(R.id.tv_upload_placeholder);
+        btnReplacePoster = view.findViewById(R.id.btn_replace_poster);
+
+        // Setup poster upload
+        tvUploadPlaceholder.setOnClickListener(v -> imagePickerLauncher.launch("image/*"));
+        btnReplacePoster.setOnClickListener(v -> imagePickerLauncher.launch("image/*"));
+
+        // Hide replace button initially if no poster is selected
+        if (posterUri == null) {
+            btnReplacePoster.setVisibility(View.GONE);
+        }
 
         // Setup date-time pickers
         btnRegStartDate.setOnClickListener(v -> showDateTimePicker(1));
