@@ -33,8 +33,7 @@
                     android:layout_height="match_parent"
                     android:background="#E8E8E8"
                     android:scaleType="centerInside"
-                    android:src="@drawable/ic_launcher_foreground"
-                    app:tint="#D0D0D0" />
+                    android:src="@drawable/ic_launcher_foreground" />
             </com.google.android.material.card.MaterialCardView>
 
             <com.google.android.material.button.MaterialButton

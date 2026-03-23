@@ -1,6 +1,8 @@
 package com.example.thevms.ui.Event;
 
 import android.app.AlertDialog;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.provider.Settings;
 import android.util.Log;
 import android.view.LayoutInflater;
@@ -115,6 +117,7 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
         TextView nameText, distanceText, waitlistText, dateText, descriptionText, exportCsvText;
         Button cancelBtn, lotteryBtn, postCommentBtn;
         RecyclerView attendeesRv, commentsRv;
+        ImageView posterImage;
         Spinner statusSpinner;
         EditText commentEditText;
         AttendeeAdapter attendeeAdapter;
@@ -142,6 +145,7 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
             lotteryBtn = itemView.findViewById(R.id.btn_run_lottery);
             attendeesRv = itemView.findViewById(R.id.rv_attendees);
             commentsRv = itemView.findViewById(R.id.rv_comments);
+            posterImage = itemView.findViewById(R.id.iv_event_poster);
             statusSpinner = itemView.findViewById(R.id.spinner_attendee_status);
             exportCsvText = itemView.findViewById(R.id.tv_export_csv);
             commentEditText = itemView.findViewById(R.id.et_organizer_comment);
@@ -252,6 +256,18 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
 
             if (event.getEventStartTime() != null) {
                 dateText.setText("🗓 " + dateFormat.format(event.getEventStartTime()));
+            }
+
+            if (event.getPhoto() != null) {
+                Bitmap bitmap = BitmapFactory.decodeByteArray(event.getPhoto(), 0, event.getPhoto().length);
+                posterImage.setImageBitmap(bitmap);
+                posterImage.setScaleType(ImageView.ScaleType.CENTER_CROP);
+                posterImage.setAlpha(1.0f);
+                posterImage.clearColorFilter();
+            } else {
+                posterImage.setImageResource(R.drawable.ic_launcher_foreground);
+                posterImage.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
+                posterImage.setAlpha(0.3f);
             }
 
             event.fetchEntrantCount().addOnSuccessListener(count ->
