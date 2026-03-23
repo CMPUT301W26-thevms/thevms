@@ -37,9 +37,7 @@ import java.util.TimeZone;
  * Handles event details input, date-time selection, and geolocation settings.
  */
 public class CreateEventFragment extends Fragment {
-
-    private EditText etName, etLocation, etDescription;
-    private EditText etMaxAttendees, etMaxWaitlist;
+    private EditText etName, etLocation, etDescription, etMaxAttendees, etMaxWaitlist;
     private Button btnConfirm, btnCancel;
     private Button btnRegStartDate, btnRegEndDate, btnEventStartDate, btnEventEndDate;
     private Date regStartDate, regEndDate, eventStartDate, eventEndDate;
@@ -194,6 +192,7 @@ public class CreateEventFragment extends Fragment {
         String name = etName.getText().toString().trim();
         String locationStr = etLocation.getText().toString().trim();
         String description = etDescription.getText().toString().trim();
+        String maxAttendeesStr = etMaxAttendees.getText().toString().trim();
         boolean isGeoRequired = switchGeo.isChecked();
 
         if (name.isEmpty()) {
@@ -250,7 +249,6 @@ public class CreateEventFragment extends Fragment {
         }
 
         Integer maxAttendees = null;
-        String maxAttendeesStr = etMaxAttendees.getText().toString().trim();
         if (!maxAttendeesStr.isEmpty()) {
             try {
                 maxAttendees = Integer.parseInt(maxAttendeesStr);
@@ -289,6 +287,11 @@ public class CreateEventFragment extends Fragment {
             // Updated: location is now the coordinates of the event, not the location string.
             Event.create(name, description, organizer, locationStr, null, regStartDate, regEndDate, eventStartDate, eventEndDate, isGeoRequired, radius, eventLocation)
                     .addOnSuccessListener(event -> {
+                        if (!maxAttendeesStr.isEmpty()) {
+                            try {
+                                event.setMaxAttendees(Integer.parseInt(maxAttendeesStr));
+                            } catch (NumberFormatException ignored) {}
+                        }
                         event.setMaxAttendees(finalMaxAttendees);
                         event.setMaxWaitlist(finalMaxWaitlist);
                         event.save().addOnSuccessListener(aVoid -> {
