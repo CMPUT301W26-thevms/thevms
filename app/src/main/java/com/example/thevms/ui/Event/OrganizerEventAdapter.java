@@ -33,9 +33,9 @@ import java.util.Random;
 
 public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAdapter.ViewHolder> {
 
-    // Display labels shown in the dropdown — must match Firestore status values exactly
+    // Display labels shown in the dropdown — matching the required terminology
     private static final String[] STATUS_LABELS = {
-            "Waiting", "Selected", "Accepted", "Rejected", "Cancelled", "Declined"
+            "Waiting", "Selected", "Accepted", "Not Selected", "Cancelled", "Declined"
     };
 
     private static final String[] STATUS_VALUES = {
@@ -148,9 +148,15 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
             dbHandler.getEntrantsForEvent(String.valueOf(event.getEventId()))
                     .addOnSuccessListener(queryDocumentSnapshots -> {
                         List<DocumentSnapshot> waitingList = new ArrayList<>();
+                        int currentSelectedOrAccepted = 0;
+
                         for (QueryDocumentSnapshot doc : queryDocumentSnapshots) {
-                            if (DatabaseHandler.STATUS_WAITING.equals(doc.getString("status"))) {
+                            String status = doc.getString("status");
+                            if (DatabaseHandler.STATUS_WAITING.equals(status)) {
                                 waitingList.add(doc);
+                            } else if (DatabaseHandler.STATUS_SELECTED.equals(status) || 
+                                       DatabaseHandler.STATUS_ACCEPTED.equals(status)) {
+                                currentSelectedOrAccepted++;
                             }
                         }
 
@@ -159,11 +165,19 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
                             return;
                         }
 
-                        java.util.Collections.shuffle(waitingList);
+                        // Use maxAttendees if specified, otherwise default to a small number
+                        int totalCapacity = (event.getMaxAttendees() != null && event.getMaxAttendees() > 0) ? event.getMaxAttendees() : 1;
+                        
+                        // IMPORTANT: Calculate remaining spots
+                        int spotsLeft = totalCapacity - currentSelectedOrAccepted;
 
-                        // Use maxAttendees if specified, otherwise pick a default (e.g., 3)
-                        int capacity = (event.getMaxAttendees() != null && event.getMaxAttendees() > 0) ? event.getMaxAttendees() : 3;
-                        int winnersCount = Math.min(waitingList.size(), capacity);
+                        if (spotsLeft <= 0) {
+                            Toast.makeText(itemView.getContext(), "Event is already at full capacity!", Toast.LENGTH_SHORT).show();
+                            return;
+                        }
+
+                        java.util.Collections.shuffle(waitingList);
+                        int winnersCount = Math.min(waitingList.size(), spotsLeft);
 
                         for (int i = 0; i < winnersCount; i++) {
                             DocumentSnapshot doc = waitingList.get(i);
@@ -172,7 +186,7 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
                             dbHandler.updateEntrantStatus(String.valueOf(event.getEventId()), doc.getId(), data);
                         }
 
-                        Toast.makeText(itemView.getContext(), "Selected " + winnersCount + " entrants!", Toast.LENGTH_SHORT).show();
+                        Toast.makeText(itemView.getContext(), "Selected " + winnersCount + " new entrants!", Toast.LENGTH_SHORT).show();
                         bind(event, dateFormat, null); // Refresh list
                     });
         }

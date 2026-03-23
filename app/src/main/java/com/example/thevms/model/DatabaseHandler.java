@@ -31,6 +31,8 @@ public class DatabaseHandler {
     public static final String COLLECTION_EVENTS = "events";
     public static final String COLLECTION_USERS = "users";
     public static final String COLLECTION_ENTRANTS = "entrants";
+    public static final String COLLECTION_NOTIFICATIONS = "notifications";
+
     // Entrant status constants
     public static final String STATUS_WAITING = "waiting";
     public static final String STATUS_SELECTED = "selected";
@@ -200,7 +202,20 @@ public class DatabaseHandler {
                     for (QueryDocumentSnapshot doc : task.getResult()) {
                         // The document ID in the entrants sub-collection is the user's deviceId
                         if (doc.getId().equals(userId)) {
-                            tasks.add(doc.getReference().delete());
+                            String status = doc.getString("status");
+                            // If user was selected or accepted, trigger re-selection for the event
+                            if (STATUS_SELECTED.equals(status) || STATUS_ACCEPTED.equals(status)) {
+                                String eventPath = doc.getReference().getPath(); // e.g. "events/123/entrants/userId"
+                                String[] parts = eventPath.split("/");
+                                if (parts.length > 1) {
+                                    String eventId = parts[1];
+                                    tasks.add(doc.getReference().delete().continueWithTask(t -> selectAndInviteNextEntrant(eventId)));
+                                } else {
+                                    tasks.add(doc.getReference().delete());
+                                }
+                            } else {
+                                tasks.add(doc.getReference().delete());
+                            }
                         }
                     }
                     // Wait for all sub-collection deletions to finish
@@ -392,8 +407,32 @@ public class DatabaseHandler {
 
                     Map<String, Object> data = new HashMap<>();
                     data.put("status", STATUS_SELECTED);
-                    return updateEntrantStatus(eventId, next.getId(), data);
+                    data.put("isSecondChance", true); // Metadata to indicate this was a re-selection
+                    
+                    return updateEntrantStatus(eventId, next.getId(), data).continueWithTask(t -> {
+                        // Send a notification to the selected user
+                        return sendNotification(next.getId(), eventId, "Congratulations! You have been selected for a second chance for an event!");
+                    });
                 });
+    }
+
+    /**
+     * Sends a notification to a specific user.
+     *
+     * @param userId  The user ID.
+     * @param eventId The event ID associated with the notification.
+     * @param message The notification message.
+     * @return A Task representing the operation.
+     */
+    public Task<Void> sendNotification(String userId, String eventId, String message) {
+        Map<String, Object> notification = new HashMap<>();
+        notification.put("userId", userId);
+        notification.put("eventId", eventId);
+        notification.put("message", message);
+        notification.put("timestamp", com.google.firebase.Timestamp.now());
+        notification.put("read", false);
+
+        return getDb().collection(COLLECTION_NOTIFICATIONS).add(notification).continueWith(task -> null);
     }
 
     public FirebaseFirestore getDb() {
