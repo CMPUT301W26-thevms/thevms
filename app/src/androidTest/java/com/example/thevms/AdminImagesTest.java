@@ -127,4 +127,30 @@ public class AdminImagesTest {
             onView(withId(R.id.images_recycler_view)).check(hasItemCount(1));
         }
     }
+
+    @Test
+    public void testDeleteImageSucceeds() throws InterruptedException {
+        try (ActivityScenario<MainActivity> scenario = ActivityScenario.launch(MainActivity.class)) {
+            // Navigate to Manage Images
+            waitForView(withId(R.id.nav_admin_settings), 5000);
+            onView(withId(R.id.nav_admin_settings)).perform(click());
+            waitForView(withId(R.id.admin_manage_images), 2000);
+            onView(withId(R.id.admin_manage_images)).perform(click());
+
+            // Verify initial image presence
+            waitForView(withText("Image Event"), 2000);
+            onView(withId(R.id.images_recycler_view)).check(hasItemCount(1));
+
+            // Perform Deletion
+            onView(withId(R.id.btn_delete_image)).perform(click());
+            waitForView(withText("Delete Image?"), 2000);
+            onView(withId(R.id.btn_dialog_delete)).perform(click());
+
+            // Verify empty state is shown after deletion
+            waitForView(withId(R.id.empty_state_text), 5000);
+            onView(withId(R.id.empty_state_text)).check(matches(isDisplayed()));
+            onView(withText("No images found.")).check(matches(isDisplayed()));
+            onView(withId(R.id.images_recycler_view)).check(hasItemCount(0));
+        }
+    }
 }
