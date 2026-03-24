@@ -93,13 +93,23 @@ public class NotificationAdapter extends RecyclerView.Adapter<NotificationAdapte
         }
 
         public void bind(Notification notification) {
-            title.setText(notification.getTitle());
-            String senderInfo = "From: " + notification.getSenderName() + " (" + notification.getSenderRole().toString() + ")";
+            title.setText(notification.getTitle() != null ? notification.getTitle() : "Notification");
+            
+            String nameStr = (notification.getSenderName() != null) ? notification.getSenderName() : "System";
+            String roleStr = (notification.getSenderRole() != null) ? notification.getSenderRole().toString() : "ADMIN";
+            String senderInfo = "From: " + nameStr + " (" + roleStr + ")";
             from.setText(senderInfo);
-            description.setText(notification.getDescription());
+            
+            if (notification.getDescription() != null && !notification.getDescription().trim().isEmpty()) {
+                description.setText(notification.getDescription());
+            } else {
+                description.setText("This is not how you create a notification please use one of the create notification methods or make a new create notification method.");
+            }
             
             if (notification.getTimestamp() != null) {
                 time.setText(DateFormat.format("MMM dd, h:mm a", notification.getTimestamp()));
+            } else {
+                time.setText("");
             }
 
             if (isReadOnly) {
@@ -107,12 +117,9 @@ public class NotificationAdapter extends RecyclerView.Adapter<NotificationAdapte
                 inviteActionsContainer.setVisibility(View.GONE);
                 
                 // Admin logs view: show who the notification was sent to
-                if (notification.getReceiverName() != null) {
-                    to.setVisibility(View.VISIBLE);
-                    to.setText("To: " + notification.getReceiverName());
-                } else {
-                    to.setVisibility(View.GONE);
-                }
+                to.setVisibility(View.VISIBLE);
+                String receiverName = (notification.getReceiverName() != null) ? notification.getReceiverName() : "Unknown Recipient";
+                to.setText("To: " + receiverName);
             } else {
                 btnDelete.setVisibility(View.VISIBLE);
                 to.setVisibility(View.GONE); // Inbox view: don't show recipient
