@@ -74,6 +74,8 @@ public class AdminActivity {
                 mainActivity.navigateToFragment(AdminProfilesFragment.newInstance(false), R.id.nav_admin_settings);
             } else if ("Manage Organizers".equals(actionName)) {
                 mainActivity.navigateToFragment(AdminProfilesFragment.newInstance(true), R.id.nav_admin_settings);
+            } else if ("Manage Images".equals(actionName)) {
+                mainActivity.navigateToFragment(new AdminImagesFragment(), R.id.nav_admin_settings);
             } else if ("View Logs".equals(actionName)) {
                 mainActivity.navigateToFragment(new AdminLogsFragment(), R.id.nav_admin_settings);
             } else {
