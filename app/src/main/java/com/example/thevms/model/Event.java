@@ -5,6 +5,7 @@ import android.location.Location;
 import com.google.android.gms.tasks.Task;
 import com.google.android.gms.tasks.Tasks;
 import com.google.firebase.Timestamp;
+import com.google.firebase.firestore.Blob;
 import com.google.firebase.firestore.DocumentSnapshot;
 
 import java.util.Date;
@@ -16,7 +17,7 @@ import java.util.Map;
  *
  * <p><b>Creation Workflow:</b></p>
  * <ol>
- *     <li>Call the static {@link #create(String, String, Organizer, String, String, Date, Date, Date, Date, boolean, Double, Location, boolean)} method.</li>
+ *     <li>Call the static {@link #create(String, String, Organizer, String, byte[], Date, Date, Date, Date, boolean, Double, Location, boolean)} method.</li>
  *     <li>This method asynchronously fetches a unique ID from the database.</li>
  *     <li>It then returns a {@code Task<Event>}. You use an {@code .addOnSuccessListener} to get the in-memory Event object.</li>
  *     <li>The created object does NOT yet exist in the database.</li>
@@ -57,7 +58,7 @@ public class Event {
     private String locationName; // Added for UI convenience
 
     private String qrCode;
-    private String imageUrl;
+    private byte[] photo;
 
     private Date registrationStartTime;
     private Date registrationEndTime;
@@ -65,7 +66,7 @@ public class Event {
     private Date eventEndTime;
 
     private Integer maxAttendees; // US 01.01.01
-    private Integer maxWaitlist; // US 01.02.01
+    private Integer maxWaitlist;
     private boolean geolocationRequired; // US 01.08.01
     private Double limitDistance;
 
@@ -83,7 +84,7 @@ public class Event {
      * @param description           Description of the event.
      * @param organizer             The event organizer.
      * @param location              The event location string.
-     * @param imageUrl              URL for the event's banner image.
+     * @param photo                 The event's poster image as raw bytes.
      * @param registrationStartTime The start time for registration.
      * @param registrationEndTime   The end time for registration.
      * @param eventStartTime        The start time of the event.
@@ -93,14 +94,14 @@ public class Event {
      * @param geoLocation           The actual GPS coordinates (Latitude/Longitude) of the event.
      * @param isPrivate             Whether the event is private and hidden from search.
      */
-    private Event(Long eventId, String name, String description, Organizer organizer, String location, String imageUrl, Date registrationStartTime, Date registrationEndTime, Date eventStartTime, Date eventEndTime, boolean geolocationRequired, Double radius, Location geoLocation, boolean isPrivate) {
+    private Event(Long eventId, String name, String description, Organizer organizer, String location, byte[] photo, Date registrationStartTime, Date registrationEndTime, Date eventStartTime, Date eventEndTime, boolean geolocationRequired, Double radius, Location geoLocation, boolean isPrivate) {
         this.dbHandler = new DatabaseHandler();
         this.eventId = eventId;
         this.name = name;
         this.description = description;
         this.organizer = organizer;
         this.location = location;
-        this.imageUrl = imageUrl;
+        this.photo = photo;
         this.registrationStartTime = registrationStartTime;
         this.registrationEndTime = registrationEndTime;
         this.eventStartTime = eventStartTime;
@@ -128,7 +129,7 @@ public class Event {
      * @param description           Description of the event.
      * @param organizer             The event organizer.
      * @param location              The event location.
-     * @param imageUrl              URL for the event's banner image.
+     * @param photo                 The event's poster image as raw bytes.
      * @param registrationStartTime The start time for registration.
      * @param registrationEndTime   The end time for registration.
      * @param eventStartTime        The start time of the event.
@@ -139,12 +140,12 @@ public class Event {
      * @param isPrivate             Boolean flag for event privacy.
      * @return A {@code Task<Event>} that, upon completion, will contain the fully initialized Event object.
      */
-    public static Task<Event> create(String name, String description, Organizer organizer, String location, String imageUrl, Date registrationStartTime, Date registrationEndTime, Date eventStartTime, Date eventEndTime, boolean geolocationRequired, Double radius, Location geoLocation, boolean isPrivate) {
+    public static Task<Event> create(String name, String description, Organizer organizer, String location, byte[] photo, Date registrationStartTime, Date registrationEndTime, Date eventStartTime, Date eventEndTime, boolean geolocationRequired, Double radius, Location geoLocation, boolean isPrivate) {
         DatabaseHandler dbHandler = new DatabaseHandler();
         return dbHandler.getNextEventId().continueWith(task -> {
             if (task.isSuccessful()) {
                 Long eventId = task.getResult();
-                return new Event(eventId, name, description, organizer, location, imageUrl, registrationStartTime, registrationEndTime, eventStartTime, eventEndTime, geolocationRequired, radius, geoLocation, isPrivate);
+                return new Event(eventId, name, description, organizer, location, photo, registrationStartTime, registrationEndTime, eventStartTime, eventEndTime, geolocationRequired, radius, geoLocation, isPrivate);
             } else {
                 throw task.getException();
             }
@@ -178,7 +179,15 @@ public class Event {
         Long id = data.get("eventId") instanceof Long ? (Long) data.get("eventId") : null;
         String name = (String) data.get("name");
         String desc = (String) data.get("description");
-        String img = (String) data.get("imageUrl");
+
+        byte[] photo = null;
+        if (data.containsKey("photo")) {
+            Object photoObj = data.get("photo");
+            if (photoObj instanceof Blob) {
+                photo = ((Blob) photoObj).toBytes();
+            }
+        }
+
         String orgId = (String) data.get("organizerId");
         String email = (String) data.get("organizerEmail");
         String fName = (String) data.get("organizerFirstName");
@@ -193,7 +202,7 @@ public class Event {
         Boolean geoRequired = data.get("geolocationRequired") instanceof Boolean ? (Boolean) data.get("geolocationRequired") : false;
         Double radius = data.get("radius") instanceof Double ? (Double) data.get("radius") : 0.0;
         Boolean isPrivate = data.get("isPrivate") instanceof Boolean ? (Boolean) data.get("isPrivate") : false;
-        
+
         Location geoLocation = null;
         if (data.containsKey("latitude") && data.get("latitude") != null && data.containsKey("longitude") && data.get("longitude") != null) {
             geoLocation = new Location("event_location");
@@ -201,7 +210,7 @@ public class Event {
             geoLocation.setLongitude((Double) data.get("longitude"));
         }
 
-        Event event = new Event(id, name, desc, organizer, location, img, regStart, regEnd, eventStart, eventEnd, geoRequired != null && geoRequired, radius, geoLocation, isPrivate != null && isPrivate);
+        Event event = new Event(id, name, desc, organizer, location, photo, regStart, regEnd, eventStart, eventEnd, geoRequired != null && geoRequired, radius, geoLocation, isPrivate != null && isPrivate);
 
         if (data.containsKey("maxAttendees") && data.get("maxAttendees") != null) {
             Object val = data.get("maxAttendees");
@@ -217,7 +226,8 @@ public class Event {
             Object dist = data.get("limitDistance");
             if (dist instanceof Double) event.setLimitDistance((Double) dist);
             else if (dist instanceof Long) event.setLimitDistance(((Long) dist).doubleValue());
-            else if (dist instanceof Integer) event.setLimitDistance(((Integer) dist).doubleValue());
+            else if (dist instanceof Integer)
+                event.setLimitDistance(((Integer) dist).doubleValue());
         }
         if (data.containsKey("locationName")) {
             event.setLocationName((String) data.get("locationName"));
@@ -265,7 +275,11 @@ public class Event {
         }
         map.put("location", location);
         map.put("locationName", locationName);
-        map.put("imageUrl", imageUrl);
+        if (photo != null) {
+            map.put("photo", Blob.fromBytes(photo));
+        } else {
+            map.put("photo", null);
+        }
         map.put("registrationStartTime", registrationStartTime);
         map.put("registrationEndTime", registrationEndTime);
         map.put("eventStartTime", eventStartTime);
@@ -355,228 +369,334 @@ public class Event {
 
     /**
      * Gets the count of entrants registered for the event.
+     *
      * @return The entrant count.
      */
-    public long getEntrantCount() {return entrantCount;}
+    public long getEntrantCount() {
+        return entrantCount;
+    }
 
     /**
      * Gets the unique event ID.
+     *
      * @return The event ID.
      */
-    public Long getEventId() {return eventId;}
+    public Long getEventId() {
+        return eventId;
+    }
 
     /**
      * Gets the name of the event.
+     *
      * @return The event name.
      */
-    public String getName() {return name;}
+    public String getName() {
+        return name;
+    }
 
     /**
      * Sets the name of the event.
+     *
      * @param name The new event name.
      */
-    public void setName(String name) {this.name = name;}
+    public void setName(String name) {
+        this.name = name;
+    }
 
     /**
      * Gets the description of the event.
+     *
      * @return The event description.
      */
-    public String getDescription() {return description;}
+    public String getDescription() {
+        return description;
+    }
 
     /**
      * Sets the description of the event.
+     *
      * @param description The new event description.
      */
-    public void setDescription(String description) {this.description = description;}
+    public void setDescription(String description) {
+        this.description = description;
+    }
 
     /**
      * Gets the organizer of the event.
+     *
      * @return The Organizer object.
      */
-    public Organizer getOrganizer() {return organizer;}
+    public Organizer getOrganizer() {
+        return organizer;
+    }
 
     /**
      * Sets the organizer of the event.
+     *
      * @param organizer The new Organizer.
      */
-    public void setOrganizer(Organizer organizer) {this.organizer = organizer;}
+    public void setOrganizer(Organizer organizer) {
+        this.organizer = organizer;
+    }
 
     /**
      * Gets the location string of the event.
+     *
      * @return The location string.
      */
-    public String getLocation() {return location;}
+    public String getLocation() {
+        return location;
+    }
 
     /**
      * Sets the location string of the event.
+     *
      * @param location The new location string.
      */
-    public void setLocation(String location) {this.location = location;}
+    public void setLocation(String location) {
+        this.location = location;
+    }
 
     /**
      * Gets the descriptive name of the location.
+     *
      * @return The location name.
      */
-    public String getLocationName() { return locationName; }
+    public String getLocationName() {
+        return locationName;
+    }
 
     /**
      * Sets the descriptive name of the location.
+     *
      * @param locationName The new location name.
      */
-    public void setLocationName(String locationName) { this.locationName = locationName; }
+    public void setLocationName(String locationName) {
+        this.locationName = locationName;
+    }
 
     /**
-     * Gets the URL of the event's banner image.
-     * @return The image URL.
+     * Gets the raw bytes of the event's poster image.
+     *
+     * @return The image bytes.
      */
-    public String getImageUrl() {return imageUrl;}
+    public byte[] getPhoto() {
+        return photo;
+    }
 
     /**
-     * Sets the URL of the event's banner image.
-     * @param imageUrl The new image URL.
+     * Sets the raw bytes of the event's poster image.
+     *
+     * @param photo The new image bytes.
      */
-    public void setImageUrl(String imageUrl) {this.imageUrl = imageUrl;}
-
-    /**
-     * Removes the event's banner image URL.
-     */
-    public void removeImageUrl() {this.imageUrl = null;}
+    public void setPhoto(byte[] photo) {
+        this.photo = photo;
+    }
 
     /**
      * Gets the registration start time.
+     *
      * @return The registration start Date.
      */
-    public Date getRegistrationStartTime() {return registrationStartTime;}
+    public Date getRegistrationStartTime() {
+        return registrationStartTime;
+    }
 
     /**
      * Sets the registration start time.
+     *
      * @param registrationStartTime The new registration start Date.
      */
-    public void setRegistrationStartTime(Date registrationStartTime) {this.registrationStartTime = registrationStartTime;}
+    public void setRegistrationStartTime(Date registrationStartTime) {
+        this.registrationStartTime = registrationStartTime;
+    }
 
     /**
      * Gets the registration end time.
+     *
      * @return The registration end Date.
      */
-    public Date getRegistrationEndTime() {return registrationEndTime;}
+    public Date getRegistrationEndTime() {
+        return registrationEndTime;
+    }
 
     /**
      * Sets the registration end time.
+     *
      * @param registrationEndTime The new registration end Date.
      */
-    public void setRegistrationEndTime(Date registrationEndTime) {this.registrationEndTime = registrationEndTime;}
+    public void setRegistrationEndTime(Date registrationEndTime) {
+        this.registrationEndTime = registrationEndTime;
+    }
 
     /**
      * Gets the event start time.
+     *
      * @return The event start Date.
      */
-    public Date getEventStartTime() {return eventStartTime;}
+    public Date getEventStartTime() {
+        return eventStartTime;
+    }
 
     /**
      * Sets the event start time.
+     *
      * @param eventStartTime The new event start Date.
      */
-    public void setEventStartTime(Date eventStartTime) {this.eventStartTime = eventStartTime;}
+    public void setEventStartTime(Date eventStartTime) {
+        this.eventStartTime = eventStartTime;
+    }
 
     /**
      * Gets the event end time.
+     *
      * @return The event end Date.
      */
-    public Date getEventEndTime() {return eventEndTime;}
+    public Date getEventEndTime() {
+        return eventEndTime;
+    }
 
     /**
      * Sets the event end time.
+     *
      * @param eventEndTime The new event end Date.
      */
-    public void setEventEndTime(Date eventEndTime) {this.eventEndTime = eventEndTime;}
+    public void setEventEndTime(Date eventEndTime) {
+        this.eventEndTime = eventEndTime;
+    }
 
     /**
      * Gets the list of entrants for the event.
+     *
      * @return A HashMap of entrants and their registration status.
      */
-    public HashMap<Entrant, Boolean> getEntrantList() {return entrantList;}
+    public HashMap<Entrant, Boolean> getEntrantList() {
+        return entrantList;
+    }
 
     /**
      * Gets the maximum number of attendees allowed for the event.
+     *
      * @return The maximum attendees, or null if no limit.
      */
-    public Integer getMaxAttendees() { return maxAttendees; }
+    public Integer getMaxAttendees() {
+        return maxAttendees;
+    }
 
     /**
      * Sets the maximum number of attendees allowed for the event.
+     *
      * @param maxAttendees The new maximum attendees.
      */
-    public void setMaxAttendees(Integer maxAttendees) { this.maxAttendees = maxAttendees; }
+    public void setMaxAttendees(Integer maxAttendees) {
+        this.maxAttendees = maxAttendees;
+    }
 
     /**
      * Gets the maximum number of people allowed on the waitlist.
+     *
      * @return The maximum waitlist size, or null if no limit.
      */
-    public Integer getMaxWaitlist() { return maxWaitlist; }
+    public Integer getMaxWaitlist() {
+        return maxWaitlist;
+    }
 
     /**
      * Sets the maximum number of people allowed on the waitlist.
+     *
      * @param maxWaitlist The new maximum waitlist size.
      */
-    public void setMaxWaitlist(Integer maxWaitlist) { this.maxWaitlist = maxWaitlist; }
+    public void setMaxWaitlist(Integer maxWaitlist) {
+        this.maxWaitlist = maxWaitlist;
+    }
 
     /**
      * Checks if geolocation is required to join the event.
+     *
      * @return True if required, false otherwise.
      */
-    public boolean isGeolocationRequired() {return geolocationRequired;}
+    public boolean isGeolocationRequired() {
+        return geolocationRequired;
+    }
 
     /**
      * Sets whether geolocation is required to join the event.
+     *
      * @param geolocationRequired True to require geolocation, false otherwise.
      */
-    public void setGeolocationRequired(boolean geolocationRequired) {this.geolocationRequired = geolocationRequired;}
+    public void setGeolocationRequired(boolean geolocationRequired) {
+        this.geolocationRequired = geolocationRequired;
+    }
 
     /**
      * Gets the geofencing radius.
+     *
      * @return The radius in kilometers.
      */
-    public Double getRadius() {return radius;}
+    public Double getRadius() {
+        return radius;
+    }
 
     /**
      * Sets the geofencing radius.
+     *
      * @param radius The new radius in kilometers.
      */
-    public void setRadius(Double radius) {this.radius = radius;}
+    public void setRadius(Double radius) {
+        this.radius = radius;
+    }
 
     /**
      * Gets the GPS coordinates of the event.
+     *
      * @return The Location object.
      */
-    public Location getGeoLocation() {return geoLocation;}
+    public Location getGeoLocation() {
+        return geoLocation;
+    }
 
     /**
      * Sets the GPS coordinates of the event.
+     *
      * @param geoLocation The new Location object.
      */
-    public void setGeoLocation(Location geoLocation) {this.geoLocation = geoLocation;}
+    public void setGeoLocation(Location geoLocation) {
+        this.geoLocation = geoLocation;
+    }
 
     /**
      * Gets the distance limit for the event.
+     *
      * @return The limit distance.
      */
-    public Double getLimitDistance() { return limitDistance; }
+    public Double getLimitDistance() {
+        return limitDistance;
+    }
 
     /**
      * Sets the distance limit for the event.
+     *
      * @param limitDistance The new limit distance.
      */
-    public void setLimitDistance(Double limitDistance) { this.limitDistance = limitDistance; }
+    public void setLimitDistance(Double limitDistance) {
+        this.limitDistance = limitDistance;
+    }
 
     /**
      * Checks if the event is private.
+     *
      * @return True if private, false otherwise.
      */
-    public boolean isPrivate() { return isPrivate; }
+    public boolean isPrivate() {
+        return isPrivate;
+    }
 
     /**
      * Sets the privacy of the event.
+     *
      * @param isPrivate True to make private, false otherwise.
      */
-    public void setPrivate(boolean isPrivate) { this.isPrivate = isPrivate; }
+    public void setPrivate(boolean isPrivate) {
+        this.isPrivate = isPrivate;
+    }
 }

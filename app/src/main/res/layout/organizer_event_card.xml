@@ -33,8 +33,7 @@
                     android:layout_height="match_parent"
                     android:background="#E8E8E8"
                     android:scaleType="centerInside"
-                    android:src="@drawable/ic_launcher_foreground"
-                    app:tint="#D0D0D0" />
+                    android:src="@drawable/ic_launcher_foreground" />
             </com.google.android.material.card.MaterialCardView>
 
             <com.google.android.material.button.MaterialButton
@@ -46,6 +45,20 @@
                 android:layout_margin="12dp"
                 android:backgroundTint="#2D2D2D"
                 android:text="Run Lottery"
+                android:textAllCaps="false"
+                android:textColor="@android:color/white"
+                android:textSize="16sp"
+                app:cornerRadius="8dp" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btn_update_poster"
+                style="@style/Widget.MaterialComponents.Button.UnelevatedButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="bottom|end"
+                android:layout_margin="12dp"
+                android:backgroundTint="#2D2D2D"
+                android:text="Update Poster"
                 android:textAllCaps="false"
                 android:textColor="@android:color/white"
                 android:textSize="16sp"

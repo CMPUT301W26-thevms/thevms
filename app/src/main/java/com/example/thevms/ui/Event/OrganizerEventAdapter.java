@@ -1,6 +1,8 @@
 package com.example.thevms.ui.Event;
 
 import android.app.AlertDialog;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.provider.Settings;
 import android.text.Editable;
 import android.text.TextWatcher;
@@ -59,6 +61,7 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
     private List<Event> events = new ArrayList<>();
     private static final SimpleDateFormat dateFormat = new SimpleDateFormat("MMM d", Locale.getDefault());
     private OnEventCancelListener cancelListener;
+    private OnEventUpdatePosterListener updatePosterListener;
 
     /**
      * Interface for listening to event cancellation actions.
@@ -70,6 +73,18 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
          * @param event The event being cancelled.
          */
         void onCancel(Event event);
+    }
+
+    /**
+     * Interface for listening to update poster actions.
+     */
+    public interface OnEventUpdatePosterListener {
+        /**
+         * Called when the organizer wants to update the event poster.
+         *
+         * @param event The event whose poster is being updated.
+         */
+        void onUpdatePoster(Event event);
     }
 
     /**
@@ -91,6 +106,15 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
         this.cancelListener = cancelListener;
     }
 
+    /**
+     * Sets the listener for update poster actions.
+     *
+     * @param updatePosterListener The listener to set.
+     */
+    public void setOnEventUpdatePosterListener(OnEventUpdatePosterListener updatePosterListener) {
+        this.updatePosterListener = updatePosterListener;
+    }
+
     @NonNull
     @Override
     public ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
@@ -102,7 +126,7 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
     @Override
     public void onBindViewHolder(@NonNull ViewHolder holder, int position) {
         Event event = events.get(position);
-        holder.bind(event, dateFormat, cancelListener);
+        holder.bind(event, dateFormat, cancelListener, updatePosterListener);
     }
 
     @Override
@@ -116,8 +140,9 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
      */
     static class ViewHolder extends RecyclerView.ViewHolder {
         TextView nameText, distanceText, waitlistText, dateText, descriptionText, exportCsvText;
-        Button cancelBtn, lotteryBtn, postCommentBtn, inviteBtn;
+        Button cancelBtn, lotteryBtn, postCommentBtn, updatePosterBtn, inviteBtn;
         RecyclerView attendeesRv, commentsRv;
+        ImageView posterImage;
         Spinner statusSpinner;
         EditText commentEditText;
         AttendeeAdapter attendeeAdapter;
@@ -143,9 +168,11 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
             descriptionText = itemView.findViewById(R.id.tv_description);
             cancelBtn = itemView.findViewById(R.id.btn_cancel_event);
             lotteryBtn = itemView.findViewById(R.id.btn_run_lottery);
+            updatePosterBtn = itemView.findViewById(R.id.btn_update_poster);
             inviteBtn = itemView.findViewById(R.id.btn_invite_entrants);
             attendeesRv = itemView.findViewById(R.id.rv_attendees);
             commentsRv = itemView.findViewById(R.id.rv_comments);
+            posterImage = itemView.findViewById(R.id.iv_event_poster);
             statusSpinner = itemView.findViewById(R.id.spinner_attendee_status);
             exportCsvText = itemView.findViewById(R.id.tv_export_csv);
             commentEditText = itemView.findViewById(R.id.et_organizer_comment);
@@ -234,18 +261,19 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
                         }
 
                         Toast.makeText(itemView.getContext(), "Selected " + winnersCount + " entrants!", Toast.LENGTH_SHORT).show();
-                        bind(event, dateFormat, null); // Refresh list
+                        bind(event, dateFormat, null, null); // Refresh list
                     });
         }
 
         /**
          * Binds an event's data to the ViewHolder and fetches the list of entrants.
          *
-         * @param event          The event to bind.
-         * @param dateFormat     The date format for the event date.
-         * @param cancelListener The listener for event cancellation.
+         * @param event                The event to bind.
+         * @param dateFormat           The date format for the event date.
+         * @param cancelListener       The listener for event cancellation.
+         * @param updatePosterListener The listener for poster update.
          */
-        public void bind(Event event, SimpleDateFormat dateFormat, OnEventCancelListener cancelListener) {
+        public void bind(Event event, SimpleDateFormat dateFormat, OnEventCancelListener cancelListener, OnEventUpdatePosterListener updatePosterListener) {
             String eventId = String.valueOf(event.getEventId());
             itemView.setTag(eventId);
 
@@ -258,6 +286,18 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
                 dateText.setText("🗓 " + dateFormat.format(event.getEventStartTime()));
             }
 
+            if (event.getPhoto() != null) {
+                Bitmap bitmap = BitmapFactory.decodeByteArray(event.getPhoto(), 0, event.getPhoto().length);
+                posterImage.setImageBitmap(bitmap);
+                posterImage.setScaleType(ImageView.ScaleType.CENTER_CROP);
+                posterImage.setAlpha(1.0f);
+                posterImage.clearColorFilter();
+            } else {
+                posterImage.setImageResource(R.drawable.ic_launcher_foreground);
+                posterImage.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
+                posterImage.setAlpha(0.3f);
+            }
+
             event.fetchEntrantCount().addOnSuccessListener(count ->
                     waitlistText.setText(count + " people in waitlist")
             );
@@ -267,6 +307,10 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
             });
 
             lotteryBtn.setOnClickListener(v -> runLottery(event));
+
+            updatePosterBtn.setOnClickListener(v -> {
+                if (updatePosterListener != null) updatePosterListener.onUpdatePoster(event);
+            });
 
             inviteBtn.setVisibility(event.isPrivate() ? View.VISIBLE : View.GONE);
             inviteBtn.setOnClickListener(v -> showInviteDialog(event));
@@ -343,7 +387,8 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
 
             searchEt.addTextChangedListener(new TextWatcher() {
                 @Override
-                public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+                public void beforeTextChanged(CharSequence s, int start, int count, int after) {
+                }
 
                 @Override
                 public void onTextChanged(CharSequence s, int start, int before, int count) {
@@ -367,7 +412,8 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
                 }
 
                 @Override
-                public void afterTextChanged(Editable s) {}
+                public void afterTextChanged(Editable s) {
+                }
             });
 
             inviteAdapter.setOnInviteClickListener(entrant -> {
