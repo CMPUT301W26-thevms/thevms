@@ -17,7 +17,7 @@ import java.util.Map;
  *
  * <p><b>Creation Workflow:</b></p>
  * <ol>
- *     <li>Call the static {@link #create(String, String, Organizer, String, String, byte[], Date, Date, Date, Date, boolean, Double, Location, boolean)} method.</li>
+ *     <li>Call the static {@link #create(String, String, Organizer, String, byte[], Date, Date, Date, Date, boolean, Double, Location, boolean)} method.</li>
  *     <li>This method asynchronously fetches a unique ID from the database.</li>
  *     <li>It then returns a {@code Task<Event>}. You use an {@code .addOnSuccessListener} to get the in-memory Event object.</li>
  *     <li>The created object does NOT yet exist in the database.</li>
@@ -58,7 +58,6 @@ public class Event {
     private String locationName; // Added for UI convenience
 
     private String qrCode;
-    private String imageUrl;
     private byte[] photo;
 
     private Date registrationStartTime;
@@ -85,7 +84,6 @@ public class Event {
      * @param description           Description of the event.
      * @param organizer             The event organizer.
      * @param location              The event location string.
-     * @param imageUrl              URL for the event's banner image.
      * @param photo                 The event's poster image as raw bytes.
      * @param registrationStartTime The start time for registration.
      * @param registrationEndTime   The end time for registration.
@@ -96,14 +94,13 @@ public class Event {
      * @param geoLocation           The actual GPS coordinates (Latitude/Longitude) of the event.
      * @param isPrivate             Whether the event is private and hidden from search.
      */
-    private Event(Long eventId, String name, String description, Organizer organizer, String location, String imageUrl, byte[] photo, Date registrationStartTime, Date registrationEndTime, Date eventStartTime, Date eventEndTime, boolean geolocationRequired, Double radius, Location geoLocation, boolean isPrivate) {
+    private Event(Long eventId, String name, String description, Organizer organizer, String location, byte[] photo, Date registrationStartTime, Date registrationEndTime, Date eventStartTime, Date eventEndTime, boolean geolocationRequired, Double radius, Location geoLocation, boolean isPrivate) {
         this.dbHandler = new DatabaseHandler();
         this.eventId = eventId;
         this.name = name;
         this.description = description;
         this.organizer = organizer;
         this.location = location;
-        this.imageUrl = imageUrl;
         this.photo = photo;
         this.registrationStartTime = registrationStartTime;
         this.registrationEndTime = registrationEndTime;
@@ -132,7 +129,6 @@ public class Event {
      * @param description           Description of the event.
      * @param organizer             The event organizer.
      * @param location              The event location.
-     * @param imageUrl              URL for the event's banner image.
      * @param photo                 The event's poster image as raw bytes.
      * @param registrationStartTime The start time for registration.
      * @param registrationEndTime   The end time for registration.
@@ -144,12 +140,12 @@ public class Event {
      * @param isPrivate             Boolean flag for event privacy.
      * @return A {@code Task<Event>} that, upon completion, will contain the fully initialized Event object.
      */
-    public static Task<Event> create(String name, String description, Organizer organizer, String location, String imageUrl, byte[] photo, Date registrationStartTime, Date registrationEndTime, Date eventStartTime, Date eventEndTime, boolean geolocationRequired, Double radius, Location geoLocation, boolean isPrivate) {
+    public static Task<Event> create(String name, String description, Organizer organizer, String location, byte[] photo, Date registrationStartTime, Date registrationEndTime, Date eventStartTime, Date eventEndTime, boolean geolocationRequired, Double radius, Location geoLocation, boolean isPrivate) {
         DatabaseHandler dbHandler = new DatabaseHandler();
         return dbHandler.getNextEventId().continueWith(task -> {
             if (task.isSuccessful()) {
                 Long eventId = task.getResult();
-                return new Event(eventId, name, description, organizer, location, imageUrl, photo, registrationStartTime, registrationEndTime, eventStartTime, eventEndTime, geolocationRequired, radius, geoLocation, isPrivate);
+                return new Event(eventId, name, description, organizer, location, photo, registrationStartTime, registrationEndTime, eventStartTime, eventEndTime, geolocationRequired, radius, geoLocation, isPrivate);
             } else {
                 throw task.getException();
             }
@@ -183,7 +179,6 @@ public class Event {
         Long id = data.get("eventId") instanceof Long ? (Long) data.get("eventId") : null;
         String name = (String) data.get("name");
         String desc = (String) data.get("description");
-        String img = (String) data.get("imageUrl");
 
         byte[] photo = null;
         if (data.containsKey("photo")) {
@@ -215,7 +210,7 @@ public class Event {
             geoLocation.setLongitude((Double) data.get("longitude"));
         }
 
-        Event event = new Event(id, name, desc, organizer, location, img, photo, regStart, regEnd, eventStart, eventEnd, geoRequired != null && geoRequired, radius, geoLocation, isPrivate != null && isPrivate);
+        Event event = new Event(id, name, desc, organizer, location, photo, regStart, regEnd, eventStart, eventEnd, geoRequired != null && geoRequired, radius, geoLocation, isPrivate != null && isPrivate);
 
         if (data.containsKey("maxAttendees") && data.get("maxAttendees") != null) {
             Object val = data.get("maxAttendees");
@@ -280,7 +275,6 @@ public class Event {
         }
         map.put("location", location);
         map.put("locationName", locationName);
-        map.put("imageUrl", imageUrl);
         if (photo != null) {
             map.put("photo", Blob.fromBytes(photo));
         } else {
@@ -482,24 +476,6 @@ public class Event {
     }
 
     /**
-     * Gets the URL of the event's banner image.
-     *
-     * @return The image URL.
-     */
-    public String getImageUrl() {
-        return imageUrl;
-    }
-
-    /**
-     * Sets the URL of the event's banner image.
-     *
-     * @param imageUrl The new image URL.
-     */
-    public void setImageUrl(String imageUrl) {
-        this.imageUrl = imageUrl;
-    }
-
-    /**
      * Gets the raw bytes of the event's poster image.
      *
      * @return The image bytes.
@@ -515,13 +491,6 @@ public class Event {
      */
     public void setPhoto(byte[] photo) {
         this.photo = photo;
-    }
-
-    /**
-     * Removes the event's banner image URL.
-     */
-    public void removeImageUrl() {
-        this.imageUrl = null;
     }
 
     /**

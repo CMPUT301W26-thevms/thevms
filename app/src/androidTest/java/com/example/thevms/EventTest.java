@@ -2,7 +2,6 @@ package com.example.thevms;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
 
 import com.example.thevms.model.Entrant;
 import com.example.thevms.model.Event;
@@ -20,9 +19,9 @@ public class EventTest {
         // Since Event constructor is private, we use reflection for the unit test
         // to avoid mocking the database for a simple logic check.
         Constructor<Event> constructor = Event.class.getDeclaredConstructor(
-                Long.class, String.class, String.class, 
-                com.example.thevms.model.Organizer.class, 
-                String.class, String.class,
+                Long.class, String.class, String.class,
+                com.example.thevms.model.Organizer.class,
+                String.class, byte[].class,
                 Date.class, Date.class, Date.class, Date.class,
                 boolean.class, Double.class, android.location.Location.class,
                 boolean.class
@@ -44,7 +43,7 @@ public class EventTest {
 
         assertTrue("Task should be completed", task.isComplete());
         assertTrue("Task should have failed", !task.isSuccessful());
-        
+
         Exception e = task.getException();
         assertTrue("Exception should be IllegalStateException", e instanceof IllegalStateException);
         assertEquals("Registration has not started yet.", e.getMessage());
@@ -55,7 +54,7 @@ public class EventTest {
         Constructor<Event> constructor = Event.class.getDeclaredConstructor(
                 Long.class, String.class, String.class,
                 com.example.thevms.model.Organizer.class,
-                String.class, String.class,
+                String.class, byte[].class,
                 Date.class, Date.class, Date.class, Date.class,
                 boolean.class, Double.class, android.location.Location.class,
                 boolean.class
@@ -78,7 +77,7 @@ public class EventTest {
 
         assertTrue("Task should be completed", task.isComplete());
         assertTrue("Task should have failed", !task.isSuccessful());
-        
+
         Exception e = task.getException();
         assertTrue("Exception should be IllegalStateException", e instanceof IllegalStateException);
         assertEquals("Registration has ended.", e.getMessage());

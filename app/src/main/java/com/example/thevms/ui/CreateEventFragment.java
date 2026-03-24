@@ -338,7 +338,7 @@ public class CreateEventFragment extends Fragment {
 
             // Note: Currently locationStr is a String, but Event model expects android.location.Location.
             // Updated: location is now the coordinates of the event, not the location string.
-            Event.create(name, description, organizer, locationStr, null, photoBytes, regStartDate, regEndDate, eventStartDate, eventEndDate, isGeoRequired, radius, eventLocation, isPrivate)
+            Event.create(name, description, organizer, locationStr, photoBytes, regStartDate, regEndDate, eventStartDate, eventEndDate, isGeoRequired, radius, eventLocation, isPrivate)
                     .addOnSuccessListener(event -> {
                         if (!maxAttendeesStr.isEmpty()) {
                             try {
