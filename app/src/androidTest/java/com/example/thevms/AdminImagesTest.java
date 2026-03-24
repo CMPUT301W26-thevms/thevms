@@ -7,9 +7,10 @@ import static androidx.test.espresso.assertion.ViewAssertions.matches;
 import static androidx.test.espresso.matcher.ViewMatchers.isDisplayed;
 import static androidx.test.espresso.matcher.ViewMatchers.withId;
 import static androidx.test.espresso.matcher.ViewMatchers.withText;
-import static org.hamcrest.CoreMatchers.not;
 
 import android.content.Context;
+import android.graphics.Bitmap;
+import android.graphics.Color;
 import android.provider.Settings;
 import android.view.View;
 
@@ -31,6 +32,7 @@ import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
+import java.io.ByteArrayOutputStream;
 import java.util.Date;
 import java.util.concurrent.TimeUnit;
 
@@ -56,12 +58,18 @@ public class AdminImagesTest {
         Entrant admin = new Entrant(adminDeviceId, "admin@example.com", "Admin", "User", "1234567890", true, UserRole.ADMIN);
         Tasks.await(admin.save(), 5, TimeUnit.SECONDS);
 
-        // Seed an event with a "photo" (simulated with a small byte array)
+        // Seed an event with a real valid image (simulated with a generated bitmap)
         Organizer organizer = new Organizer("org1", "org@test.com", "Bob", "Organizer", null);
         Tasks.await(organizer.save(), 5, TimeUnit.SECONDS);
-        
-        byte[] fakePhoto = new byte[]{1, 2, 3, 4};
-        Event event = Tasks.await(Event.create("Image Event", "Desc", organizer, "Location", fakePhoto, new Date(), new Date(), new Date(), new Date(), false, 0.0, null, false), 5, TimeUnit.SECONDS);
+
+        // Generate a simple red square bitmap - Gemini helped
+        Bitmap bitmap = Bitmap.createBitmap(100, 100, Bitmap.Config.ARGB_8888);
+        bitmap.eraseColor(Color.RED);
+        ByteArrayOutputStream stream = new ByteArrayOutputStream();
+        bitmap.compress(Bitmap.CompressFormat.PNG, 100, stream);
+        byte[] realPhotoBytes = stream.toByteArray();
+
+        Event event = Tasks.await(Event.create("Image Event", "Desc", organizer, "Location", realPhotoBytes, new Date(), new Date(), new Date(), new Date(), false, 0.0, null, false), 5, TimeUnit.SECONDS);
         Tasks.await(event.save(), 5, TimeUnit.SECONDS);
     }
 
@@ -105,7 +113,7 @@ public class AdminImagesTest {
             // Verify title
             waitForView(withId(R.id.admin_images_title_text), 2000);
             onView(withId(R.id.admin_images_title_text)).check(matches(withText("Manage Images")));
-            
+
             // Verify our seeded image is there by checking the source name (Event name)
             onView(withText("Image Event")).check(matches(isDisplayed()));
             onView(withId(R.id.images_recycler_view)).check(hasItemCount(1));
