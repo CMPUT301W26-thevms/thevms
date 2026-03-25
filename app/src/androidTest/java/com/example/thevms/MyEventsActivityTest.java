@@ -74,7 +74,8 @@ public class MyEventsActivityTest {
                 new Date(System.currentTimeMillis() + 3600000),
                 false,
                 0.0,
-                null
+                null,
+                false
         ), 10, TimeUnit.SECONDS);
         Tasks.await(event.save(), 10, TimeUnit.SECONDS);
 

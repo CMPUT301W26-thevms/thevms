@@ -123,6 +123,20 @@
                     app:strokeColor="@android:color/darker_gray" />
 
                 <Button
+                    android:id="@+id/filter_capacity_btn"
+                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="8dp"
+                    android:minWidth="0dp"
+                    android:paddingHorizontal="16dp"
+                    android:text="Capacity"
+                    android:textAllCaps="false"
+                    android:textColor="@android:color/black"
+                    app:cornerRadius="12dp"
+                    app:strokeColor="@android:color/darker_gray" />
+
+                <Button
                     android:id="@+id/clear_filters_btn"
                     style="@style/Widget.MaterialComponents.Button.OutlinedButton"
                     android:layout_width="wrap_content"

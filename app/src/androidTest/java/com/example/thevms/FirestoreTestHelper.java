@@ -120,7 +120,8 @@ public class FirestoreTestHelper {
                 new Date(startDate.getTime() + 3600000), // End +1h
                 false,
                 0.0,
-                null
+                null,
+                false
         ), 10, TimeUnit.SECONDS);
         Tasks.await(event.save(), 10, TimeUnit.SECONDS);
     }

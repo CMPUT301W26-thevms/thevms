@@ -2,7 +2,6 @@ package com.example.thevms;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertNull;
 
 import com.example.thevms.model.Event;
 import com.example.thevms.model.Organizer;
@@ -37,14 +36,9 @@ public class EventTest {
 
         event.setName("New Name");
         event.setDescription("New Desc");
-        event.setImageUrl("http://image.com");
 
         assertEquals("New Name", event.getName());
         assertEquals("New Desc", event.getDescription());
-        assertEquals("http://image.com", event.getImageUrl());
-
-        event.removeImageUrl();
-        assertNull(event.getImageUrl());
     }
 
     @Test

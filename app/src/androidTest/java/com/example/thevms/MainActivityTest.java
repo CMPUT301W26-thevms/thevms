@@ -148,7 +148,7 @@ public class MainActivityTest {
                     .findFragmentById(R.id.fragment_container);
             if (fragment != null) {
                 // Range: 00:00 to 23:59
-                fragment.setTestingFilters(null, null, 0, 0, 23, 59);
+                fragment.setTestingFilters(null, null, 0, 0, 23, 59, null);
                 fragment.expandBottomSheet();
             }
         });
