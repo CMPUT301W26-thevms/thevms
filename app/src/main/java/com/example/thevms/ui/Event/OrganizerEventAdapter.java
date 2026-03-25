@@ -34,6 +34,11 @@ import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.ListenerRegistration;
 import com.google.firebase.firestore.QueryDocumentSnapshot;
+import com.google.zxing.BarcodeFormat;
+import com.google.zxing.MultiFormatWriter;
+import com.google.zxing.WriterException;
+import com.google.zxing.common.BitMatrix;
+import com.journeyapps.barcodescanner.BarcodeEncoder;
 
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -140,7 +145,7 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
      */
     static class ViewHolder extends RecyclerView.ViewHolder {
         TextView nameText, distanceText, waitlistText, dateText, descriptionText, exportCsvText;
-        Button cancelBtn, lotteryBtn, postCommentBtn, updatePosterBtn, inviteBtn;
+        Button cancelBtn, lotteryBtn, postCommentBtn, updatePosterBtn, inviteBtn, showQrBtn;
         RecyclerView attendeesRv, commentsRv;
         ImageView posterImage;
         Spinner statusSpinner;
@@ -170,6 +175,7 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
             lotteryBtn = itemView.findViewById(R.id.btn_run_lottery);
             updatePosterBtn = itemView.findViewById(R.id.btn_update_poster);
             inviteBtn = itemView.findViewById(R.id.btn_invite_entrants);
+            showQrBtn = itemView.findViewById(R.id.btn_show_qr);
             attendeesRv = itemView.findViewById(R.id.rv_attendees);
             commentsRv = itemView.findViewById(R.id.rv_comments);
             posterImage = itemView.findViewById(R.id.iv_event_poster);
@@ -312,6 +318,8 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
                 if (updatePosterListener != null) updatePosterListener.onUpdatePoster(event);
             });
 
+            showQrBtn.setOnClickListener(v -> showQrCodeDialog(event));
+
             inviteBtn.setVisibility(event.isPrivate() ? View.VISIBLE : View.GONE);
             inviteBtn.setOnClickListener(v -> showInviteDialog(event));
 
@@ -360,6 +368,35 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
             });
 
             setupComments(eventId);
+        }
+
+        private void showQrCodeDialog(Event event) {
+            AlertDialog.Builder builder = new AlertDialog.Builder(itemView.getContext());
+            View dialogView = LayoutInflater.from(itemView.getContext()).inflate(R.layout.dialog_qr_code, null);
+            builder.setView(dialogView);
+
+            ImageView qrImage = dialogView.findViewById(R.id.iv_qr_code);
+            Button closeBtn = dialogView.findViewById(R.id.btn_close_qr);
+            TextView title = dialogView.findViewById(R.id.tv_qr_title);
+
+            title.setText(event.getName() + " QR Code");
+
+            // Generate QR code for "101010" as requested
+            String qrData = "101010"; // Simple string of numbers
+            MultiFormatWriter multiFormatWriter = new MultiFormatWriter();
+            try {
+                BitMatrix bitMatrix = multiFormatWriter.encode(qrData, BarcodeFormat.QR_CODE, 500, 500);
+                BarcodeEncoder barcodeEncoder = new BarcodeEncoder();
+                Bitmap bitmap = barcodeEncoder.createBitmap(bitMatrix);
+                qrImage.setImageBitmap(bitmap);
+            } catch (WriterException e) {
+                Log.e("OrganizerEventAdapter", "Error generating QR code", e);
+                Toast.makeText(itemView.getContext(), "Error generating QR code", Toast.LENGTH_SHORT).show();
+            }
+
+            AlertDialog dialog = builder.create();
+            closeBtn.setOnClickListener(v -> dialog.dismiss());
+            dialog.show();
         }
 
         private void showInviteDialog(Event event) {

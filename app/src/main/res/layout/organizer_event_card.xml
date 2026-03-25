@@ -50,19 +50,38 @@
                 android:textSize="16sp"
                 app:cornerRadius="8dp" />
 
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/btn_update_poster"
-                style="@style/Widget.MaterialComponents.Button.UnelevatedButton"
+            <LinearLayout
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_gravity="bottom|end"
-                android:layout_margin="12dp"
-                android:backgroundTint="#2D2D2D"
-                android:text="Update Poster"
-                android:textAllCaps="false"
-                android:textColor="@android:color/white"
-                android:textSize="16sp"
-                app:cornerRadius="8dp" />
+                android:orientation="vertical"
+                android:layout_margin="12dp">
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btn_show_qr"
+                    style="@style/Widget.MaterialComponents.Button.UnelevatedButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:backgroundTint="#2D2D2D"
+                    android:text="Show QR"
+                    android:textAllCaps="false"
+                    android:textColor="@android:color/white"
+                    android:textSize="16sp"
+                    app:cornerRadius="8dp" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btn_update_poster"
+                    style="@style/Widget.MaterialComponents.Button.UnelevatedButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:backgroundTint="#2D2D2D"
+                    android:text="Update Poster"
+                    android:textAllCaps="false"
+                    android:textColor="@android:color/white"
+                    android:textSize="16sp"
+                    app:cornerRadius="8dp" />
+            </LinearLayout>
         </FrameLayout>
 
         <!-- Event Details Row -->

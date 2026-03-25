@@ -48,6 +48,8 @@ dependencies {
     implementation(libs.espresso.contrib)
     implementation(libs.play.services.location)
     implementation(libs.swiperefreshlayout)
+    implementation(libs.zxing.core)
+    implementation(libs.zxing.android.embedded)
     testImplementation(libs.junit)
     androidTestImplementation(libs.ext.junit)
     androidTestImplementation(libs.espresso.core)

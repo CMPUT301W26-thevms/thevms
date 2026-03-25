@@ -11,6 +11,7 @@ import com.google.firebase.firestore.DocumentSnapshot;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Random;
 
 /**
  * Represents an event Object.
@@ -107,12 +108,23 @@ public class Event {
         this.eventStartTime = eventStartTime;
         this.eventEndTime = eventEndTime;
         this.entrantList = new HashMap<>();
-        this.qrCode = "NULL FOR NOW";
+        
+        // Generate a "unique" promotional QR code string (simple numbers)
+        this.qrCode = generateSimpleQrCodeString();
 
         this.geolocationRequired = geolocationRequired;
         this.radius = radius;
         this.geoLocation = geoLocation;
         this.isPrivate = isPrivate;
+    }
+
+    private String generateSimpleQrCodeString() {
+        Random random = new Random();
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < 6; i++) {
+            sb.append(random.nextInt(10));
+        }
+        return sb.toString();
     }
 
     /**
@@ -232,6 +244,9 @@ public class Event {
         if (data.containsKey("locationName")) {
             event.setLocationName((String) data.get("locationName"));
         }
+        if (data.containsKey("qrCode")) {
+            event.setQrCode((String) data.get("qrCode"));
+        }
 
         return event;
     }
@@ -294,6 +309,7 @@ public class Event {
         map.put("maxWaitlist", maxWaitlist);
         map.put("limitDistance", limitDistance);
         map.put("isPrivate", isPrivate);
+        map.put("qrCode", qrCode);
         return map;
     }
 
@@ -698,5 +714,13 @@ public class Event {
      */
     public void setPrivate(boolean isPrivate) {
         this.isPrivate = isPrivate;
+    }
+
+    public String getQrCode() {
+        return qrCode;
+    }
+
+    public void setQrCode(String qrCode) {
+        this.qrCode = qrCode;
     }
 }
