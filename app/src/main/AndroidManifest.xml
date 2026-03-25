@@ -15,6 +15,9 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.Thevms">
+        <meta-data
+            android:name="com.google.android.geo.API_KEY"
+            android:value="AIzaSyB9_ag_TE33q_ykpjdhtIbgJuBHEdRWbZ8" />
         <activity
             android:name=".ui.SignupActivity"
             android:exported="true">

@@ -269,9 +269,9 @@ public class EventAdapter extends RecyclerView.Adapter<EventAdapter.EventViewHol
         }
 
         // Handle join event
-        private void joinEvent(Event event, String deviceId) {
+        private void joinEvent(Event event, String deviceId, android.location.Location joiningLocation) {
             Entrant.getOrCreate(deviceId).addOnSuccessListener(entrant -> {
-                event.addEntrant(entrant).addOnSuccessListener(aVoid -> {
+                event.addEntrant(entrant, joiningLocation).addOnSuccessListener(aVoid -> {
                     Toast.makeText(itemView.getContext(), "Successfully joined " + event.getName(), Toast.LENGTH_SHORT).show();
                     updateEntrantCount(event);
                     joinButton.setVisibility(View.GONE);
@@ -299,7 +299,7 @@ public class EventAdapter extends RecyclerView.Adapter<EventAdapter.EventViewHol
             double radiusInMeters = event.getRadius() * 1000;
 
             if (distanceInMeters <= radiusInMeters) {
-                joinEvent(event, deviceId);
+                joinEvent(event, deviceId, currentLoc);
             } else {
                 Toast.makeText(itemView.getContext(),
                         "Out of location requirement", Toast.LENGTH_LONG).show();
@@ -308,7 +308,7 @@ public class EventAdapter extends RecyclerView.Adapter<EventAdapter.EventViewHol
 
         private void checkLocation(Event event, String deviceId) {
             if (!event.isGeolocationRequired()) {
-                joinEvent(event, deviceId);
+                joinEvent(event, deviceId, null);
                 return;
             }
 
@@ -359,7 +359,7 @@ public class EventAdapter extends RecyclerView.Adapter<EventAdapter.EventViewHol
                         double radiusInMeters = event.getRadius() * 1000;
 
                         if (distanceInMeters <= radiusInMeters) {
-                            joinEvent(event, deviceId);
+                            joinEvent(event, deviceId, currentLoc);
                         } else {
                             Toast.makeText(itemView.getContext(), "Out of location requirement", Toast.LENGTH_LONG).show();
                         }

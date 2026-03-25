@@ -216,7 +216,7 @@ public class Entrant {
     }
 
     public void registerInEvent(Event event) {
-        event.addEntrant(this);
+        event.addEntrant(this, null);
     }
 
     public void unregisterFromEvent(Event event) {

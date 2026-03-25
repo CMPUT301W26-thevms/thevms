@@ -78,16 +78,18 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
     }
 
     static class ViewHolder extends RecyclerView.ViewHolder {
-        TextView nameText, distanceText, waitlistText, dateText, descriptionText, exportCsvText;
+        TextView nameText, distanceText, waitlistText, dateText, descriptionText, exportCsvText, mapText;
         Button cancelBtn;
         RecyclerView attendeesRv;
         Spinner statusSpinner;
         AttendeeAdapter attendeeAdapter;
         DatabaseHandler dbHandler;
         FirebaseFirestore db;
+        com.google.android.gms.maps.MapView mapView;
 
         // Stored so the CSV export can use it for the filename
         String currentEventName = "";
+        boolean mapVisible = false;
 
         public ViewHolder(@NonNull View itemView) {
             super(itemView);
@@ -100,12 +102,16 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
             attendeesRv = itemView.findViewById(R.id.rv_attendees);
             statusSpinner = itemView.findViewById(R.id.spinner_attendee_status);
             exportCsvText = itemView.findViewById(R.id.tv_export_csv);
+            mapText = itemView.findViewById(R.id.tv_view_map);
+            mapView = itemView.findViewById(R.id.map_view_inline);
 
             attendeesRv.setLayoutManager(new LinearLayoutManager(itemView.getContext()));
             attendeeAdapter = new AttendeeAdapter();
             attendeesRv.setAdapter(attendeeAdapter);
             dbHandler = new DatabaseHandler();
             db = FirebaseFirestore.getInstance();
+            mapView.onCreate(null);
+            mapView.onResume();
 
             // Wire cancel listener — cancels entrant and promotes next waitlisted randomly
             attendeeAdapter.setOnCancelEntrantListener(item -> {
@@ -161,6 +167,66 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
 
             cancelBtn.setOnClickListener(v -> {
                 if (cancelListener != null) cancelListener.onCancel(event);
+            });
+
+            mapText.setOnClickListener(v -> {
+                mapVisible = !mapVisible;
+                View mapContainer = itemView.findViewById(R.id.map_view_inline);
+
+                if (mapVisible) {
+                    mapContainer.setVisibility(View.VISIBLE);
+                    mapView.getMapAsync(googleMap -> {
+                        googleMap.clear();
+                        dbHandler.getEntrantsWithLocations(eventId)
+                                .addOnSuccessListener(querySnapshot -> {
+                                    com.google.android.gms.maps.model.LatLngBounds.Builder boundsBuilder =
+                                            new com.google.android.gms.maps.model.LatLngBounds.Builder();
+                                    int count = 0;
+                                    com.google.android.gms.maps.model.LatLng eventPos = null;
+                                    if (event.getGeoLocation() != null) {
+                                        eventPos = new com.google.android.gms.maps.model.LatLng(
+                                                event.getGeoLocation().getLatitude(),
+                                                event.getGeoLocation().getLongitude()
+                                        );
+                                        googleMap.addMarker(
+                                                new com.google.android.gms.maps.model.MarkerOptions()
+                                                        .position(eventPos)
+                                                        .title(event.getName())
+                                        );
+                                        boundsBuilder.include(eventPos);
+                                        count++;
+                                    }
+                                    for (QueryDocumentSnapshot doc : querySnapshot) {
+                                        Double lat = doc.getDouble("entrantLat");
+                                        Double lng = doc.getDouble("entrantLng");
+                                        if (lat == null || lng == null) continue;
+                                        com.google.android.gms.maps.model.LatLng pos =
+                                                new com.google.android.gms.maps.model.LatLng(lat, lng);
+                                        googleMap.addMarker(
+                                                new com.google.android.gms.maps.model.MarkerOptions()
+                                                        .position(pos)
+                                                        .icon(com.google.android.gms.maps.model.BitmapDescriptorFactory
+                                                                .defaultMarker(
+                                                                        com.google.android.gms.maps.model.BitmapDescriptorFactory.HUE_AZURE
+                                                                ))
+                                        );
+                                        boundsBuilder.include(pos);
+                                        count++;
+                                    }
+                                    if (count > 0) {
+                                        int pad = (int) (40 * itemView.getContext()
+                                                .getResources().getDisplayMetrics().density);
+                                        mapContainer.post(() ->
+                                                googleMap.animateCamera(
+                                                        com.google.android.gms.maps.CameraUpdateFactory
+                                                                .newLatLngBounds(boundsBuilder.build(), pad))
+                                        );
+                                    }
+                                });
+                    });
+                } else {
+                    mapContainer.setVisibility(View.GONE);
+                }
             });
 
             // Reset spinner to "Waiting" each time a card is bound

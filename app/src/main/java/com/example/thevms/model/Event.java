@@ -302,7 +302,7 @@ public class Event {
      * @param entrant The entrant to add.
      * @return A Task representing the async operation.
      */
-    public Task<Void> addEntrant(Entrant entrant) {
+    public Task<Void> addEntrant(Entrant entrant, Location joiningLocation) {
         Date now = new Date();
         if (registrationStartTime != null && now.before(registrationStartTime)) {
             return Tasks.forException(new IllegalStateException("Registration has not started yet."));
@@ -317,6 +317,11 @@ public class Event {
         registrationData.put("entrantId", entrant.getDeviceId());
         registrationData.put("status", "waiting"); // Default status
         registrationData.put("registrationTime", now);
+
+        if (joiningLocation != null) {
+            registrationData.put("entrantLat", joiningLocation.getLatitude());
+            registrationData.put("entrantLng", joiningLocation.getLongitude());
+        }
 
         return dbHandler.updateEntrantStatus(String.valueOf(this.eventId), entrant.getDeviceId(), registrationData);
     }

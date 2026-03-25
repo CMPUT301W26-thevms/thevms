@@ -339,6 +339,19 @@ public class DatabaseHandler {
                 });
     }
 
+    /**
+     * Retrieves all entrants with locations for a specific event.
+     * @param eventId The event ID.
+     * @return A Task that resolves with the QuerySnapshot of entrants with locations.
+     */
+    public Task<QuerySnapshot> getEntrantsWithLocations(String eventId) {
+        return getDb().collection(COLLECTION_EVENTS)
+                .document(eventId)
+                .collection(COLLECTION_ENTRANTS)
+                .whereGreaterThan("entrantLat", -90.0)
+                .get();
+    }
+
     public FirebaseFirestore getDb() {
         if (db == null) {
             db = FirebaseFirestore.getInstance();
