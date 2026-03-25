@@ -38,8 +38,17 @@
             android:exported="false" />
         <activity
             android:name=".ui.Event.EventDetailActivity"
-            android:exported="false"
-            android:label="Event Detail" />
+            android:exported="true"
+            android:label="Event Detail">
+            <intent-filter android:label="View Event">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data
+                    android:scheme="thevms"
+                    android:host="event" />
+            </intent-filter>
+        </activity>
 
         <provider
             android:name="androidx.core.content.FileProvider"

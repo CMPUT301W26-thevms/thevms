@@ -381,8 +381,9 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
 
             title.setText(event.getName() + " QR Code");
 
-            // Generate QR code for "101010" as requested
-            String qrData = "101010"; // Simple string of numbers
+            // Encode the deep link URL into the QR code
+            // Deep link format: thevms://event?id=EVENT_ID
+            String qrData = "thevms://event?id=" + event.getEventId();
             MultiFormatWriter multiFormatWriter = new MultiFormatWriter();
             try {
                 BitMatrix bitMatrix = multiFormatWriter.encode(qrData, BarcodeFormat.QR_CODE, 500, 500);

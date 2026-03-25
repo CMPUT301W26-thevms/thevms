@@ -1,5 +1,6 @@
 package com.example.thevms.ui.Event;
 
+import android.net.Uri;
 import android.os.Bundle;
 import android.view.View;
 import android.widget.Toast;
@@ -18,6 +19,7 @@ import java.util.Locale;
 /**
  * Activity for displaying the full details of a single event.
  * Reuses the binding logic from {@link EventAdapter.EventViewHolder} to ensure consistent behavior.
+ * Supports launching via deep links (e.g., from a scanned QR code).
  */
 public class EventDetailActivity extends AppCompatActivity {
 
@@ -37,6 +39,12 @@ public class EventDetailActivity extends AppCompatActivity {
 
         String eventId = getIntent().getStringExtra("EVENT_ID");
         isAdmin = getIntent().getBooleanExtra("IS_ADMIN", false);
+
+        // Handle Deep Link if launched from QR code
+        Uri data = getIntent().getData();
+        if (eventId == null && data != null && "thevms".equals(data.getScheme())) {
+            eventId = data.getQueryParameter("id");
+        }
 
         if (eventId == null) {
             Toast.makeText(this, "Error: Event ID not found", Toast.LENGTH_SHORT).show();
