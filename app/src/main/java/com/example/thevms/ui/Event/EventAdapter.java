@@ -3,6 +3,8 @@ package com.example.thevms.ui.Event;
 import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.app.AlertDialog;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.provider.Settings;
 import android.util.Log;
 import android.view.LayoutInflater;
@@ -257,6 +259,15 @@ public class EventAdapter extends RecyclerView.Adapter<EventAdapter.EventViewHol
 
             if (locationTextView != null) {
                 locationTextView.setText(event.getLocation());
+            }
+
+            // Display event poster if available
+            if (event.getPhoto() != null && eventImageView != null) {
+                byte[] photoBytes = event.getPhoto();
+                Bitmap bitmap = BitmapFactory.decodeByteArray(photoBytes, 0, photoBytes.length);
+                eventImageView.setImageBitmap(bitmap);
+            } else if (eventImageView != null) {
+                eventImageView.setImageBitmap(null);
             }
 
             dbHandler.getEntrantStatus(String.valueOf(event.getEventId()), deviceId).addOnSuccessListener(status -> {
