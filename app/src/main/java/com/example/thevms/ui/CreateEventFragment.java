@@ -13,11 +13,8 @@ import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ImageView;
-import android.widget.TextView;
 import android.widget.Toast;
 
-import androidx.activity.result.ActivityResultLauncher;
-import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.annotation.VisibleForTesting;
@@ -45,33 +42,20 @@ import java.util.TimeZone;
  * Handles event details input, date-time selection, and geolocation settings.
  */
 public class CreateEventFragment extends Fragment {
-    private EditText etName, etLocation, etDescription, etMaxAttendees, etMaxWaitlist;
+
+    private EditText etName, etLocation, etDescription;
+    private EditText etMaxAttendees, etMaxWaitlist;
     private Button btnConfirm, btnCancel;
     private Button btnRegStartDate, btnRegEndDate, btnEventStartDate, btnEventEndDate;
     private Date regStartDate, regEndDate, eventStartDate, eventEndDate;
     private final SimpleDateFormat dateTimeFormat = new SimpleDateFormat("MMM dd, yyyy HH:mm", Locale.getDefault());
-    private com.google.android.material.materialswitch.MaterialSwitch switchGeo, switchPrivate;
+    private com.google.android.material.materialswitch.MaterialSwitch switchGeo;
     private View layoutLimitDistance;
     private EditText etLimitDistance;
-
-    private android.location.Location testingLocation;
-
-    private ImageView ivEventPoster;
-    private TextView tvUploadPlaceholder;
-    private Button btnReplacePoster;
+    private com.google.android.material.materialswitch.MaterialSwitch switchPrivate;
+    
     private Uri posterUri;
-
-    private final ActivityResultLauncher<String> imagePickerLauncher = registerForActivityResult(
-            new ActivityResultContracts.GetContent(),
-            uri -> {
-                if (uri != null) {
-                    posterUri = uri;
-                    ivEventPoster.setImageURI(uri);
-                    tvUploadPlaceholder.setVisibility(View.GONE);
-                    btnReplacePoster.setVisibility(View.VISIBLE);
-                }
-            }
-    );
+    private android.location.Location testingLocation;
 
     @Nullable
     @Override
@@ -83,7 +67,6 @@ public class CreateEventFragment extends Fragment {
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
 
-        // Initialize UI components
         etName = view.findViewById(R.id.et_event_name);
         etLocation = view.findViewById(R.id.et_event_location);
         etDescription = view.findViewById(R.id.et_event_description);
@@ -91,76 +74,46 @@ public class CreateEventFragment extends Fragment {
         etMaxWaitlist = view.findViewById(R.id.et_max_waitlist);
         btnConfirm = view.findViewById(R.id.btn_confirm);
         btnCancel = view.findViewById(R.id.btn_cancel);
-
+        
         btnRegStartDate = view.findViewById(R.id.btn_reg_start_date);
         btnRegEndDate = view.findViewById(R.id.btn_reg_end_date);
         btnEventStartDate = view.findViewById(R.id.btn_event_start_date);
         btnEventEndDate = view.findViewById(R.id.btn_event_end_date);
 
-        ivEventPoster = view.findViewById(R.id.iv_event_poster);
-        tvUploadPlaceholder = view.findViewById(R.id.tv_upload_placeholder);
-        btnReplacePoster = view.findViewById(R.id.btn_replace_poster);
-
-        // Setup poster upload
-        tvUploadPlaceholder.setOnClickListener(v -> imagePickerLauncher.launch("image/*"));
-        btnReplacePoster.setOnClickListener(v -> imagePickerLauncher.launch("image/*"));
-
-        // Hide replace button initially if no poster is selected
-        if (posterUri == null) {
-            btnReplacePoster.setVisibility(View.GONE);
-        }
-
-        // Setup date-time pickers
         btnRegStartDate.setOnClickListener(v -> showDateTimePicker(1));
         btnRegEndDate.setOnClickListener(v -> showDateTimePicker(2));
         btnEventStartDate.setOnClickListener(v -> showDateTimePicker(3));
         btnEventEndDate.setOnClickListener(v -> showDateTimePicker(4));
 
         switchGeo = view.findViewById(R.id.switch_geolocation);
-        switchPrivate = view.findViewById(R.id.switch_private_event);
         layoutLimitDistance = view.findViewById(R.id.layout_limit_distance);
         etLimitDistance = view.findViewById(R.id.et_limit_distance);
-        layoutLimitDistance.setVisibility(View.GONE);
-        // If switch is on, show limit distance field, else hide limit distance field
-        switchGeo.setOnCheckedChangeListener((buttonView, isChecked) -> {
-            if (isChecked) {
-                layoutLimitDistance.setVisibility(View.VISIBLE);
-            } else {
-                layoutLimitDistance.setVisibility(View.GONE);
-            }
-        });
+        switchPrivate = view.findViewById(R.id.switch_private_event);
 
-        // Setup cancel button to show custom confirmation dialog
+        if (layoutLimitDistance != null) {
+            layoutLimitDistance.setVisibility(View.GONE);
+            switchGeo.setOnCheckedChangeListener((buttonView, isChecked) -> {
+                layoutLimitDistance.setVisibility(isChecked ? View.VISIBLE : View.GONE);
+            });
+        }
+
         btnCancel.setOnClickListener(v -> showCancelConfirmationDialog());
-
-        // Setup confirm button to save the event
         btnConfirm.setOnClickListener(v -> handleCreateEvent());
     }
 
-    /**
-     * Testing helper to manually set dates and bypass picker UI.
-     *
-     * @param rs Registration start date.
-     * @param re Registration end date.
-     * @param es Event start date.
-     * @param ee Event end date.
-     */
     @VisibleForTesting
     public void setTestingDates(Date rs, Date re, Date es, Date ee) {
         this.regStartDate = rs;
         this.regEndDate = re;
         this.eventStartDate = es;
         this.eventEndDate = ee;
-
+        
         if (btnRegStartDate != null) btnRegStartDate.setText(dateTimeFormat.format(rs));
         if (btnRegEndDate != null) btnRegEndDate.setText(dateTimeFormat.format(re));
         if (btnEventStartDate != null) btnEventStartDate.setText(dateTimeFormat.format(es));
         if (btnEventEndDate != null) btnEventEndDate.setText(dateTimeFormat.format(ee));
     }
 
-    /**
-     * Testing helper to set a mock location coordinate.
-     */
     @VisibleForTesting
     public void setTestingLocation(double lat, double lng) {
         this.testingLocation = new android.location.Location("test");
@@ -168,26 +121,13 @@ public class CreateEventFragment extends Fragment {
         this.testingLocation.setLongitude(lng);
     }
 
-    /**
-     * Shows a Material Date Picker followed by a Time Picker and updates the selected date-time.
-     *
-     * @param type 1: RegStart, 2: RegEnd, 3: EventStart, 4: EventEnd
-     */
     private void showDateTimePicker(int type) {
         String title = "";
         switch (type) {
-            case 1:
-                title = "Select Registration Start Date";
-                break;
-            case 2:
-                title = "Select Registration End Date";
-                break;
-            case 3:
-                title = "Select Event Start Date";
-                break;
-            case 4:
-                title = "Select Event End Date";
-                break;
+            case 1: title = "Select Registration Start Date"; break;
+            case 2: title = "Select Registration End Date"; break;
+            case 3: title = "Select Event Start Date"; break;
+            case 4: title = "Select Event End Date"; break;
         }
 
         MaterialDatePicker<Long> datePicker = MaterialDatePicker.Builder.datePicker()
@@ -199,10 +139,10 @@ public class CreateEventFragment extends Fragment {
             Calendar calendar = Calendar.getInstance();
             Calendar utcCalendar = Calendar.getInstance(TimeZone.getTimeZone("UTC"));
             utcCalendar.setTimeInMillis(selection);
-
-            calendar.set(utcCalendar.get(Calendar.YEAR),
-                    utcCalendar.get(Calendar.MONTH),
-                    utcCalendar.get(Calendar.DAY_OF_MONTH));
+            
+            calendar.set(utcCalendar.get(Calendar.YEAR), 
+                         utcCalendar.get(Calendar.MONTH), 
+                         utcCalendar.get(Calendar.DAY_OF_MONTH));
 
             MaterialTimePicker timePicker = new MaterialTimePicker.Builder()
                     .setTimeFormat(TimeFormat.CLOCK_24H)
@@ -219,218 +159,98 @@ public class CreateEventFragment extends Fragment {
 
                 Date selectedDateTime = calendar.getTime();
                 switch (type) {
-                    case 1:
-                        regStartDate = selectedDateTime;
-                        btnRegStartDate.setText(dateTimeFormat.format(regStartDate));
-                        break;
-                    case 2:
-                        regEndDate = selectedDateTime;
-                        btnRegEndDate.setText(dateTimeFormat.format(regEndDate));
-                        break;
-                    case 3:
-                        eventStartDate = selectedDateTime;
-                        btnEventStartDate.setText(dateTimeFormat.format(eventStartDate));
-                        break;
-                    case 4:
-                        eventEndDate = selectedDateTime;
-                        btnEventEndDate.setText(dateTimeFormat.format(eventEndDate));
-                        break;
+                    case 1: regStartDate = selectedDateTime; btnRegStartDate.setText(dateTimeFormat.format(regStartDate)); break;
+                    case 2: regEndDate = selectedDateTime; btnRegEndDate.setText(dateTimeFormat.format(regEndDate)); break;
+                    case 3: eventStartDate = selectedDateTime; btnEventStartDate.setText(dateTimeFormat.format(eventStartDate)); break;
+                    case 4: eventEndDate = selectedDateTime; btnEventEndDate.setText(dateTimeFormat.format(eventEndDate)); break;
                 }
             });
-
             timePicker.show(getParentFragmentManager(), "TIME_PICKER");
         });
-
         datePicker.show(getParentFragmentManager(), "DATE_PICKER");
     }
 
-    /**
-     * Records fields, creates an Event object, and saves it to the database.
-     */
     private void handleCreateEvent() {
         String name = etName.getText().toString().trim();
         String locationStr = etLocation.getText().toString().trim();
         String description = etDescription.getText().toString().trim();
         boolean isGeoRequired = switchGeo.isChecked();
+        boolean isPrivate = switchPrivate != null && switchPrivate.isChecked();
 
-        if (name.isEmpty()) {
-            etName.setError("Name is required");
-            return;
-        }
-
-        if (locationStr.isEmpty()) {
-            etLocation.setError("Location is required");
-            return;
-        }
-
-        if (description.isEmpty()) {
-            etDescription.setError("Description is required");
-            return;
-        }
+        if (name.isEmpty()) { etName.setError("Name is required"); return; }
+        if (locationStr.isEmpty()) { etLocation.setError("Location is required"); return; }
+        if (description.isEmpty()) { etDescription.setError("Description is required"); return; }
 
         if (regStartDate == null || regEndDate == null || eventStartDate == null || eventEndDate == null) {
             Toast.makeText(requireContext(), "Please select all dates and times", Toast.LENGTH_SHORT).show();
             return;
         }
 
-        // Chronological validation: regStart < regEnd < eventStart < eventEnd
-        if (!regEndDate.after(regStartDate)) {
-            Toast.makeText(requireContext(), "Registration end must be after registration start", Toast.LENGTH_SHORT).show();
-            return;
-        }
-
-        if (!eventStartDate.after(regEndDate)) {
-            Toast.makeText(requireContext(), "Event start must be after registration end", Toast.LENGTH_SHORT).show();
-            return;
-        }
-
-        if (!eventEndDate.after(eventStartDate)) {
-            Toast.makeText(requireContext(), "Event end must be after event start", Toast.LENGTH_SHORT).show();
-            return;
-        }
-
-        // If geolocation is required, validate radius, radius must be greater than 0
-        double radius;
+        double radius = 0.0;
         if (isGeoRequired) {
             try {
                 radius = Double.parseDouble(etLimitDistance.getText().toString().trim());
-                if (radius <= 0) {
-                    Toast.makeText(requireContext(), "Please enter a valid number for distance", Toast.LENGTH_SHORT).show();
-                    return;
-                }
-            } catch (NumberFormatException e) {
-                Toast.makeText(requireContext(), "Please enter a valid number for distance", Toast.LENGTH_SHORT).show();
-                return;
-            }
-        } else {
-            radius = 0.0;
+                if (radius <= 0) { Toast.makeText(requireContext(), "Please enter a valid distance", Toast.LENGTH_SHORT).show(); return; }
+            } catch (NumberFormatException e) { Toast.makeText(requireContext(), "Please enter a valid distance", Toast.LENGTH_SHORT).show(); return; }
         }
 
         Integer maxAttendees = null;
-        String maxAttendeesStr = etMaxAttendees.getText().toString().trim();
-        if (!maxAttendeesStr.isEmpty()) {
-            try {
-                maxAttendees = Integer.parseInt(maxAttendeesStr);
-            } catch (NumberFormatException e) {
-                etMaxAttendees.setError("Invalid number");
-                return;
-            }
+        if (!etMaxAttendees.getText().toString().trim().isEmpty()) {
+            try { maxAttendees = Integer.parseInt(etMaxAttendees.getText().toString().trim()); }
+            catch (NumberFormatException e) { etMaxAttendees.setError("Invalid number"); return; }
         }
 
         Integer maxWaitlist = null;
-        String maxWaitlistStr = etMaxWaitlist.getText().toString().trim();
-        if (!maxWaitlistStr.isEmpty()) {
-            try {
-                maxWaitlist = Integer.parseInt(maxWaitlistStr);
-            } catch (NumberFormatException e) {
-                etMaxWaitlist.setError("Invalid number");
-                return;
-            }
+        if (!etMaxWaitlist.getText().toString().trim().isEmpty()) {
+            try { maxWaitlist = Integer.parseInt(etMaxWaitlist.getText().toString().trim()); }
+            catch (NumberFormatException e) { etMaxWaitlist.setError("Invalid number"); return; }
         }
 
-        android.location.Location eventLocation = getLocationFromAddress(locationStr);
-        if (eventLocation == null) {
-            Toast.makeText(requireContext(), "Please enter a valid location", Toast.LENGTH_SHORT).show();
-            return;
-        }
+        android.location.Location eventLocation = (testingLocation != null) ? testingLocation : getLocationFromAddress(locationStr);
+        if (eventLocation == null) { Toast.makeText(requireContext(), "Please enter a valid location", Toast.LENGTH_SHORT).show(); return; }
 
         @SuppressLint("HardwareIds")
         String deviceId = Settings.Secure.getString(requireContext().getContentResolver(), Settings.Secure.ANDROID_ID);
 
+        byte[] photoBytes = (posterUri != null) ? uriToBytes(posterUri) : null;
+        
         Integer finalMaxAttendees = maxAttendees;
         Integer finalMaxWaitlist = maxWaitlist;
+
+        double finalRadius = radius;
         Entrant.getOrCreate(deviceId).addOnSuccessListener(user -> {
             Organizer organizer = new Organizer(user.getDeviceId(), user.getEmail(), user.getFirstName(), user.getLastName(), user.getPhoneNumber());
 
-            Event.create(name, description, organizer, locationStr, null, regStartDate, regEndDate, eventStartDate, eventEndDate, isGeoRequired, radius, eventLocation)
-            byte[] photoBytes = null;
-            if (posterUri != null) {
-                photoBytes = uriToBytes(posterUri);
-            }
-
-            // Note: Currently locationStr is a String, but Event model expects android.location.Location.
-            // Updated: location is now the coordinates of the event, not the location string.
-            Event.create(name, description, organizer, locationStr, photoBytes, regStartDate, regEndDate, eventStartDate, eventEndDate, isGeoRequired, radius, eventLocation, isPrivate)
+            Event.create(name, description, organizer, locationStr, photoBytes, regStartDate, regEndDate, eventStartDate, eventEndDate, isGeoRequired, finalRadius, eventLocation, isPrivate)
                     .addOnSuccessListener(event -> {
-                        if (!maxAttendeesStr.isEmpty()) {
-                            try {
-                                event.setMaxAttendees(Integer.parseInt(maxAttendeesStr));
-                            } catch (NumberFormatException ignored) {
-                            }
-                        }
                         event.setMaxAttendees(finalMaxAttendees);
                         event.setMaxWaitlist(finalMaxWaitlist);
                         event.save().addOnSuccessListener(aVoid -> {
                             Toast.makeText(requireContext(), "Event created successfully!", Toast.LENGTH_SHORT).show();
-                            try {
-                                getParentFragmentManager().popBackStack();
-                            } catch (IllegalStateException e) {
-                                Log.e("CreateEventFragment", "Error while popping back stack", e);
-                            }
-                        }).addOnFailureListener(e -> {
-                            Toast.makeText(requireContext(), "Failed to save event", Toast.LENGTH_SHORT).show();
-                        });
-                    }).addOnFailureListener(e -> {
-                        Toast.makeText(requireContext(), "Failed to create event object", Toast.LENGTH_SHORT).show();
+                            try { getParentFragmentManager().popBackStack(); } catch (Exception ignored) {}
+                        }).addOnFailureListener(e -> Toast.makeText(requireContext(), "Failed to save event", Toast.LENGTH_SHORT).show());
                     });
         });
     }
 
-    /**
-     * Converts a Uri to a byte array.
-     *
-     * @param uri The Uri of the image.
-     * @return The byte array of the image, or null if conversion fails.
-     */
     private byte[] uriToBytes(Uri uri) {
         try {
             InputStream inputStream = requireContext().getContentResolver().openInputStream(uri);
             Bitmap bitmap = BitmapFactory.decodeStream(inputStream);
             ByteArrayOutputStream baos = new ByteArrayOutputStream();
-            // Compress to JPEG to reduce size, ensuring it fits in Firestore (1MB limit)
             bitmap.compress(Bitmap.CompressFormat.JPEG, 70, baos);
             return baos.toByteArray();
-        } catch (Exception e) {
-            Log.e("CreateEventFragment", "Error converting Uri to bytes", e);
-            return null;
-        }
+        } catch (Exception e) { return null; }
     }
 
-    /**
-     * Shows a confirmation dialog when the user attempts to cancel event creation.
-     */
     private void showCancelConfirmationDialog() {
         View dialogView = LayoutInflater.from(requireContext()).inflate(R.layout.dialog_cancel_confirmation, null);
-
-        AlertDialog dialog = new AlertDialog.Builder(requireContext(), R.style.TransparentDialog)
-                .setView(dialogView)
-                .create();
-
-        ImageView closeIcon = dialogView.findViewById(R.id.iv_close);
-        Button backButton = dialogView.findViewById(R.id.btn_dialog_back);
-        Button yesButton = dialogView.findViewById(R.id.btn_dialog_yes);
-
-        closeIcon.setOnClickListener(v -> dialog.dismiss());
-        backButton.setOnClickListener(v -> dialog.dismiss());
-
-        yesButton.setOnClickListener(v -> {
-            dialog.dismiss();
-            try {
-                getParentFragmentManager().popBackStack();
-            } catch (IllegalStateException e) {
-                Log.e("CreateEventFragment", "Error while popping back stack", e);
-            }
-        });
-
+        AlertDialog dialog = new AlertDialog.Builder(requireContext(), R.style.TransparentDialog).setView(dialogView).create();
+        dialogView.findViewById(R.id.btn_dialog_yes).setOnClickListener(v -> { dialog.dismiss(); try { getParentFragmentManager().popBackStack(); } catch (Exception ignored) {} });
+        dialogView.findViewById(R.id.btn_dialog_back).setOnClickListener(v -> dialog.dismiss());
         dialog.show();
     }
 
-    /**
-     * Converts a location name (address) string into GPS coordinates.
-     *
-     * @param strAddress The location name to geocode.
-     * @return An android.location.Location object with latitude and longitude, or null if geocoding fails.
-     */
     private android.location.Location getLocationFromAddress(String strAddress) {
         android.location.Geocoder geocoder = new android.location.Geocoder(requireContext(), Locale.getDefault());
         try {
@@ -442,9 +262,7 @@ public class CreateEventFragment extends Fragment {
                 location.setLongitude(address.getLongitude());
                 return location;
             }
-        } catch (Exception e) {
-            Log.e("CreateEventFragment", "Error while getting location", e);
-        }
+        } catch (Exception ignored) {}
         return null;
     }
 }

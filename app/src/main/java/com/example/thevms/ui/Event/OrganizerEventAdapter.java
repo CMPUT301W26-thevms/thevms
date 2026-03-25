@@ -275,7 +275,7 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
                         }
 
                         Toast.makeText(itemView.getContext(), "Selected " + winnersCount + " new entrants!", Toast.LENGTH_SHORT).show();
-                        bind(event, dateFormat, null); // Refresh list
+                        bind(event, dateFormat, null, null); // Refresh list
                     });
         }
 
@@ -457,7 +457,7 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
 
             commentsListener = dbHandler.listenToComments(eventId, (value, error) -> {
                 if (error != null) {
-                    Log.w("OrganizerEventAdapter", "Listen failed.", error);
+                    Log.w("OrganizerEventAdapter", "Listen failed.");
                     return;
                 }
 
