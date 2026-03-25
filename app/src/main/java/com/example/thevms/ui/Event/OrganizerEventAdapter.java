@@ -318,7 +318,10 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
                 if (updatePosterListener != null) updatePosterListener.onUpdatePoster(event);
             });
 
-            showQrBtn.setOnClickListener(v -> showQrCodeDialog(event));
+            // Hide QR button for private events
+            showQrBtn.setVisibility(event.isPrivate() ? View.GONE : View.VISIBLE);
+            if (!event.isPrivate())
+                showQrBtn.setOnClickListener(v -> showQrCodeDialog(event));
 
             inviteBtn.setVisibility(event.isPrivate() ? View.VISIBLE : View.GONE);
             inviteBtn.setOnClickListener(v -> showInviteDialog(event));
