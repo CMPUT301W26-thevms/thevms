@@ -47,6 +47,8 @@ public class CreateEventFragment extends Fragment {
     private com.google.android.material.materialswitch.MaterialSwitch switchGeo;
     private View layoutLimitDistance;
     private EditText etLimitDistance;
+    
+    private android.location.Location testingLocation;
 
     @Nullable
     @Override
@@ -117,6 +119,16 @@ public class CreateEventFragment extends Fragment {
         if (btnRegEndDate != null) btnRegEndDate.setText(dateTimeFormat.format(re));
         if (btnEventStartDate != null) btnEventStartDate.setText(dateTimeFormat.format(es));
         if (btnEventEndDate != null) btnEventEndDate.setText(dateTimeFormat.format(ee));
+    }
+
+    /**
+     * Testing helper to set a mock location coordinate.
+     */
+    @VisibleForTesting
+    public void setTestingLocation(double lat, double lng) {
+        this.testingLocation = new android.location.Location("test");
+        this.testingLocation.setLatitude(lat);
+        this.testingLocation.setLongitude(lng);
     }
 
     /**
@@ -271,7 +283,9 @@ public class CreateEventFragment extends Fragment {
             }
         }
 
-        android.location.Location eventLocation = getLocationFromAddress(locationStr);
+        // Use testing location if provided, otherwise perform geocoding
+        android.location.Location eventLocation = (testingLocation != null) ? testingLocation : getLocationFromAddress(locationStr);
+        
         if (eventLocation == null) {
             Toast.makeText(requireContext(), "Please enter a valid location", Toast.LENGTH_SHORT).show();
             return;
@@ -285,8 +299,6 @@ public class CreateEventFragment extends Fragment {
         Entrant.getOrCreate(deviceId).addOnSuccessListener(user -> {
             Organizer organizer = new Organizer(user.getDeviceId(), user.getEmail(), user.getFirstName(), user.getLastName(), user.getPhoneNumber());
 
-            // Note: Currently locationStr is a String, but Event model expects android.location.Location.
-            // Updated: location is now the coordinates of the event, not the location string.
             Event.create(name, description, organizer, locationStr, null, regStartDate, regEndDate, eventStartDate, eventEndDate, isGeoRequired, radius, eventLocation)
                     .addOnSuccessListener(event -> {
                         event.setMaxAttendees(finalMaxAttendees);

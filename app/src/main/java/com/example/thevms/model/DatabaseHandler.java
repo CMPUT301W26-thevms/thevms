@@ -2,6 +2,7 @@ package com.example.thevms.model;
 
 import com.google.android.gms.tasks.Task;
 import com.google.android.gms.tasks.Tasks;
+import com.google.firebase.Timestamp;
 import com.google.firebase.firestore.DocumentReference;
 import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.EventListener;
@@ -43,6 +44,7 @@ public class DatabaseHandler {
     public static final String STATUS_INVITED = "invited";
     public static final String STATUS_DECLINED = "declined";
     public static final String STATUS_CANCELLED = "cancelled";
+    public static final String STATUS_CO_ORGANIZER = "co-organizer";
 
     /**
      * Default constructor for DatabaseHandler.
@@ -431,16 +433,17 @@ public class DatabaseHandler {
      * @return A Task representing the operation.
      */
     public Task<Void> sendNotification(String userId, String eventId, String message) {
-      Notification notification = new Notification();
-      notification.setReceiverId(userId);
-      notification.setEventId(eventId);
-      notification.setMessage(message);
-      notification.setTimestamp(com.google.firebase.Timestamp.now());
-      notification.setRead(false);
+        Notification notification = new Notification();
+        notification.setReceiverId(userId);
+        notification.setEventId(eventId);
+        notification.setDescription(message);
+        notification.setTimestamp(new java.util.Date());
+        notification.setType(Notification.TYPE_GENERAL);
 
-      return sendNotification(notification);
-   }
+        return sendNotification(notification);
+    }
 
+    /**
      * Adds a comment to an event.
      *
      * @param eventId The event ID.
@@ -544,6 +547,35 @@ public class DatabaseHandler {
      */
     public Task<Void> deleteNotification(String notificationId) {
         return getDb().collection(COLLECTION_NOTIFICATIONS).document(notificationId).delete();
+    }
+
+    /**
+     * Assigns an entrant as a co-organizer for an event.
+     */
+    public Task<Void> assignCoOrganizer(String eventId, String userId) {
+        Map<String, Object> statusData = new HashMap<>();
+        statusData.put("status", STATUS_CO_ORGANIZER);
+
+        Map<String, Object> eventUpdate = new HashMap<>();
+        eventUpdate.put("coOrganizers", com.google.firebase.firestore.FieldValue.arrayUnion(userId));
+
+        return getDb().collection(COLLECTION_EVENTS).document(eventId)
+                .update(eventUpdate)
+                .continueWithTask(task -> updateEntrantStatus(eventId, userId, statusData))
+                .continueWithTask(task -> sendNotification(userId, eventId, "You have been assigned as a co-organizer for the event!"));
+    }
+
+    /**
+     * Checks if a user is a co-organizer for an event.
+     */
+    public Task<Boolean> isCoOrganizer(String eventId, String userId) {
+        return getDb().collection(COLLECTION_EVENTS).document(eventId).get().continueWith(task -> {
+            if (task.isSuccessful() && task.getResult().exists()) {
+                List<String> coOps = (List<String>) task.getResult().get("coOrganizers");
+                return coOps != null && coOps.contains(userId);
+            }
+            return false;
+        });
     }
 
     /**

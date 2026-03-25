@@ -307,19 +307,27 @@ public class Event {
             return Tasks.forException(new IllegalStateException("Registration has ended."));
         }
 
-        return fetchEntrantCount().continueWithTask(task -> {
-            if (!task.isSuccessful()) throw task.getException();
-            long count = task.getResult();
-            if (maxWaitlist != null && count >= maxWaitlist) {
-                return Tasks.forException(new IllegalStateException("Waitlist is full."));
+        // --- NEW CO-ORGANIZER CHECK ---
+        return dbHandler.isCoOrganizer(String.valueOf(this.eventId), entrant.getDeviceId()).continueWithTask(task -> {
+            if (task.isSuccessful() && task.getResult()) {
+                return Tasks.forException(new IllegalStateException("Co-organizers cannot join the event as participants."));
             }
 
-            Map<String, Object> registrationData = new HashMap<>();
-            registrationData.put("entrantId", entrant.getDeviceId());
-            registrationData.put("status", DatabaseHandler.STATUS_WAITING);
-            registrationData.put("registrationTime", now);
+            // Original logic follows
+            return fetchEntrantCount().continueWithTask(countTask -> {
+                if (!countTask.isSuccessful()) throw countTask.getException();
+                long count = countTask.getResult();
+                if (maxWaitlist != null && count >= maxWaitlist) {
+                    return Tasks.forException(new IllegalStateException("Waitlist is full."));
+                }
 
-            return dbHandler.updateEntrantStatus(String.valueOf(this.eventId), entrant.getDeviceId(), registrationData);
+                Map<String, Object> registrationData = new HashMap<>();
+                registrationData.put("entrantId", entrant.getDeviceId());
+                registrationData.put("status", DatabaseHandler.STATUS_WAITING);
+                registrationData.put("registrationTime", now);
+
+                return dbHandler.updateEntrantStatus(String.valueOf(this.eventId), entrant.getDeviceId(), registrationData);
+            });
         });
     }
 
