@@ -30,6 +30,7 @@ import com.example.thevms.model.DatabaseHandler;
 import com.example.thevms.model.Entrant;
 import com.example.thevms.model.Event;
 import com.example.thevms.model.Notification;
+import com.example.thevms.model.Organizer;
 import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.ListenerRegistration;
@@ -293,6 +294,17 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
 
             currentEventName = event.getName() != null ? event.getName() : "Event";
 
+            Organizer organizer = event.getOrganizer();
+            String organizerDisplayName = buildFullName(
+                    organizer != null ? organizer.getFirstName() : null,
+                    organizer != null ? organizer.getLastName() : null,
+                    "Organizer");
+            String resolvedOrganizerId = organizer != null ? organizer.getDeviceId() : null;
+            if (resolvedOrganizerId == null) {
+                resolvedOrganizerId = Settings.Secure.getString(itemView.getContext().getContentResolver(), Settings.Secure.ANDROID_ID);
+            }
+            attendeeAdapter.setEventContext(eventId, currentEventName, resolvedOrganizerId, organizerDisplayName);
+
             nameText.setText(event.getName());
             descriptionText.setText(event.getDescription());
 
@@ -529,6 +541,23 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
             }
 
             dialog.show();
+        }
+
+        private String buildFullName(String first, String last, String fallback) {
+            StringBuilder builder = new StringBuilder();
+            if (first != null && !first.isEmpty()) {
+                builder.append(first);
+            }
+            if (last != null && !last.isEmpty()) {
+                if (builder.length() > 0) {
+                    builder.append(" ");
+                }
+                builder.append(last);
+            }
+            if (builder.length() == 0) {
+                return fallback;
+            }
+            return builder.toString();
         }
 
         /**

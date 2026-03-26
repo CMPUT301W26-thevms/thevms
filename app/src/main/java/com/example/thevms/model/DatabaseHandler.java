@@ -550,9 +550,16 @@ public class DatabaseHandler {
     }
 
     /**
-     * Assigns an entrant as a co-organizer for an event.
+     * Assigns an entrant as a co-organizer for an event and notifies them.
+     *
+     * @param eventId        ID of the event.
+     * @param eventName      Human readable event name.
+     * @param organizerId    Device/user ID of the organizer sending the invite.
+     * @param organizerName  Organizer display name.
+     * @param userId         Device/user ID of the entrant being promoted.
+     * @param receiverName   Display name of the entrant for the notification body.
      */
-    public Task<Void> assignCoOrganizer(String eventId, String userId) {
+    public Task<Void> assignCoOrganizer(String eventId, String eventName, String organizerId, String organizerName, String userId, String receiverName) {
         Map<String, Object> statusData = new HashMap<>();
         statusData.put("status", STATUS_CO_ORGANIZER);
 
@@ -562,7 +569,17 @@ public class DatabaseHandler {
         return getDb().collection(COLLECTION_EVENTS).document(eventId)
                 .update(eventUpdate)
                 .continueWithTask(task -> updateEntrantStatus(eventId, userId, statusData))
-                .continueWithTask(task -> sendNotification(userId, eventId, "You have been assigned as a co-organizer for the event!"));
+                .continueWithTask(task -> {
+                    Notification invite = Notification.createCoOrganizerInvite(
+                            organizerId != null ? organizerId : "system",
+                            organizerName != null ? organizerName : "Organizer",
+                            userId,
+                            receiverName != null ? receiverName : "Entrant",
+                            eventId,
+                            eventName != null ? eventName : "Event"
+                    );
+                    return invite.send();
+                });
     }
 
     /**
