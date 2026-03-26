@@ -1,13 +1,23 @@
 package com.example.thevms.ui.Event;
 
+import android.app.AlertDialog;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
+import android.provider.Settings;
+import android.text.Editable;
+import android.text.TextWatcher;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
+import android.widget.EditText;
+import android.widget.ImageView;
 import android.widget.Spinner;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.LinearLayoutManager;
@@ -15,47 +25,94 @@ import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.thevms.R;
 import com.example.thevms.model.AttendeeItem;
+import com.example.thevms.model.Comment;
 import com.example.thevms.model.DatabaseHandler;
 import com.example.thevms.model.Entrant;
 import com.example.thevms.model.Event;
+import com.example.thevms.model.Notification;
 import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FirebaseFirestore;
+import com.google.firebase.firestore.ListenerRegistration;
 import com.google.firebase.firestore.QueryDocumentSnapshot;
 
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.Random;
 
+/**
+ * Adapter for organizers to manage their events.
+ * Displays event details, attendee lists with status filtering, and controls for running a lottery or cancelling events.
+ */
 public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAdapter.ViewHolder> {
 
     // Display labels shown in the dropdown — must match Firestore status values exactly
     private static final String[] STATUS_LABELS = {
-            "Waiting", "Selected", "Accepted", "Rejected", "Cancelled"
+            "Waiting", "Selected", "Accepted", "Rejected", "Cancelled", "Declined"
     };
 
     private static final String[] STATUS_VALUES = {
-            "waiting", "selected", "accepted", "rejected", "cancelled"
+            "waiting", "selected", "accepted", "rejected", "cancelled", "declined"
     };
 
     private List<Event> events = new ArrayList<>();
-    private final SimpleDateFormat dateFormat = new SimpleDateFormat("MMM d", Locale.getDefault());
+    private static final SimpleDateFormat dateFormat = new SimpleDateFormat("MMM d", Locale.getDefault());
     private OnEventCancelListener cancelListener;
+    private OnEventUpdatePosterListener updatePosterListener;
 
+    /**
+     * Interface for listening to event cancellation actions.
+     */
     public interface OnEventCancelListener {
+        /**
+         * Called when an event is cancelled by the organizer.
+         *
+         * @param event The event being cancelled.
+         */
         void onCancel(Event event);
     }
 
+    /**
+     * Interface for listening to update poster actions.
+     */
+    public interface OnEventUpdatePosterListener {
+        /**
+         * Called when the organizer wants to update the event poster.
+         *
+         * @param event The event whose poster is being updated.
+         */
+        void onUpdatePoster(Event event);
+    }
+
+    /**
+     * Updates the list of events to be displayed.
+     *
+     * @param events The new list of events.
+     */
     public void setEvents(List<Event> events) {
         this.events = events;
         notifyDataSetChanged();
     }
 
+    /**
+     * Sets the listener for event cancellation actions.
+     *
+     * @param cancelListener The listener to set.
+     */
     public void setOnEventCancelListener(OnEventCancelListener cancelListener) {
         this.cancelListener = cancelListener;
+    }
+
+    /**
+     * Sets the listener for update poster actions.
+     *
+     * @param updatePosterListener The listener to set.
+     */
+    public void setOnEventUpdatePosterListener(OnEventUpdatePosterListener updatePosterListener) {
+        this.updatePosterListener = updatePosterListener;
     }
 
     @NonNull
@@ -69,7 +126,7 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
     @Override
     public void onBindViewHolder(@NonNull ViewHolder holder, int position) {
         Event event = events.get(position);
-        holder.bind(event, dateFormat, cancelListener);
+        holder.bind(event, dateFormat, cancelListener, updatePosterListener);
     }
 
     @Override
@@ -77,20 +134,36 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
         return events.size();
     }
 
+    /**
+     * ViewHolder class for organizer event cards.
+     * Manages nested RecyclerView for attendees and event management controls.
+     */
     static class ViewHolder extends RecyclerView.ViewHolder {
+        TextView nameText, distanceText, waitlistText, dateText, descriptionText, exportCsvText;
+        Button cancelBtn, lotteryBtn, postCommentBtn, updatePosterBtn, inviteBtn;
+        RecyclerView attendeesRv, commentsRv;
+        ImageView posterImage;
         TextView nameText, distanceText, waitlistText, dateText, descriptionText, exportCsvText, mapText;
         Button cancelBtn;
         RecyclerView attendeesRv;
         Spinner statusSpinner;
+        EditText commentEditText;
         AttendeeAdapter attendeeAdapter;
+        CommentAdapter commentAdapter;
         DatabaseHandler dbHandler;
         FirebaseFirestore db;
         com.google.android.gms.maps.MapView mapView;
+        ListenerRegistration commentsListener;
 
         // Stored so the CSV export can use it for the filename
         String currentEventName = "";
         boolean mapVisible = false;
 
+        /**
+         * Initializes the ViewHolder and sets up nested UI components like the attendee list and status spinner.
+         *
+         * @param itemView The view representing a single organizer event card.
+         */
         public ViewHolder(@NonNull View itemView) {
             super(itemView);
             nameText = itemView.findViewById(R.id.tv_event_name);
@@ -99,15 +172,28 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
             dateText = itemView.findViewById(R.id.tv_event_date);
             descriptionText = itemView.findViewById(R.id.tv_description);
             cancelBtn = itemView.findViewById(R.id.btn_cancel_event);
+            lotteryBtn = itemView.findViewById(R.id.btn_run_lottery);
+            updatePosterBtn = itemView.findViewById(R.id.btn_update_poster);
+            inviteBtn = itemView.findViewById(R.id.btn_invite_entrants);
             attendeesRv = itemView.findViewById(R.id.rv_attendees);
+            commentsRv = itemView.findViewById(R.id.rv_comments);
+            posterImage = itemView.findViewById(R.id.iv_event_poster);
             statusSpinner = itemView.findViewById(R.id.spinner_attendee_status);
             exportCsvText = itemView.findViewById(R.id.tv_export_csv);
             mapText = itemView.findViewById(R.id.tv_view_map);
             mapView = itemView.findViewById(R.id.map_view_inline);
+            commentEditText = itemView.findViewById(R.id.et_organizer_comment);
+            postCommentBtn = itemView.findViewById(R.id.btn_post_organizer_comment);
 
             attendeesRv.setLayoutManager(new LinearLayoutManager(itemView.getContext()));
             attendeeAdapter = new AttendeeAdapter();
             attendeesRv.setAdapter(attendeeAdapter);
+
+            commentsRv.setLayoutManager(new LinearLayoutManager(itemView.getContext()));
+            commentAdapter = new CommentAdapter();
+            commentAdapter.setShowDeleteButton(true);
+            commentsRv.setAdapter(commentAdapter);
+
             dbHandler = new DatabaseHandler();
             db = FirebaseFirestore.getInstance();
             mapView.onCreate(null);
@@ -135,8 +221,10 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
                 public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
                     attendeeAdapter.filterByStatus(STATUS_VALUES[position]);
                 }
+
                 @Override
-                public void onNothingSelected(AdapterView<?> parent) {}
+                public void onNothingSelected(AdapterView<?> parent) {
+                }
             });
 
             // Wire export CSV button — exports whatever is currently filtered in the list
@@ -148,7 +236,53 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
             );
         }
 
-        public void bind(Event event, SimpleDateFormat dateFormat, OnEventCancelListener cancelListener) {
+        /**
+         * Executes the lottery for an event, randomly selecting winners from the waiting list.
+         *
+         * @param event The event for which to run the lottery.
+         */
+        private void runLottery(Event event) {
+            dbHandler.getEntrantsForEvent(String.valueOf(event.getEventId()))
+                    .addOnSuccessListener(queryDocumentSnapshots -> {
+                        List<DocumentSnapshot> waitingList = new ArrayList<>();
+                        for (QueryDocumentSnapshot doc : queryDocumentSnapshots) {
+                            if (DatabaseHandler.STATUS_WAITING.equals(doc.getString("status"))) {
+                                waitingList.add(doc);
+                            }
+                        }
+
+                        if (waitingList.isEmpty()) {
+                            Toast.makeText(itemView.getContext(), "No one in waiting list", Toast.LENGTH_SHORT).show();
+                            return;
+                        }
+
+                        java.util.Collections.shuffle(waitingList);
+
+                        // Use maxAttendees if specified, otherwise pick a default (e.g., 3)
+                        int capacity = (event.getMaxAttendees() != null && event.getMaxAttendees() > 0) ? event.getMaxAttendees() : 3;
+                        int winnersCount = Math.min(waitingList.size(), capacity);
+
+                        for (int i = 0; i < winnersCount; i++) {
+                            DocumentSnapshot doc = waitingList.get(i);
+                            Map<String, Object> data = new HashMap<>();
+                            data.put("status", DatabaseHandler.STATUS_SELECTED);
+                            dbHandler.updateEntrantStatus(String.valueOf(event.getEventId()), doc.getId(), data);
+                        }
+
+                        Toast.makeText(itemView.getContext(), "Selected " + winnersCount + " entrants!", Toast.LENGTH_SHORT).show();
+                        bind(event, dateFormat, null, null); // Refresh list
+                    });
+        }
+
+        /**
+         * Binds an event's data to the ViewHolder and fetches the list of entrants.
+         *
+         * @param event                The event to bind.
+         * @param dateFormat           The date format for the event date.
+         * @param cancelListener       The listener for event cancellation.
+         * @param updatePosterListener The listener for poster update.
+         */
+        public void bind(Event event, SimpleDateFormat dateFormat, OnEventCancelListener cancelListener, OnEventUpdatePosterListener updatePosterListener) {
             String eventId = String.valueOf(event.getEventId());
             itemView.setTag(eventId);
 
@@ -159,6 +293,18 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
 
             if (event.getEventStartTime() != null) {
                 dateText.setText("🗓 " + dateFormat.format(event.getEventStartTime()));
+            }
+
+            if (event.getPhoto() != null) {
+                Bitmap bitmap = BitmapFactory.decodeByteArray(event.getPhoto(), 0, event.getPhoto().length);
+                posterImage.setImageBitmap(bitmap);
+                posterImage.setScaleType(ImageView.ScaleType.CENTER_CROP);
+                posterImage.setAlpha(1.0f);
+                posterImage.clearColorFilter();
+            } else {
+                posterImage.setImageResource(R.drawable.ic_launcher_foreground);
+                posterImage.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
+                posterImage.setAlpha(0.3f);
             }
 
             event.fetchEntrantCount().addOnSuccessListener(count ->
@@ -229,6 +375,17 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
                 }
             });
 
+            lotteryBtn.setOnClickListener(v -> runLottery(event));
+
+            updatePosterBtn.setOnClickListener(v -> {
+                if (updatePosterListener != null) updatePosterListener.onUpdatePoster(event);
+            });
+
+            inviteBtn.setVisibility(event.isPrivate() ? View.VISIBLE : View.GONE);
+            inviteBtn.setOnClickListener(v -> showInviteDialog(event));
+
+            postCommentBtn.setOnClickListener(v -> postOrganizerComment(eventId));
+
             // Reset spinner to "Waiting" each time a card is bound
             statusSpinner.setSelection(0);
 
@@ -270,49 +427,177 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
                     attendeeAdapter.setAttendees(new ArrayList<>());
                 }
             });
+
+            setupComments(eventId);
+        }
+
+        private void showInviteDialog(Event event) {
+            AlertDialog.Builder builder = new AlertDialog.Builder(itemView.getContext());
+            View dialogView = LayoutInflater.from(itemView.getContext()).inflate(R.layout.dialog_invite_entrants, null);
+            builder.setView(dialogView);
+
+            EditText searchEt = dialogView.findViewById(R.id.et_search_entrants);
+            RecyclerView resultsRv = dialogView.findViewById(R.id.rv_search_results);
+            Button closeBtn = dialogView.findViewById(R.id.btn_close_invite);
+
+            InviteEntrantAdapter inviteAdapter = new InviteEntrantAdapter();
+            resultsRv.setLayoutManager(new LinearLayoutManager(itemView.getContext()));
+            resultsRv.setAdapter(inviteAdapter);
+
+            AlertDialog dialog = builder.create();
+
+            List<Entrant> allUsers = new ArrayList<>();
+            dbHandler.getAllUsers().addOnSuccessListener(queryDocumentSnapshots -> {
+                for (QueryDocumentSnapshot doc : queryDocumentSnapshots) {
+                    Entrant u = Entrant.fromMap(doc.getId(), doc.getData());
+                    if (u != null) allUsers.add(u);
+                }
+            });
+
+            searchEt.addTextChangedListener(new TextWatcher() {
+                @Override
+                public void beforeTextChanged(CharSequence s, int start, int count, int after) {
+                }
+
+                @Override
+                public void onTextChanged(CharSequence s, int start, int before, int count) {
+                    String query = s.toString().toLowerCase();
+                    if (query.isEmpty()) {
+                        inviteAdapter.setEntrants(new ArrayList<>());
+                        return;
+                    }
+                    List<Entrant> filtered = new ArrayList<>();
+                    for (Entrant u : allUsers) {
+                        boolean matchesName = (u.getFirstName() != null && u.getFirstName().toLowerCase().contains(query))
+                                || (u.getLastName() != null && u.getLastName().toLowerCase().contains(query));
+                        boolean matchesEmail = u.getEmail() != null && u.getEmail().toLowerCase().contains(query);
+                        boolean matchesPhone = u.getPhoneNumber() != null && u.getPhoneNumber().contains(query);
+
+                        if (matchesName || matchesEmail || matchesPhone) {
+                            filtered.add(u);
+                        }
+                    }
+                    inviteAdapter.setEntrants(filtered);
+                }
+
+                @Override
+                public void afterTextChanged(Editable s) {
+                }
+            });
+
+            inviteAdapter.setOnInviteClickListener(entrant -> {
+                // Invite logic
+                Map<String, Object> registrationData = new HashMap<>();
+                registrationData.put("entrantId", entrant.getDeviceId());
+                registrationData.put("status", DatabaseHandler.STATUS_WAITING);
+                registrationData.put("registrationTime", new Date());
+
+                dbHandler.updateEntrantStatus(String.valueOf(event.getEventId()), entrant.getDeviceId(), registrationData)
+                        .addOnSuccessListener(aVoid -> {
+                            Toast.makeText(itemView.getContext(), "Invited " + entrant.getFirstName(), Toast.LENGTH_SHORT).show();
+                            // Trigger notification
+                            String organizerId = Settings.Secure.getString(itemView.getContext().getContentResolver(), Settings.Secure.ANDROID_ID);
+                            Notification.createWaitingListInvite(organizerId, "Organizer", entrant.getDeviceId(), String.valueOf(event.getEventId()), String.valueOf(event.getEventId()), event.getName()).send();
+                        });
+            });
+
+            closeBtn.setOnClickListener(v -> dialog.dismiss());
+            dialog.show();
+        }
+
+        private void setupComments(String eventId) {
+            if (commentsListener != null) {
+                commentsListener.remove();
+            }
+
+            commentsListener = dbHandler.listenToComments(eventId, (value, error) -> {
+                if (error != null) {
+                    Log.w("OrganizerEventAdapter", "Listen failed.", error);
+                    return;
+                }
+
+                if (value == null) return;
+
+                List<Comment> comments = new ArrayList<>();
+                List<String> commentIds = new ArrayList<>();
+                for (QueryDocumentSnapshot doc : value) {
+                    comments.add(doc.toObject(Comment.class));
+                    commentIds.add(doc.getId());
+                }
+                commentAdapter.setComments(comments, commentIds);
+            });
+
+            commentAdapter.setOnCommentDeleteListener((comment, commentId) -> {
+                showDeleteCommentConfirmation(eventId, commentId);
+            });
+        }
+
+        private void postOrganizerComment(String eventId) {
+            String text = commentEditText.getText().toString().trim();
+            if (text.isEmpty()) return;
+
+            String deviceId = Settings.Secure.getString(itemView.getContext().getContentResolver(), Settings.Secure.ANDROID_ID);
+            dbHandler.getUser(deviceId).addOnSuccessListener(userDoc -> {
+                String firstName = userDoc.getString("firstName");
+                String lastName = userDoc.getString("lastName");
+                if (firstName == null) firstName = "Organizer";
+                if (lastName == null) lastName = "";
+
+                Comment comment = new Comment(deviceId, firstName, lastName, text, new Date(), true);
+                dbHandler.addComment(eventId, comment).addOnSuccessListener(aVoid -> {
+                    commentEditText.setText("");
+                    Toast.makeText(itemView.getContext(), "Comment posted", Toast.LENGTH_SHORT).show();
+                });
+            });
+        }
+
+        private void showDeleteCommentConfirmation(String eventId, String commentId) {
+            AlertDialog.Builder builder = new AlertDialog.Builder(itemView.getContext());
+            View dialogView = LayoutInflater.from(itemView.getContext()).inflate(R.layout.dialog_cancel_confirmation, null);
+            builder.setView(dialogView);
+
+            AlertDialog dialog = builder.create();
+            if (dialog.getWindow() != null) {
+                dialog.getWindow().setBackgroundDrawableResource(android.R.color.transparent);
+            }
+
+            TextView title = dialogView.findViewById(R.id.tv_dialog_title);
+            TextView message = dialogView.findViewById(R.id.tv_dialog_message);
+            Button btnBack = dialogView.findViewById(R.id.btn_dialog_back);
+            Button btnYes = dialogView.findViewById(R.id.btn_dialog_yes);
+            ImageView ivClose = dialogView.findViewById(R.id.iv_close);
+
+            if (title != null) title.setText(R.string.delete_comment_title);
+            if (message != null) message.setText(R.string.delete_comment_message);
+            if (btnYes != null) btnYes.setText(R.string.delete_comment_confirm);
+            if (btnBack != null) btnBack.setText(R.string.delete_comment_cancel);
+
+            if (btnBack != null) btnBack.setOnClickListener(v -> dialog.dismiss());
+            if (ivClose != null) ivClose.setOnClickListener(v -> dialog.dismiss());
+            if (btnYes != null) {
+                btnYes.setOnClickListener(v -> {
+                    dbHandler.deleteComment(eventId, commentId).addOnSuccessListener(aVoid -> {
+                        Toast.makeText(itemView.getContext(), R.string.comment_deleted_toast, Toast.LENGTH_SHORT).show();
+                        dialog.dismiss();
+                    });
+                });
+            }
+
+            dialog.show();
         }
 
         /**
-         * Cancels a selected entrant and randomly promotes one waiting entrant.
+         * Cancels a specific entrant's selection and automatically invites the next person from the waiting list.
          *
-         * Flow:
-         * 1. Set cancelled entrant's status → "cancelled"
-         * 2. Query all "waiting" entrants for this event
-         * 3. Pick one at random → set their status to "selected"
-         * 4. TODO: notify newly selected entrant
+         * @param eventId            The ID of the event.
+         * @param cancelledEntrantId The ID of the entrant to cancel.
          */
         private void cancelEntrantAndSelectNext(String eventId, String cancelledEntrantId) {
-            db.collection("events")
-                    .document(eventId)
-                    .collection("entrants")
-                    .document(cancelledEntrantId)
-                    .update("status", "cancelled")
+            Map<String, Object> cancelData = new HashMap<>();
+            cancelData.put("status", DatabaseHandler.STATUS_CANCELLED);
+            dbHandler.updateEntrantStatus(eventId, cancelledEntrantId, cancelData)
                     .addOnSuccessListener(unused -> {
-                        db.collection("events")
-                                .document(eventId)
-                                .collection("entrants")
-                                .whereEqualTo("status", "waiting")
-                                .get()
-                                .addOnSuccessListener(waitlistSnapshot -> {
-                                    List<QueryDocumentSnapshot> waiting = new ArrayList<>();
-                                    for (QueryDocumentSnapshot doc : waitlistSnapshot) {
-                                        waiting.add(doc);
-                                    }
-
-                                    if (waiting.isEmpty()) return;
-
-                                    // Pick randomly — fair selection, no ordering
-                                    QueryDocumentSnapshot nextDoc = waiting.get(
-                                            new Random().nextInt(waiting.size())
-                                    );
-
-                                    nextDoc.getReference()
-                                            .update("status", "selected")
-                                            .addOnSuccessListener(v -> {
-                                                // TODO: notify newly selected entrant
-                                                // e.g. NotificationHandler.notify(nextDoc.getString("entrantId"), eventId);
-                                            });
-                                });
+                        dbHandler.selectAndInviteNextEntrant(eventId);
                     });
         }
     }

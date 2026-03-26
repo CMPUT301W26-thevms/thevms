@@ -7,6 +7,7 @@ import android.os.SystemClock;
 
 import androidx.test.platform.app.InstrumentationRegistry;
 
+import com.example.thevms.model.Comment;
 import com.example.thevms.model.DatabaseHandler;
 import com.example.thevms.model.Event;
 import com.example.thevms.model.Organizer;
@@ -34,37 +35,13 @@ import java.util.concurrent.TimeoutException;
  */
 public class FirestoreTestHelper {
 
-    private static final String EMULATOR_HOST = "10.0.2.2";
-    private static final int EMULATOR_PORT = 8080;
-    
     private final DatabaseHandler dbHandler;
 
-    /**
-     * Creates a new helper and ensures the Firestore emulator is running.
-     */
     public FirestoreTestHelper() {
-        // Verify emulator is running before proceeding
-        checkEmulator();
-        
         this.dbHandler = new DatabaseHandler();
         // Point to the local emulator.
         // 10.0.2.2 is the special alias for the host machine from the Android emulator.
-        this.dbHandler.useEmulator(EMULATOR_HOST, EMULATOR_PORT);
-    }
-
-    /**
-     * Checks if the Firestore emulator is running.
-     * Throws a RuntimeException if it's not reachable.
-     */
-    public static void checkEmulator() {
-        try {
-            new java.net.Socket(EMULATOR_HOST, EMULATOR_PORT).close();
-        } catch (Exception e) {
-            throw new RuntimeException(
-                    "Firestore emulator not running on " + EMULATOR_HOST + ":" + EMULATOR_PORT + ". " +
-                            "Run: firebase emulators:start --only firestore", e
-            );
-        }
+        this.dbHandler.useEmulator("10.0.2.2", 8080);
     }
 
     /**
@@ -77,7 +54,8 @@ public class FirestoreTestHelper {
         // 1. Clear top-level collections
         String[] collections = {
                 DatabaseHandler.COLLECTION_EVENTS,
-                DatabaseHandler.COLLECTION_USERS
+                DatabaseHandler.COLLECTION_USERS,
+                DatabaseHandler.COLLECTION_NOTIFICATIONS
         };
 
         for (String collection : collections) {
@@ -91,14 +69,21 @@ public class FirestoreTestHelper {
             }
         }
 
-        // 2. Clear entrants using collectionGroup (since they are sub-collections)
-        QuerySnapshot entrantSnapshot = Tasks.await(db.collectionGroup(DatabaseHandler.COLLECTION_ENTRANTS).get(), 10, TimeUnit.SECONDS);
-        List<Task<Void>> entrantDeleteTasks = new ArrayList<>();
-        for (QueryDocumentSnapshot doc : entrantSnapshot) {
-            entrantDeleteTasks.add(doc.getReference().delete());
-        }
-        if (!entrantDeleteTasks.isEmpty()) {
-            Tasks.await(Tasks.whenAll(entrantDeleteTasks), 10, TimeUnit.SECONDS);
+        // 2. Clear entrants and comments using collectionGroup (since they are sub-collections)
+        String[] subCollections = {
+                DatabaseHandler.COLLECTION_ENTRANTS,
+                DatabaseHandler.COLLECTION_COMMENTS
+        };
+
+        for (String subColl : subCollections) {
+            QuerySnapshot subSnapshot = Tasks.await(db.collectionGroup(subColl).get(), 10, TimeUnit.SECONDS);
+            List<Task<Void>> subDeleteTasks = new ArrayList<>();
+            for (QueryDocumentSnapshot doc : subSnapshot) {
+                subDeleteTasks.add(doc.getReference().delete());
+            }
+            if (!subDeleteTasks.isEmpty()) {
+                Tasks.await(Tasks.whenAll(subDeleteTasks), 10, TimeUnit.SECONDS);
+            }
         }
     }
 
@@ -135,7 +120,8 @@ public class FirestoreTestHelper {
                 new Date(startDate.getTime() + 3600000), // End +1h
                 false,
                 0.0,
-                null
+                null,
+                false
         ), 10, TimeUnit.SECONDS);
         Tasks.await(event.save(), 10, TimeUnit.SECONDS);
     }
@@ -145,6 +131,18 @@ public class FirestoreTestHelper {
         for (int i = 1; i <= count; i++) {
             seedEvent("Test Event " + i, new Date(), mockOrganizer);
         }
+    }
+
+    public void seedDummyEventsForOrganizer(int count, String organizerId) throws ExecutionException, InterruptedException, TimeoutException {
+        Organizer mockOrganizer = new Organizer(organizerId, "test@example.com", "Test", "Organizer", null);
+        for (int i = 1; i <= count; i++) {
+            seedEvent("Test Event " + i, new Date(), mockOrganizer);
+        }
+    }
+
+    public void seedComment(String eventId, String userId, String firstName, String lastName, String text) throws ExecutionException, InterruptedException, TimeoutException {
+        Comment comment = new Comment(userId, firstName, lastName, text, new Date());
+        Tasks.await(dbHandler.addComment(eventId, comment), 10, TimeUnit.SECONDS);
     }
 
     /**

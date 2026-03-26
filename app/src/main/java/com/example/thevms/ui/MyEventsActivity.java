@@ -1,7 +1,11 @@
 package com.example.thevms.ui;
 
 import android.annotation.SuppressLint;
+import android.content.Intent;
+import android.graphics.Bitmap;
+import android.net.Uri;
 import android.os.Bundle;
+import android.provider.MediaStore;
 import android.provider.Settings;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -9,6 +13,8 @@ import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.Toolbar;
@@ -22,9 +28,15 @@ import com.example.thevms.ui.Event.OrganizerEventAdapter;
 import com.google.android.material.button.MaterialButton;
 import com.google.firebase.firestore.DocumentSnapshot;
 
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * Activity for organizers to view and manage their own created events.
+ * Displays a list of events associated with the current device ID.
+ */
 public class MyEventsActivity extends AppCompatActivity {
 
     private RecyclerView recyclerView;
@@ -32,6 +44,28 @@ public class MyEventsActivity extends AppCompatActivity {
     private ProgressBar loadingBar;
     private TextView emptyText;
     private DatabaseHandler dbHandler;
+    private Event eventToUpdate;
+
+    private final ActivityResultLauncher<Intent> pickImageLauncher = registerForActivityResult(
+            new ActivityResultContracts.StartActivityForResult(),
+            result -> {
+                if (result.getResultCode() == RESULT_OK && result.getData() != null && eventToUpdate != null) {
+                    Uri imageUri = result.getData().getData();
+                    try {
+                        Bitmap bitmap = MediaStore.Images.Media.getBitmap(this.getContentResolver(), imageUri);
+                        byte[] photoBytes = compressImage(bitmap);
+                        eventToUpdate.setPhoto(photoBytes);
+                        eventToUpdate.save().addOnSuccessListener(aVoid -> {
+                            Toast.makeText(this, "Poster updated successfully", Toast.LENGTH_SHORT).show();
+                            loadMyEvents();
+                        });
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                        Toast.makeText(this, "Failed to update poster", Toast.LENGTH_SHORT).show();
+                    }
+                }
+            }
+    );
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -56,10 +90,20 @@ public class MyEventsActivity extends AppCompatActivity {
         recyclerView.setAdapter(adapter);
 
         adapter.setOnEventCancelListener(this::showCancelConfirmationDialog);
+        adapter.setOnEventUpdatePosterListener(event -> {
+            this.eventToUpdate = event;
+            Intent intent = new Intent(Intent.ACTION_PICK, MediaStore.Images.Media.EXTERNAL_CONTENT_URI);
+            pickImageLauncher.launch(intent);
+        });
 
         loadMyEvents();
     }
 
+    /**
+     * Shows a confirmation dialog before cancelling (deleting) an event.
+     *
+     * @param event The event to be cancelled.
+     */
     private void showCancelConfirmationDialog(Event event) {
         View dialogView = LayoutInflater.from(this).inflate(R.layout.dialog_cancel_confirmation, null);
         AlertDialog dialog = new AlertDialog.Builder(this)
@@ -90,6 +134,9 @@ public class MyEventsActivity extends AppCompatActivity {
         dialog.show();
     }
 
+    /**
+     * Fetches the list of events organized by the current user and updates the UI.
+     */
     private void loadMyEvents() {
         loadingBar.setVisibility(View.VISIBLE);
         emptyText.setVisibility(View.GONE);
@@ -116,5 +163,11 @@ public class MyEventsActivity extends AppCompatActivity {
             loadingBar.setVisibility(View.GONE);
             Toast.makeText(this, "Failed to load events", Toast.LENGTH_SHORT).show();
         });
+    }
+
+    private byte[] compressImage(Bitmap bitmap) {
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        bitmap.compress(Bitmap.CompressFormat.JPEG, 50, baos);
+        return baos.toByteArray();
     }
 }

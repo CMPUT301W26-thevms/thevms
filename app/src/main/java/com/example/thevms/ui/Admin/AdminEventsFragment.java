@@ -24,6 +24,10 @@ import com.google.firebase.firestore.DocumentSnapshot;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * Fragment for administrators to view and manage all events in the system.
+ * Provides a list of all events with the option to remove them.
+ */
 public class AdminEventsFragment extends Fragment {
 
     private RecyclerView recyclerView;
@@ -56,6 +60,11 @@ public class AdminEventsFragment extends Fragment {
         return view;
     }
 
+    /**
+     * Updates the loading state of the UI.
+     *
+     * @param isLoading True if data is being loaded, false otherwise.
+     */
     private void setLoading(boolean isLoading) {
         if (loadingSpinner != null) {
             loadingSpinner.setVisibility(isLoading ? View.VISIBLE : View.GONE);
@@ -68,6 +77,9 @@ public class AdminEventsFragment extends Fragment {
         }
     }
 
+    /**
+     * Fetches all events from the database and updates the local list.
+     */
     private void loadEvents() {
         setLoading(true);
         dbHandler.getAllEvents().addOnSuccessListener(queryDocumentSnapshots -> {
@@ -91,6 +103,9 @@ public class AdminEventsFragment extends Fragment {
         });
     }
 
+    /**
+     * Updates the RecyclerView and empty state text based on the current list of events.
+     */
     private void updateUI() {
         adapter.setEvents(events);
         if (events.isEmpty()) {

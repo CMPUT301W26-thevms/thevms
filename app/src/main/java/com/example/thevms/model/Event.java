@@ -5,6 +5,7 @@ import android.location.Location;
 import com.google.android.gms.tasks.Task;
 import com.google.android.gms.tasks.Tasks;
 import com.google.firebase.Timestamp;
+import com.google.firebase.firestore.Blob;
 import com.google.firebase.firestore.DocumentSnapshot;
 
 import java.util.Date;
@@ -16,7 +17,7 @@ import java.util.Map;
  *
  * <p><b>Creation Workflow:</b></p>
  * <ol>
- *     <li>Call the static {@link #create(String, String, Organizer, String, String, Date, Date, Date, Date, boolean, Double, Location)} method.</li>
+ *     <li>Call the static {@link #create(String, String, Organizer, String, byte[], Date, Date, Date, Date, boolean, Double, Location, boolean)} method.</li>
  *     <li>This method asynchronously fetches a unique ID from the database.</li>
  *     <li>It then returns a {@code Task<Event>}. You use an {@code .addOnSuccessListener} to get the in-memory Event object.</li>
  *     <li>The created object does NOT yet exist in the database.</li>
@@ -32,7 +33,7 @@ import java.util.Map;
  * <pre>
  * {@code
  * // 1. Create the event in memory (gets a unique ID async)
- * Event.create(name, desc, org, loc, imgUrl, date, date, date, date, geolocationRequired, radius, geoLocation)
+ * Event.create(name, desc, org, loc, imgUrl, date, date, date, date, geolocationRequired, radius, geoLocation, isPrivate)
  *      .addOnSuccessListener(event -> {
  *          // 2. Save the event to the database
  *          event.save()
@@ -54,28 +55,36 @@ public class Event {
     private Organizer organizer;
     private String location;
     private Location geoLocation; // location coordinate
+    private String locationName; // Added for UI convenience
 
     private String qrCode;
-    private String imageUrl;
+    private byte[] photo;
 
     private Date registrationStartTime;
     private Date registrationEndTime;
     private Date eventStartTime;
     private Date eventEndTime;
+
+    private Integer maxAttendees; // US 01.01.01
+    private Integer maxWaitlist;
+    private boolean geolocationRequired; // US 01.08.01
+    private Double limitDistance;
+
     private HashMap<Entrant, Boolean> entrantList;
     private long entrantCount = 0;
-    private boolean geolocationRequired = false;
     private Double radius = 0.0;
+    private boolean isPrivate;
 
     /**
-     * Constructor for the Event class.
+     * Private constructor for the Event class.
+     * Use {@link #create} or {@link #fromMap} to instantiate.
      *
      * @param eventId               The unique ID fetched from the database.
      * @param name                  Name of the event.
      * @param description           Description of the event.
      * @param organizer             The event organizer.
-     * @param location              The event location.
-     * @param imageUrl              URL for the event's banner image.
+     * @param location              The event location string.
+     * @param photo                 The event's poster image as raw bytes.
      * @param registrationStartTime The start time for registration.
      * @param registrationEndTime   The end time for registration.
      * @param eventStartTime        The start time of the event.
@@ -83,30 +92,30 @@ public class Event {
      * @param geolocationRequired   Whether joining requires being within a certain distance.
      * @param radius                The allowed distance radius (in kilometers).
      * @param geoLocation           The actual GPS coordinates (Latitude/Longitude) of the event.
+     * @param isPrivate             Whether the event is private and hidden from search.
      */
-    private Event(Long eventId, String name, String description, Organizer organizer, String location, String imageUrl, Date registrationStartTime, Date registrationEndTime, Date eventStartTime, Date eventEndTime, boolean geolocationRequired, Double radius, Location geoLocation) {
+    private Event(Long eventId, String name, String description, Organizer organizer, String location, byte[] photo, Date registrationStartTime, Date registrationEndTime, Date eventStartTime, Date eventEndTime, boolean geolocationRequired, Double radius, Location geoLocation, boolean isPrivate) {
         this.dbHandler = new DatabaseHandler();
         this.eventId = eventId;
         this.name = name;
         this.description = description;
         this.organizer = organizer;
         this.location = location;
-        this.imageUrl = imageUrl;
+        this.photo = photo;
         this.registrationStartTime = registrationStartTime;
         this.registrationEndTime = registrationEndTime;
         this.eventStartTime = eventStartTime;
         this.eventEndTime = eventEndTime;
         this.entrantList = new HashMap<>();
-
         this.qrCode = "NULL FOR NOW";
 
         this.geolocationRequired = geolocationRequired;
         this.radius = radius;
         this.geoLocation = geoLocation;
+        this.isPrivate = isPrivate;
     }
 
     /**
-     * This method was written using - Google Gemini
      * Asynchronously creates an Event object in memory with a unique ID from the database.
      * <p>
      * This method is the designated factory for creating new Event instances.
@@ -120,7 +129,7 @@ public class Event {
      * @param description           Description of the event.
      * @param organizer             The event organizer.
      * @param location              The event location.
-     * @param imageUrl              URL for the event's banner image.
+     * @param photo                 The event's poster image as raw bytes.
      * @param registrationStartTime The start time for registration.
      * @param registrationEndTime   The end time for registration.
      * @param eventStartTime        The start time of the event.
@@ -128,31 +137,26 @@ public class Event {
      * @param geolocationRequired   Boolean flag for geofencing.
      * @param radius                The radius limit for joining (in km).
      * @param geoLocation           The {@link Location} object containing coordinates.
+     * @param isPrivate             Boolean flag for event privacy.
      * @return A {@code Task<Event>} that, upon completion, will contain the fully initialized Event object.
      */
-    public static Task<Event> create(String name, String description, Organizer organizer, String location, String imageUrl, Date registrationStartTime, Date registrationEndTime, Date eventStartTime, Date eventEndTime, boolean geolocationRequired, Double radius, Location geoLocation) {
+    public static Task<Event> create(String name, String description, Organizer organizer, String location, byte[] photo, Date registrationStartTime, Date registrationEndTime, Date eventStartTime, Date eventEndTime, boolean geolocationRequired, Double radius, Location geoLocation, boolean isPrivate) {
         DatabaseHandler dbHandler = new DatabaseHandler();
         return dbHandler.getNextEventId().continueWith(task -> {
             if (task.isSuccessful()) {
                 Long eventId = task.getResult();
-                return new Event(eventId, name, description, organizer, location, imageUrl, registrationStartTime, registrationEndTime, eventStartTime, eventEndTime, geolocationRequired, radius, geoLocation);
+                return new Event(eventId, name, description, organizer, location, photo, registrationStartTime, registrationEndTime, eventStartTime, eventEndTime, geolocationRequired, radius, geoLocation, isPrivate);
             } else {
-                // If getting the ID fails, the exception is propagated in the returned Task.
                 throw task.getException();
             }
         });
     }
 
     /**
-     * Helper method to safely convert a Firestore object to a Date.
-     * <p>
-     * Firestore often returns dates as {@link Timestamp} objects. This method
-     * handles the conversion from {@link Timestamp} to {@link Date}, or returns
-     * the object if it is already a {@link Date}.
-     * Creates an Event object from a Firestore DocumentSnapshot.
+     * Utility method to convert Firestore Timestamp or Date objects to Date.
      *
-     * @param obj The object to convert (typically from a Firestore document).
-     * @return The converted {@link Date} object, or {@code null} if the object is null or of an unsupported type
+     * @param obj The object to convert.
+     * @return The converted Date object, or null.
      */
     private static Date toDate(Object obj) {
         if (obj instanceof Timestamp) {
@@ -164,109 +168,118 @@ public class Event {
     }
 
     /**
-     * Creates an Event object from a Map of data (typically from Firestore).
-     * <p>
-     * This method extracts event properties from a Map, handling date conversions
-     * using the {@link #toDate(Object)} helper. It constructs a new Event instance
-     * using the extracted values.
+     * Creates an Event object from a data map.
      *
-     * @param data A Map containing the key-value pairs of the event data.
-     * @return A new {@link Event} object populated with the data from the Map, or {@code null} if the data is null.
+     * @param data The map containing event data.
+     * @return A new Event object, or null if data is null.
      */
     public static Event fromMap(Map<String, Object> data) {
         if (data == null) return null;
 
-        Long id = (Long) data.get("eventId");
+        Long id = data.get("eventId") instanceof Long ? (Long) data.get("eventId") : null;
         String name = (String) data.get("name");
         String desc = (String) data.get("description");
-        String img = (String) data.get("imageUrl");
+
+        byte[] photo = null;
+        if (data.containsKey("photo")) {
+            Object photoObj = data.get("photo");
+            if (photoObj instanceof Blob) {
+                photo = ((Blob) photoObj).toBytes();
+            }
+        }
+
         String orgId = (String) data.get("organizerId");
         String email = (String) data.get("organizerEmail");
         String fName = (String) data.get("organizerFirstName");
         String lName = (String) data.get("organizerLastName");
         String phone = (String) data.get("organizerPhone");
-        Organizer organizer = new Organizer(orgId, email, fName, lName, phone);
+        Organizer organizer = (orgId != null) ? new Organizer(orgId, email, fName, lName, phone) : null;
         String location = (String) data.get("location");
         Date regStart = toDate(data.get("registrationStartTime"));
         Date regEnd = toDate(data.get("registrationEndTime"));
         Date eventStart = toDate(data.get("eventStartTime"));
         Date eventEnd = toDate(data.get("eventEndTime"));
-        Boolean geoRequired = (Boolean) data.get("geolocationRequired");
-        Double radius = (Double) data.get("radius");
-        Location geoLocation = new Location("event_location");
-        geoLocation.setLatitude((Double) data.get("latitude"));
-        geoLocation.setLongitude((Double) data.get("longitude"));
+        Boolean geoRequired = data.get("geolocationRequired") instanceof Boolean ? (Boolean) data.get("geolocationRequired") : false;
+        Double radius = data.get("radius") instanceof Double ? (Double) data.get("radius") : 0.0;
+        Boolean isPrivate = data.get("isPrivate") instanceof Boolean ? (Boolean) data.get("isPrivate") : false;
 
-        return new Event(id, name, desc, organizer, location, img, regStart, regEnd, eventStart, eventEnd, geoRequired, radius, geoLocation);
-    }
-
-    /**
-     * Creates an Event object from a Firestore DocumentSnapshot.
-     *
-     * @param doc The DocumentSnapshot to parse.
-     * @return An Event object populated with data from the document.
-     */
-    public static Event fromDoc(DocumentSnapshot doc) {
-        Long eventId = doc.getLong("eventId");
-        String name = doc.getString("name");
-        String description = doc.getString("description");
-        String orgId = doc.getString("organizerId");
-        String email = doc.getString("organizerEmail");
-        String fName = doc.getString("organizerFirstName");
-        String lName = doc.getString("organizerLastName");
-        String phone = doc.getString("organizerPhone");
-        Organizer organizer = new Organizer(orgId, email, fName, lName, phone);
-        String location = doc.getString("location");
-        String imageUrl = doc.getString("imageUrl");
-        Date regStart = doc.getDate("registrationStartTime");
-        Date regEnd = doc.getDate("registrationEndTime");
-        Date eventStart = doc.getDate("eventStartTime");
-        Date eventEnd = doc.getDate("eventEndTime");
-        Boolean geoRequired = (Boolean) doc.get("geolocationRequired");
-        Double radius = (Double) doc.get("radius");
-        Location geolocation = null;
-        if (doc.contains("latitude") && doc.contains("longitude")) {
-            geolocation = new Location("event_location");
-            geolocation.setLatitude(doc.getDouble("latitude"));
-            geolocation.setLongitude(doc.getDouble("longitude"));
+        Location geoLocation = null;
+        if (data.containsKey("latitude") && data.get("latitude") != null && data.containsKey("longitude") && data.get("longitude") != null) {
+            geoLocation = new Location("event_location");
+            geoLocation.setLatitude((Double) data.get("latitude"));
+            geoLocation.setLongitude((Double) data.get("longitude"));
         }
 
+        Event event = new Event(id, name, desc, organizer, location, photo, regStart, regEnd, eventStart, eventEnd, geoRequired != null && geoRequired, radius, geoLocation, isPrivate != null && isPrivate);
 
-        return new Event(eventId, name, description, organizer, location, imageUrl, regStart, regEnd, eventStart, eventEnd, geoRequired, radius, geolocation);
+        if (data.containsKey("maxAttendees") && data.get("maxAttendees") != null) {
+            Object val = data.get("maxAttendees");
+            if (val instanceof Long) event.setMaxAttendees(((Long) val).intValue());
+            else if (val instanceof Integer) event.setMaxAttendees((Integer) val);
+        }
+        if (data.containsKey("maxWaitlist") && data.get("maxWaitlist") != null) {
+            Object val = data.get("maxWaitlist");
+            if (val instanceof Long) event.setMaxWaitlist(((Long) val).intValue());
+            else if (val instanceof Integer) event.setMaxWaitlist((Integer) val);
+        }
+        if (data.containsKey("limitDistance") && data.get("limitDistance") != null) {
+            Object dist = data.get("limitDistance");
+            if (dist instanceof Double) event.setLimitDistance((Double) dist);
+            else if (dist instanceof Long) event.setLimitDistance(((Long) dist).doubleValue());
+            else if (dist instanceof Integer)
+                event.setLimitDistance(((Integer) dist).doubleValue());
+        }
+        if (data.containsKey("locationName")) {
+            event.setLocationName((String) data.get("locationName"));
+        }
+
+        return event;
     }
 
     /**
-     * Saves the current state of this Event object to the database.
-     * <p>
-     * This method takes all the properties of the current object, converts them into a format
-     * suitable for the database (a Map), and sends them to be saved or updated in Firestore.
-     * This is an asynchronous network operation.
+     * Creates an Event object from a DocumentSnapshot.
      *
-     * @return A {@code Task<Void>} that represents the asynchronous save operation. You can add listeners
-     * to this task to be notified of success or failure.
+     * @param doc The DocumentSnapshot.
+     * @return A new Event object, or null if document doesn't exist.
+     */
+    public static Event fromDoc(DocumentSnapshot doc) {
+        if (!doc.exists()) return null;
+        return fromMap(doc.getData());
+    }
+
+    /**
+     * Saves the current event state to the database.
+     *
+     * @return A Task representing the asynchronous save operation.
      */
     public Task<Void> save() {
         return dbHandler.saveEvent(this.eventId, this.toMap());
     }
 
     /**
-     * Converts the Event object into a Map format suitable for Firestore.
-     * This is a private helper method used by the {@link #save()} method.
+     * Converts the event's data into a Map for Firestore storage.
      *
-     * @return A Map containing the key-value pairs of the event data.
+     * @return A Map containing the event's data.
      */
     private Map<String, Object> toMap() {
         Map<String, Object> map = new HashMap<>();
         map.put("eventId", eventId);
         map.put("name", name);
         map.put("description", description);
-        map.put("organizerId", organizer.getDeviceId());
-        map.put("organizerEmail", organizer.getEmail());
-        map.put("organizerFirstName", organizer.getFirstName());
-        map.put("organizerLastName", organizer.getLastName());
-        map.put("organizerPhone", organizer.getPhoneNumber());
+        if (organizer != null) {
+            map.put("organizerId", organizer.getDeviceId());
+            map.put("organizerEmail", organizer.getEmail());
+            map.put("organizerFirstName", organizer.getFirstName());
+            map.put("organizerLastName", organizer.getLastName());
+            map.put("organizerPhone", organizer.getPhoneNumber());
+        }
         map.put("location", location);
-        map.put("imageUrl", imageUrl);
+        map.put("locationName", locationName);
+        if (photo != null) {
+            map.put("photo", Blob.fromBytes(photo));
+        } else {
+            map.put("photo", null);
+        }
         map.put("registrationStartTime", registrationStartTime);
         map.put("registrationEndTime", registrationEndTime);
         map.put("eventStartTime", eventStartTime);
@@ -277,13 +290,18 @@ public class Event {
             map.put("latitude", geoLocation.getLatitude());
             map.put("longitude", geoLocation.getLongitude());
         }
+        map.put("maxAttendees", maxAttendees);
+        map.put("maxWaitlist", maxWaitlist);
+        map.put("limitDistance", limitDistance);
+        map.put("isPrivate", isPrivate);
         return map;
     }
 
     /**
-     * Check if user is in event
-     * @param entrant The entrant to check
-     * @return A Task that resolves to true if the user is in the event, false otherwise
+     * Checks if a specific entrant is registered for this event.
+     *
+     * @param entrant The entrant to check.
+     * @return A Task resolving to true if registered, false otherwise.
      */
     public Task<Boolean> inEvent(Entrant entrant) {
         return dbHandler.getDb().collection(DatabaseHandler.COLLECTION_EVENTS)
@@ -291,16 +309,14 @@ public class Event {
                 .collection(DatabaseHandler.COLLECTION_ENTRANTS)
                 .document(entrant.getDeviceId())
                 .get()
-                .continueWith(task -> {
-                    return task.isSuccessful() && task.getResult().exists();
-                });
+                .continueWith(task -> task.isSuccessful() && task.getResult().exists());
     }
 
     /**
-     * Adds an entrant to the event's entrant list in the database.
+     * Adds an entrant to the event's waiting list if registration is open and waitlist is not full.
      *
      * @param entrant The entrant to add.
-     * @return A Task representing the async operation.
+     * @return A Task representing the operation.
      */
     public Task<Void> addEntrant(Entrant entrant, Location joiningLocation) {
         Date now = new Date();
@@ -311,12 +327,17 @@ public class Event {
             return Tasks.forException(new IllegalStateException("Registration has ended."));
         }
 
-        this.entrantList.put(entrant, Boolean.FALSE);
+        return fetchEntrantCount().continueWithTask(task -> {
+            if (!task.isSuccessful()) throw task.getException();
+            long count = task.getResult();
+            if (maxWaitlist != null && count >= maxWaitlist) {
+                return Tasks.forException(new IllegalStateException("Waitlist is full."));
+            }
 
-        Map<String, Object> registrationData = new HashMap<>();
-        registrationData.put("entrantId", entrant.getDeviceId());
-        registrationData.put("status", "waiting"); // Default status
-        registrationData.put("registrationTime", now);
+            Map<String, Object> registrationData = new HashMap<>();
+            registrationData.put("entrantId", entrant.getDeviceId());
+            registrationData.put("status", DatabaseHandler.STATUS_WAITING);
+            registrationData.put("registrationTime", now);
 
         if (joiningLocation != null) {
             registrationData.put("entrantLat", joiningLocation.getLatitude());
@@ -324,17 +345,17 @@ public class Event {
         }
 
         return dbHandler.updateEntrantStatus(String.valueOf(this.eventId), entrant.getDeviceId(), registrationData);
+            return dbHandler.updateEntrantStatus(String.valueOf(this.eventId), entrant.getDeviceId(), registrationData);
+        });
     }
 
     /**
-     * Removes an entrant from the event's entrant list in the database.
+     * Removes an entrant from the event.
      *
      * @param entrant The entrant to remove.
-     * @return A Task representing the async operation.
+     * @return A Task representing the operation.
      */
     public Task<Void> removeEntrant(Entrant entrant) {
-        this.entrantList.remove(entrant); // Update local list
-
         return dbHandler.getDb().collection(DatabaseHandler.COLLECTION_EVENTS)
                 .document(String.valueOf(this.eventId))
                 .collection(DatabaseHandler.COLLECTION_ENTRANTS)
@@ -343,24 +364,38 @@ public class Event {
     }
 
     /**
-     * Fetches the current entrant count from the database sub-collection.
+     * Fetches the current number of entrants registered for the event.
      *
-     * @return A Task that resolves with the count.
+     * @return A Task resolving to the entrant count.
      */
     public Task<Long> fetchEntrantCount() {
         return dbHandler.getEntrantCount(String.valueOf(this.eventId))
                 .addOnSuccessListener(count -> this.entrantCount = count);
     }
 
-
+    /**
+     * Gets the count of entrants registered for the event.
+     *
+     * @return The entrant count.
+     */
     public long getEntrantCount() {
         return entrantCount;
     }
 
+    /**
+     * Gets the unique event ID.
+     *
+     * @return The event ID.
+     */
     public Long getEventId() {
         return eventId;
     }
 
+    /**
+     * Gets the name of the event.
+     *
+     * @return The event name.
+     */
     public String getName() {
         return name;
     }
@@ -368,7 +403,7 @@ public class Event {
     /**
      * Sets the name of the event.
      *
-     * @param name The new name of the event.
+     * @param name The new event name.
      */
     public void setName(String name) {
         this.name = name;
@@ -377,7 +412,7 @@ public class Event {
     /**
      * Gets the description of the event.
      *
-     * @return The description of the event.
+     * @return The event description.
      */
     public String getDescription() {
         return description;
@@ -386,7 +421,7 @@ public class Event {
     /**
      * Sets the description of the event.
      *
-     * @param description The new description of the event.
+     * @param description The new event description.
      */
     public void setDescription(String description) {
         this.description = description;
@@ -395,7 +430,7 @@ public class Event {
     /**
      * Gets the organizer of the event.
      *
-     * @return The organizer of the event.
+     * @return The Organizer object.
      */
     public Organizer getOrganizer() {
         return organizer;
@@ -404,59 +439,70 @@ public class Event {
     /**
      * Sets the organizer of the event.
      *
-     * @param organizer The new organizer of the event.
+     * @param organizer The new Organizer.
      */
     public void setOrganizer(Organizer organizer) {
         this.organizer = organizer;
     }
 
     /**
-     * Gets the location of the event.
+     * Gets the location string of the event.
      *
-     * @return The location of the event.
+     * @return The location string.
      */
     public String getLocation() {
         return location;
     }
 
     /**
-     * Sets the location of the event.
+     * Sets the location string of the event.
      *
-     * @param location The new location of the event.
+     * @param location The new location string.
      */
     public void setLocation(String location) {
         this.location = location;
     }
 
     /**
-     * Gets the image URL of the event.
+     * Gets the descriptive name of the location.
      *
-     * @return The image URL of the event.
+     * @return The location name.
      */
-    public String getImageUrl() {
-        return imageUrl;
+    public String getLocationName() {
+        return locationName;
     }
 
     /**
-     * Sets the image URL of the event.
+     * Sets the descriptive name of the location.
      *
-     * @param imageUrl The new image URL of the event.
+     * @param locationName The new location name.
      */
-    public void setImageUrl(String imageUrl) {
-        this.imageUrl = imageUrl;
+    public void setLocationName(String locationName) {
+        this.locationName = locationName;
     }
 
     /**
-     * Removes the image URL of the event.
+     * Gets the raw bytes of the event's poster image.
+     *
+     * @return The image bytes.
      */
-    public void removeImageUrl() {
-        this.imageUrl = null;
+    public byte[] getPhoto() {
+        return photo;
+    }
+
+    /**
+     * Sets the raw bytes of the event's poster image.
+     *
+     * @param photo The new image bytes.
+     */
+    public void setPhoto(byte[] photo) {
+        this.photo = photo;
     }
 
     /**
      * Gets the registration start time.
      *
-     * @return The registration start time.
+     * @return The registration start Date.
      */
     public Date getRegistrationStartTime() {
         return registrationStartTime;
@@ -465,7 +511,7 @@ public class Event {
     /**
      * Sets the registration start time.
      *
-     * @param registrationStartTime The new registration start time.
+     * @param registrationStartTime The new registration start Date.
      */
     public void setRegistrationStartTime(Date registrationStartTime) {
         this.registrationStartTime = registrationStartTime;
@@ -474,7 +520,7 @@ public class Event {
     /**
      * Gets the registration end time.
      *
-     * @return The registration end time.
+     * @return The registration end Date.
      */
     public Date getRegistrationEndTime() {
         return registrationEndTime;
@@ -483,7 +529,7 @@ public class Event {
     /**
      * Sets the registration end time.
      *
-     * @param registrationEndTime The new registration end time.
+     * @param registrationEndTime The new registration end Date.
      */
     public void setRegistrationEndTime(Date registrationEndTime) {
         this.registrationEndTime = registrationEndTime;
@@ -492,7 +538,7 @@ public class Event {
     /**
      * Gets the event start time.
      *
-     * @return The event start time.
+     * @return The event start Date.
      */
     public Date getEventStartTime() {
         return eventStartTime;
@@ -501,7 +547,7 @@ public class Event {
     /**
      * Sets the event start time.
      *
-     * @param eventStartTime The new event start time.
+     * @param eventStartTime The new event start Date.
      */
     public void setEventStartTime(Date eventStartTime) {
         this.eventStartTime = eventStartTime;
@@ -510,7 +556,7 @@ public class Event {
     /**
      * Gets the event end time.
      *
-     * @return The event end time.
+     * @return The event end Date.
      */
     public Date getEventEndTime() {
         return eventEndTime;
@@ -519,7 +565,7 @@ public class Event {
     /**
      * Sets the event end time.
      *
-     * @param eventEndTime The new event end time.
+     * @param eventEndTime The new event end Date.
      */
     public void setEventEndTime(Date eventEndTime) {
         this.eventEndTime = eventEndTime;
@@ -528,33 +574,135 @@ public class Event {
     /**
      * Gets the list of entrants for the event.
      *
-     * @return A HashMap of entrants and their selection status.
+     * @return A HashMap of entrants and their registration status.
      */
     public HashMap<Entrant, Boolean> getEntrantList() {
         return entrantList;
     }
 
+    /**
+     * Gets the maximum number of attendees allowed for the event.
+     *
+     * @return The maximum attendees, or null if no limit.
+     */
+    public Integer getMaxAttendees() {
+        return maxAttendees;
+    }
+
+    /**
+     * Sets the maximum number of attendees allowed for the event.
+     *
+     * @param maxAttendees The new maximum attendees.
+     */
+    public void setMaxAttendees(Integer maxAttendees) {
+        this.maxAttendees = maxAttendees;
+    }
+
+    /**
+     * Gets the maximum number of people allowed on the waitlist.
+     *
+     * @return The maximum waitlist size, or null if no limit.
+     */
+    public Integer getMaxWaitlist() {
+        return maxWaitlist;
+    }
+
+    /**
+     * Sets the maximum number of people allowed on the waitlist.
+     *
+     * @param maxWaitlist The new maximum waitlist size.
+     */
+    public void setMaxWaitlist(Integer maxWaitlist) {
+        this.maxWaitlist = maxWaitlist;
+    }
+
+    /**
+     * Checks if geolocation is required to join the event.
+     *
+     * @return True if required, false otherwise.
+     */
     public boolean isGeolocationRequired() {
         return geolocationRequired;
     }
 
+    /**
+     * Sets whether geolocation is required to join the event.
+     *
+     * @param geolocationRequired True to require geolocation, false otherwise.
+     */
     public void setGeolocationRequired(boolean geolocationRequired) {
         this.geolocationRequired = geolocationRequired;
     }
 
+    /**
+     * Gets the geofencing radius.
+     *
+     * @return The radius in kilometers.
+     */
     public Double getRadius() {
         return radius;
     }
 
+    /**
+     * Sets the geofencing radius.
+     *
+     * @param radius The new radius in kilometers.
+     */
     public void setRadius(Double radius) {
         this.radius = radius;
     }
 
+    /**
+     * Gets the GPS coordinates of the event.
+     *
+     * @return The Location object.
+     */
     public Location getGeoLocation() {
         return geoLocation;
     }
 
+    /**
+     * Sets the GPS coordinates of the event.
+     *
+     * @param geoLocation The new Location object.
+     */
     public void setGeoLocation(Location geoLocation) {
         this.geoLocation = geoLocation;
+    }
+
+    /**
+     * Gets the distance limit for the event.
+     *
+     * @return The limit distance.
+     */
+    public Double getLimitDistance() {
+        return limitDistance;
+    }
+
+    /**
+     * Sets the distance limit for the event.
+     *
+     * @param limitDistance The new limit distance.
+     */
+    public void setLimitDistance(Double limitDistance) {
+        this.limitDistance = limitDistance;
+    }
+
+    /**
+     * Checks if the event is private.
+     *
+     * @return True if private, false otherwise.
+     */
+    public boolean isPrivate() {
+        return isPrivate;
+    }
+
+    /**
+     * Sets the privacy of the event.
+     *
+     * @param isPrivate True to make private, false otherwise.
+     */
+    public void setPrivate(boolean isPrivate) {
+        this.isPrivate = isPrivate;
     }
 }

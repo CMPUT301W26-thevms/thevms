@@ -23,6 +23,7 @@ import com.google.android.material.bottomnavigation.BottomNavigationView;
 
 /**
  * The main activity of the application that manages fragment navigation and the admin drawer.
+ * It serves as the primary entry point after signup and handles user role-based UI adjustments.
  */
 public class MainActivity extends AppCompatActivity {
 
@@ -73,10 +74,14 @@ public class MainActivity extends AppCompatActivity {
 
             if (id == R.id.nav_home) {
                 selectedFragment = new SearchFragment();
+            } else if (id == R.id.nav_inbox) {
+                selectedFragment = new InboxFragment();
             } else if (id == R.id.nav_profile) {
                 selectedFragment = new ProfileFragment();
             } else if (id == R.id.nav_add) {
                 selectedFragment = new CreateEventFragment();
+            } else if (id == R.id.nav_favorites) {
+                selectedFragment = new EntrantEventsFragment();
             } else if (id == R.id.nav_admin_settings) {
                 openAdminDrawer();
                 return false; // Gear only opens the drawer, doesn't change selection by itself
@@ -121,6 +126,8 @@ public class MainActivity extends AppCompatActivity {
 
     /**
      * Checks the user's role from the database and shows/hides role-specific buttons.
+     *
+     * @param bottomNav The BottomNavigationView to adjust.
      */
     private void checkUserRoleAndAdjustUI(BottomNavigationView bottomNav) {
         @SuppressLint("HardwareIds")
