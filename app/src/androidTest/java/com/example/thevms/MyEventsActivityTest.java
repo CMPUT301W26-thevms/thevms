@@ -122,4 +122,5 @@ public class MyEventsActivityTest {
         onView(withText("Jane Smith")).check(matches(isDisplayed()));
         onView(withText("Bob Johnson")).check(matches(isDisplayed()));
     }
+
 }
