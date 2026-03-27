@@ -1,8 +1,10 @@
 package com.example.thevms.ui.Event;
 
+import android.annotation.SuppressLint;
 import android.content.Context;
 import android.content.Intent;
 import android.net.Uri;
+import android.provider.Settings;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -40,6 +42,9 @@ public class AttendeeAdapter extends RecyclerView.Adapter<AttendeeAdapter.ViewHo
 
     private String activeStatus = "waiting"; // default on load
     private String eventId;
+    private String eventName;
+    private String organizerId;
+    private String organizerName;
     private DatabaseHandler dbHandler = new DatabaseHandler();
 
     private OnCancelEntrantListener cancelListener;
@@ -55,8 +60,11 @@ public class AttendeeAdapter extends RecyclerView.Adapter<AttendeeAdapter.ViewHo
         this.cancelListener = listener;
     }
 
-    public void setEventId(String eventId) {
+    public void setEventContext(String eventId, String eventName, String organizerId, String organizerName) {
         this.eventId = eventId;
+        this.eventName = eventName;
+        this.organizerId = organizerId;
+        this.organizerName = organizerName;
     }
 
     /**
@@ -187,7 +195,18 @@ public class AttendeeAdapter extends RecyclerView.Adapter<AttendeeAdapter.ViewHo
         if (eventId != null && ("waiting".equals(item.getStatus()) || "selected".equals(item.getStatus()))) {
             holder.assignCoOrganizerBtn.setVisibility(View.VISIBLE);
             holder.assignCoOrganizerBtn.setOnClickListener(v -> {
-                dbHandler.assignCoOrganizer(eventId, item.getEntrant().getDeviceId())
+                String safeEventName = eventName != null ? eventName : "Event";
+                String safeOrganizerId = organizerId != null ? organizerId : getDeviceId(holder.itemView.getContext());
+                String safeOrganizerName = organizerName != null ? organizerName : "Organizer";
+                String receiverName = buildDisplayName(item);
+
+                if (safeOrganizerId == null) {
+                    Toast.makeText(holder.itemView.getContext(), "Missing organizer info", Toast.LENGTH_SHORT).show();
+                    return;
+                }
+
+                dbHandler.assignCoOrganizer(eventId, safeEventName, safeOrganizerId, safeOrganizerName,
+                                item.getEntrant().getDeviceId(), receiverName)
                         .addOnSuccessListener(aVoid -> {
                             Toast.makeText(holder.itemView.getContext(), "Assigned " + item.getEntrant().getFirstName() + " as co-organizer", Toast.LENGTH_SHORT).show();
                             // Item will be filtered out next refresh due to status change
@@ -228,5 +247,24 @@ public class AttendeeAdapter extends RecyclerView.Adapter<AttendeeAdapter.ViewHo
             cancelBtn = itemView.findViewById(R.id.btn_cancel_entrant);
             assignCoOrganizerBtn = itemView.findViewById(R.id.btn_assign_co_organizer);
         }
+    }
+
+    private String buildDisplayName(AttendeeItem item) {
+        String first = item.getEntrant().getFirstName();
+        String last = item.getEntrant().getLastName();
+        if (first != null && last != null) {
+            return first + " " + last;
+        } else if (first != null) {
+            return first;
+        } else if (last != null) {
+            return last;
+        } else {
+            return item.getEntrant().getEmail() != null ? item.getEntrant().getEmail() : "Entrant";
+        }
+    }
+
+    @SuppressLint("HardwareIds")
+    private String getDeviceId(Context context) {
+        return Settings.Secure.getString(context.getContentResolver(), Settings.Secure.ANDROID_ID);
     }
 }
