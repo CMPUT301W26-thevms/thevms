@@ -348,7 +348,7 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
 
                 if (mapVisible) {
                     if (!mapInitialized) {
-                        mapView = new com.google.android.gms.maps.MapView(itemView.getContext());
+                        mapView = new InterceptableMapView(itemView.getContext());
                         mapView.onCreate(null);
                         mapContainer.removeAllViews();
                         mapContainer.addView(mapView, new FrameLayout.LayoutParams(
@@ -717,6 +717,32 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
                     .addOnSuccessListener(unused -> {
                         dbHandler.selectAndInviteNextEntrant(eventId);
                     });
+        }
+    }
+
+    static class InterceptableMapView extends com.google.android.gms.maps.MapView {
+
+        public InterceptableMapView(android.content.Context context) {
+            super(context);
+        }
+
+        @Override
+        public boolean dispatchTouchEvent(android.view.MotionEvent event) {
+            int action = event.getActionMasked();
+            boolean disallow = action == android.view.MotionEvent.ACTION_DOWN
+                    || action == android.view.MotionEvent.ACTION_MOVE;
+            if (action == android.view.MotionEvent.ACTION_UP
+                    || action == android.view.MotionEvent.ACTION_CANCEL) {
+                disallow = false;
+            }
+
+            android.view.ViewParent parent = getParent();
+            while (parent != null) {
+                parent.requestDisallowInterceptTouchEvent(disallow);
+                parent = parent.getParent();
+            }
+
+            return super.dispatchTouchEvent(event);
         }
     }
 }

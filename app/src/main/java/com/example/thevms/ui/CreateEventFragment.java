@@ -5,12 +5,15 @@ import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.net.Uri;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.provider.Settings;
 import android.text.Editable;
 import android.text.TextWatcher;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.ViewParent;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ImageView;
@@ -44,6 +47,8 @@ import java.util.Calendar;
 import java.util.Date;
 import java.util.Locale;
 import java.util.TimeZone;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 /**
  * Fragment for creating a new event.
@@ -65,6 +70,8 @@ public class CreateEventFragment extends Fragment {
     private Uri posterUri;
     private android.location.Location testingLocation;
     private android.location.Location selectedEventLocation;
+    private final ExecutorService geocodingExecutor = Executors.newSingleThreadExecutor();
+    private final Handler mainHandler = new Handler(Looper.getMainLooper());
 
     @Nullable
     @Override
@@ -137,6 +144,12 @@ public class CreateEventFragment extends Fragment {
         btnCancel.setOnClickListener(v -> showCancelConfirmationDialog());
         btnPreviewLocation.setOnClickListener(v -> previewLocationOnMap());
         btnConfirm.setOnClickListener(v -> handleCreateEvent());
+    }
+
+    @Override
+    public void onDestroy() {
+        super.onDestroy();
+        geocodingExecutor.shutdownNow();
     }
 
     @VisibleForTesting
@@ -300,10 +313,57 @@ public class CreateEventFragment extends Fragment {
             return;
         }
 
-        android.location.Location location = (testingLocation != null) ? testingLocation : getLocationFromAddress(locationStr);
+        if (testingLocation != null) {
+            showLocationPreviewDialog(locationStr, copyLocation(testingLocation));
+            return;
+        }
+
+        if (selectedEventLocation != null) {
+            showLocationPreviewDialog(locationStr, copyLocation(selectedEventLocation));
+            return;
+        }
+
+        btnPreviewLocation.setEnabled(false);
+        btnPreviewLocation.setText("Loading...");
+
+        geocodingExecutor.execute(() -> {
+            android.location.Location location = resolveLocationForPreview(locationStr);
+            mainHandler.post(() -> {
+                if (!isAdded() || getView() == null) {
+                    return;
+                }
+
+                btnPreviewLocation.setEnabled(true);
+                btnPreviewLocation.setText("Preview location");
+
+                showLocationPreviewDialog(locationStr, location);
+            });
+        });
+    }
+
+    private void showLocationPreviewDialog(String locationLabel, @Nullable android.location.Location location) {
+        if (!isAdded()) {
+            return;
+        }
         LocationPreviewDialogFragment
-                .newInstance(locationStr, location)
+                .newInstance(locationLabel, location)
                 .show(getParentFragmentManager(), "location_preview");
+    }
+
+    private android.location.Location resolveLocationForPreview(String strAddress) {
+        android.location.Location location = getLocationFromAddress(strAddress);
+        if (location != null) {
+            return location;
+        }
+
+        try {
+            Thread.sleep(250);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return null;
+        }
+
+        return getLocationFromAddress(strAddress);
     }
 
     private android.location.Location getLocationFromAddress(String strAddress) {
@@ -319,6 +379,13 @@ public class CreateEventFragment extends Fragment {
             }
         } catch (Exception ignored) {}
         return null;
+    }
+
+    private android.location.Location copyLocation(@NonNull android.location.Location source) {
+        android.location.Location copy = new android.location.Location(source);
+        copy.setLatitude(source.getLatitude());
+        copy.setLongitude(source.getLongitude());
+        return copy;
     }
 
     public static class LocationPreviewDialogFragment extends DialogFragment {
@@ -403,6 +470,11 @@ public class CreateEventFragment extends Fragment {
                         getChildFragmentManager().executePendingTransactions();
                     }
 
+                    View mapFragmentView = mapFragment.getView();
+                    if (mapFragmentView != null) {
+                        installMapTouchInterceptor(mapFragmentView);
+                    }
+
                     mapFragment.getMapAsync(map -> {
                         map.getUiSettings().setZoomGesturesEnabled(true);
                         map.getUiSettings().setScrollGesturesEnabled(true);
@@ -461,6 +533,22 @@ public class CreateEventFragment extends Fragment {
             }
 
             return dialog;
+        }
+
+        private void installMapTouchInterceptor(View mapView) {
+            mapView.setOnTouchListener((v, event) -> {
+                requestParentsNotToIntercept(v, event.getActionMasked() == android.view.MotionEvent.ACTION_DOWN
+                        || event.getActionMasked() == android.view.MotionEvent.ACTION_MOVE);
+                return false;
+            });
+        }
+
+        private void requestParentsNotToIntercept(View view, boolean disallow) {
+            ViewParent parent = view.getParent();
+            while (parent != null) {
+                parent.requestDisallowInterceptTouchEvent(disallow);
+                parent = parent.getParent();
+            }
         }
     }
 }
