@@ -584,15 +584,14 @@ public class EventAdapter extends RecyclerView.Adapter<EventAdapter.EventViewHol
             });
         }
 
-        // Handle join event
-        private void joinEvent(Event event, String deviceId, android.location.Location joiningLocation) {
         /**
          * Handles the logic for a user joining an event.
          *
          * @param event    The event to join.
          * @param deviceId The unique ID of the device.
+         * @param joiningLocation The location captured when the entrant joins, if available.
          */
-        private void joinEvent(Event event, String deviceId) {
+        private void joinEvent(Event event, String deviceId, android.location.Location joiningLocation) {
             Entrant.getOrCreate(deviceId).addOnSuccessListener(entrant -> {
                 event.addEntrant(entrant, joiningLocation).addOnSuccessListener(aVoid -> {
                     Toast.makeText(itemView.getContext(), "Successfully joined " + event.getName(), Toast.LENGTH_SHORT).show();

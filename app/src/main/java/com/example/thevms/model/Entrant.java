@@ -290,7 +290,7 @@ public class Entrant {
      *
      * @param event The event to register in.
      */
-    public void registerInEvent(Event event) { event.addEntrant(this); }
+    public void registerInEvent(Event event) { event.addEntrant(this, null); }
 
     /**
      * Unregisters the entrant from a specific event.

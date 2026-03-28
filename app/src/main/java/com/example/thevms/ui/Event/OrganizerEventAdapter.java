@@ -10,6 +10,7 @@ import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.FrameLayout;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
@@ -139,13 +140,10 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
      * Manages nested RecyclerView for attendees and event management controls.
      */
     static class ViewHolder extends RecyclerView.ViewHolder {
-        TextView nameText, distanceText, waitlistText, dateText, descriptionText, exportCsvText;
+        TextView nameText, distanceText, waitlistText, dateText, descriptionText, exportCsvText, mapText;
         Button cancelBtn, lotteryBtn, postCommentBtn, updatePosterBtn, inviteBtn;
         RecyclerView attendeesRv, commentsRv;
         ImageView posterImage;
-        TextView nameText, distanceText, waitlistText, dateText, descriptionText, exportCsvText, mapText;
-        Button cancelBtn;
-        RecyclerView attendeesRv;
         Spinner statusSpinner;
         EditText commentEditText;
         AttendeeAdapter attendeeAdapter;
@@ -153,11 +151,13 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
         DatabaseHandler dbHandler;
         FirebaseFirestore db;
         com.google.android.gms.maps.MapView mapView;
+        FrameLayout mapContainer;
         ListenerRegistration commentsListener;
 
         // Stored so the CSV export can use it for the filename
         String currentEventName = "";
         boolean mapVisible = false;
+        boolean mapInitialized = false;
 
         /**
          * Initializes the ViewHolder and sets up nested UI components like the attendee list and status spinner.
@@ -181,7 +181,7 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
             statusSpinner = itemView.findViewById(R.id.spinner_attendee_status);
             exportCsvText = itemView.findViewById(R.id.tv_export_csv);
             mapText = itemView.findViewById(R.id.tv_view_map);
-            mapView = itemView.findViewById(R.id.map_view_inline);
+            mapContainer = itemView.findViewById(R.id.map_container_inline);
             commentEditText = itemView.findViewById(R.id.et_organizer_comment);
             postCommentBtn = itemView.findViewById(R.id.btn_post_organizer_comment);
 
@@ -196,8 +196,6 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
 
             dbHandler = new DatabaseHandler();
             db = FirebaseFirestore.getInstance();
-            mapView.onCreate(null);
-            mapView.onResume();
 
             // Wire cancel listener — cancels entrant and promotes next waitlisted randomly
             attendeeAdapter.setOnCancelEntrantListener(item -> {
@@ -287,6 +285,8 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
             itemView.setTag(eventId);
 
             currentEventName = event.getName() != null ? event.getName() : "Event";
+            mapVisible = false;
+            mapContainer.setVisibility(View.GONE);
 
             nameText.setText(event.getName());
             descriptionText.setText(event.getDescription());
@@ -317,9 +317,19 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
 
             mapText.setOnClickListener(v -> {
                 mapVisible = !mapVisible;
-                View mapContainer = itemView.findViewById(R.id.map_view_inline);
 
                 if (mapVisible) {
+                    if (!mapInitialized) {
+                        mapView = new com.google.android.gms.maps.MapView(itemView.getContext());
+                        mapView.onCreate(null);
+                        mapContainer.removeAllViews();
+                        mapContainer.addView(mapView, new FrameLayout.LayoutParams(
+                                ViewGroup.LayoutParams.MATCH_PARENT,
+                                ViewGroup.LayoutParams.MATCH_PARENT
+                        ));
+                        mapInitialized = true;
+                    }
+                    mapView.onResume();
                     mapContainer.setVisibility(View.VISIBLE);
                     mapView.getMapAsync(googleMap -> {
                         googleMap.clear();
@@ -371,6 +381,9 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
                                 });
                     });
                 } else {
+                    if (mapView != null) {
+                        mapView.onPause();
+                    }
                     mapContainer.setVisibility(View.GONE);
                 }
             });

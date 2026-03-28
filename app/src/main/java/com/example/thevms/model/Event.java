@@ -344,7 +344,6 @@ public class Event {
             registrationData.put("entrantLng", joiningLocation.getLongitude());
         }
 
-        return dbHandler.updateEntrantStatus(String.valueOf(this.eventId), entrant.getDeviceId(), registrationData);
             return dbHandler.updateEntrantStatus(String.valueOf(this.eventId), entrant.getDeviceId(), registrationData);
         });
     }
