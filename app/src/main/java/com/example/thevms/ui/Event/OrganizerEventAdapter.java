@@ -3,6 +3,8 @@ package com.example.thevms.ui.Event;
 import android.app.AlertDialog;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
+import android.graphics.Canvas;
+import android.graphics.Paint;
 import android.provider.Settings;
 import android.text.Editable;
 import android.text.TextWatcher;
@@ -358,9 +360,15 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
                     mapView.onResume();
                     mapContainer.setVisibility(View.VISIBLE);
                     mapView.getMapAsync(googleMap -> {
+                        googleMap.getUiSettings().setZoomGesturesEnabled(true);
+                        googleMap.getUiSettings().setScrollGesturesEnabled(true);
+                        googleMap.getUiSettings().setRotateGesturesEnabled(true);
+                        googleMap.getUiSettings().setTiltGesturesEnabled(true);
+                        googleMap.getUiSettings().setCompassEnabled(true);
                         googleMap.clear();
                         dbHandler.getEntrantsWithLocations(eventId)
                                 .addOnSuccessListener(querySnapshot -> {
+                                    List<com.google.android.gms.maps.model.LatLng> entrantPositions = new ArrayList<>();
                                     com.google.android.gms.maps.model.LatLngBounds.Builder boundsBuilder =
                                             new com.google.android.gms.maps.model.LatLngBounds.Builder();
                                     int count = 0;
@@ -384,17 +392,16 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
                                         if (lat == null || lng == null) continue;
                                         com.google.android.gms.maps.model.LatLng pos =
                                                 new com.google.android.gms.maps.model.LatLng(lat, lng);
-                                        googleMap.addMarker(
-                                                new com.google.android.gms.maps.model.MarkerOptions()
-                                                        .position(pos)
-                                                        .icon(com.google.android.gms.maps.model.BitmapDescriptorFactory
-                                                                .defaultMarker(
-                                                                        com.google.android.gms.maps.model.BitmapDescriptorFactory.HUE_AZURE
-                                                                ))
-                                        );
+                                        entrantPositions.add(pos);
                                         boundsBuilder.include(pos);
                                         count++;
                                     }
+
+                                    renderMapMarkers(googleMap, event, entrantPositions);
+                                    List<com.google.android.gms.maps.model.LatLng> finalEntrantPositions = new ArrayList<>(entrantPositions);
+                                    googleMap.setOnCameraIdleListener(() ->
+                                            renderMapMarkers(googleMap, event, finalEntrantPositions));
+
                                     if (count > 0) {
                                         int pad = (int) (40 * itemView.getContext()
                                                 .getResources().getDisplayMetrics().density);
@@ -587,7 +594,62 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
                     commentEditText.setText("");
                     Toast.makeText(itemView.getContext(), "Comment posted", Toast.LENGTH_SHORT).show();
                 });
-            });
+                });
+            }
+
+        private void renderMapMarkers(com.google.android.gms.maps.GoogleMap googleMap,
+                                      Event event,
+                                      List<com.google.android.gms.maps.model.LatLng> entrantPositions) {
+            googleMap.clear();
+
+            if (event.getGeoLocation() != null) {
+                com.google.android.gms.maps.model.LatLng eventPos =
+                        new com.google.android.gms.maps.model.LatLng(
+                                event.getGeoLocation().getLatitude(),
+                                event.getGeoLocation().getLongitude()
+                        );
+                googleMap.addMarker(
+                        new com.google.android.gms.maps.model.MarkerOptions()
+                                .position(eventPos)
+                                .title(event.getName())
+                );
+            }
+
+            float zoom = googleMap.getCameraPosition().zoom;
+            for (com.google.android.gms.maps.model.LatLng pos : entrantPositions) {
+                googleMap.addMarker(
+                        new com.google.android.gms.maps.model.MarkerOptions()
+                                .position(pos)
+                                .anchor(0.5f, 0.5f)
+                                .icon(createUserLocationIcon(zoom))
+                );
+            }
+        }
+
+        private com.google.android.gms.maps.model.BitmapDescriptor createUserLocationIcon(float zoom) {
+            float density = itemView.getContext().getResources().getDisplayMetrics().density;
+            float clampedZoom = Math.max(8f, Math.min(20f, zoom));
+            float sizeDp = 18f + ((clampedZoom - 8f) / 12f) * 8f;
+            int sizePx = Math.max(Math.round(18f * density), Math.round(sizeDp * density));
+            float center = sizePx / 2f;
+            float radius = sizePx * 0.24f;
+
+            Bitmap bitmap = Bitmap.createBitmap(sizePx, sizePx, Bitmap.Config.ARGB_8888);
+            Canvas canvas = new Canvas(bitmap);
+
+            Paint fillPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+            fillPaint.setColor(android.graphics.Color.parseColor("#3B82F6"));
+            fillPaint.setStyle(Paint.Style.FILL);
+
+            Paint strokePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+            strokePaint.setColor(android.graphics.Color.WHITE);
+            strokePaint.setStyle(Paint.Style.STROKE);
+            strokePaint.setStrokeWidth(Math.max(2.5f, density * 1.5f));
+
+            canvas.drawCircle(center, center, radius, fillPaint);
+            canvas.drawCircle(center, center, radius, strokePaint);
+
+            return com.google.android.gms.maps.model.BitmapDescriptorFactory.fromBitmap(bitmap);
         }
 
         private void showDeleteCommentConfirmation(String eventId, String commentId) {

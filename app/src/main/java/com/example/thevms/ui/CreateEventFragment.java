@@ -6,25 +6,33 @@ import android.graphics.BitmapFactory;
 import android.net.Uri;
 import android.os.Bundle;
 import android.provider.Settings;
-import android.util.Log;
+import android.text.Editable;
+import android.text.TextWatcher;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ImageView;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.annotation.VisibleForTesting;
 import androidx.appcompat.app.AlertDialog;
+import androidx.fragment.app.DialogFragment;
 import androidx.fragment.app.Fragment;
 
 import com.example.thevms.R;
 import com.example.thevms.model.Entrant;
 import com.example.thevms.model.Event;
 import com.example.thevms.model.Organizer;
+import com.google.android.gms.maps.CameraUpdateFactory;
+import com.google.android.gms.maps.SupportMapFragment;
+import com.google.android.gms.maps.model.LatLng;
+import com.google.android.gms.maps.model.Marker;
+import com.google.android.gms.maps.model.MarkerOptions;
 import com.google.android.material.datepicker.MaterialDatePicker;
 import com.google.android.material.timepicker.MaterialTimePicker;
 import com.google.android.material.timepicker.TimeFormat;
@@ -45,7 +53,7 @@ public class CreateEventFragment extends Fragment {
 
     private EditText etName, etLocation, etDescription;
     private EditText etMaxAttendees, etMaxWaitlist;
-    private Button btnConfirm, btnCancel;
+    private Button btnConfirm, btnCancel, btnPreviewLocation;
     private Button btnRegStartDate, btnRegEndDate, btnEventStartDate, btnEventEndDate;
     private Date regStartDate, regEndDate, eventStartDate, eventEndDate;
     private final SimpleDateFormat dateTimeFormat = new SimpleDateFormat("MMM dd, yyyy HH:mm", Locale.getDefault());
@@ -56,6 +64,7 @@ public class CreateEventFragment extends Fragment {
     
     private Uri posterUri;
     private android.location.Location testingLocation;
+    private android.location.Location selectedEventLocation;
 
     @Nullable
     @Override
@@ -74,6 +83,7 @@ public class CreateEventFragment extends Fragment {
         etMaxWaitlist = view.findViewById(R.id.et_max_waitlist);
         btnConfirm = view.findViewById(R.id.btn_confirm);
         btnCancel = view.findViewById(R.id.btn_cancel);
+        btnPreviewLocation = view.findViewById(R.id.btn_preview_location);
         
         btnRegStartDate = view.findViewById(R.id.btn_reg_start_date);
         btnRegEndDate = view.findViewById(R.id.btn_reg_end_date);
@@ -97,7 +107,35 @@ public class CreateEventFragment extends Fragment {
             });
         }
 
+        getParentFragmentManager().setFragmentResultListener(
+                LocationPreviewDialogFragment.REQUEST_KEY,
+                getViewLifecycleOwner(),
+                (requestKey, result) -> {
+                    double lat = result.getDouble(LocationPreviewDialogFragment.RESULT_LATITUDE);
+                    double lng = result.getDouble(LocationPreviewDialogFragment.RESULT_LONGITUDE);
+                    selectedEventLocation = new android.location.Location("selected_event_location");
+                    selectedEventLocation.setLatitude(lat);
+                    selectedEventLocation.setLongitude(lng);
+                }
+        );
+
+        etLocation.addTextChangedListener(new TextWatcher() {
+            @Override
+            public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+
+            @Override
+            public void onTextChanged(CharSequence s, int start, int before, int count) {
+                if (testingLocation == null) {
+                    selectedEventLocation = null;
+                }
+            }
+
+            @Override
+            public void afterTextChanged(Editable s) {}
+        });
+
         btnCancel.setOnClickListener(v -> showCancelConfirmationDialog());
+        btnPreviewLocation.setOnClickListener(v -> previewLocationOnMap());
         btnConfirm.setOnClickListener(v -> handleCreateEvent());
     }
 
@@ -119,6 +157,7 @@ public class CreateEventFragment extends Fragment {
         this.testingLocation = new android.location.Location("test");
         this.testingLocation.setLatitude(lat);
         this.testingLocation.setLongitude(lng);
+        this.selectedEventLocation = this.testingLocation;
     }
 
     private void showDateTimePicker(int type) {
@@ -206,8 +245,11 @@ public class CreateEventFragment extends Fragment {
             catch (NumberFormatException e) { etMaxWaitlist.setError("Invalid number"); return; }
         }
 
-        android.location.Location eventLocation = (testingLocation != null) ? testingLocation : getLocationFromAddress(locationStr);
-        if (eventLocation == null) { Toast.makeText(requireContext(), "Please enter a valid location", Toast.LENGTH_SHORT).show(); return; }
+        android.location.Location eventLocation = (testingLocation != null) ? testingLocation : selectedEventLocation;
+        if (eventLocation == null) {
+            Toast.makeText(requireContext(), "Preview the address and confirm the map location first", Toast.LENGTH_SHORT).show();
+            return;
+        }
 
         @SuppressLint("HardwareIds")
         String deviceId = Settings.Secure.getString(requireContext().getContentResolver(), Settings.Secure.ANDROID_ID);
@@ -251,6 +293,19 @@ public class CreateEventFragment extends Fragment {
         dialog.show();
     }
 
+    private void previewLocationOnMap() {
+        String locationStr = etLocation.getText().toString().trim();
+        if (locationStr.isEmpty()) {
+            etLocation.setError("Location is required");
+            return;
+        }
+
+        android.location.Location location = (testingLocation != null) ? testingLocation : getLocationFromAddress(locationStr);
+        LocationPreviewDialogFragment
+                .newInstance(locationStr, location)
+                .show(getParentFragmentManager(), "location_preview");
+    }
+
     private android.location.Location getLocationFromAddress(String strAddress) {
         android.location.Geocoder geocoder = new android.location.Geocoder(requireContext(), Locale.getDefault());
         try {
@@ -264,5 +319,148 @@ public class CreateEventFragment extends Fragment {
             }
         } catch (Exception ignored) {}
         return null;
+    }
+
+    public static class LocationPreviewDialogFragment extends DialogFragment {
+
+        public static final String REQUEST_KEY = "location_preview_result";
+        public static final String RESULT_LATITUDE = "result_latitude";
+        public static final String RESULT_LONGITUDE = "result_longitude";
+        private static final String ARG_LABEL = "arg_label";
+        private static final String ARG_LAT = "arg_lat";
+        private static final String ARG_LNG = "arg_lng";
+        private static final String ARG_HAS_INITIAL = "arg_has_initial";
+
+        private android.location.Location pendingLocation;
+
+        public static LocationPreviewDialogFragment newInstance(String locationLabel, @Nullable android.location.Location initialLocation) {
+            LocationPreviewDialogFragment fragment = new LocationPreviewDialogFragment();
+            Bundle args = new Bundle();
+            args.putString(ARG_LABEL, locationLabel);
+            args.putBoolean(ARG_HAS_INITIAL, initialLocation != null);
+            if (initialLocation != null) {
+                args.putDouble(ARG_LAT, initialLocation.getLatitude());
+                args.putDouble(ARG_LNG, initialLocation.getLongitude());
+            }
+            fragment.setArguments(args);
+            return fragment;
+        }
+
+        @NonNull
+        @Override
+        public android.app.Dialog onCreateDialog(@Nullable Bundle savedInstanceState) {
+            View dialogView = LayoutInflater.from(requireContext()).inflate(R.layout.location_preview, null);
+            AlertDialog dialog = new AlertDialog.Builder(requireContext(), R.style.TransparentDialog)
+                    .setView(dialogView)
+                    .create();
+
+            TextView title = dialogView.findViewById(R.id.tv_dialog_title);
+            TextView message = dialogView.findViewById(R.id.tv_dialog_message);
+            ImageView closeButton = dialogView.findViewById(R.id.iv_close);
+            Button backButton = dialogView.findViewById(R.id.btn_dialog_back);
+            Button confirmButton = dialogView.findViewById(R.id.btn_dialog_yes);
+
+            Bundle args = requireArguments();
+            String locationLabel = args.getString(ARG_LABEL, "Event location");
+            boolean hasInitialLocation = args.getBoolean(ARG_HAS_INITIAL, false);
+            LatLng initialLatLng = hasInitialLocation
+                    ? new LatLng(args.getDouble(ARG_LAT), args.getDouble(ARG_LNG))
+                    : new LatLng(53.5461, -113.4938);
+
+            if (title != null) {
+                title.setText("Location Preview");
+            }
+            if (message != null) {
+                message.setText(hasInitialLocation
+                        ? "Long press the map if you need to adjust the event location before confirming."
+                        : "Address preview could not be found. Long press the map to place the event location manually.");
+            }
+            if (confirmButton != null) {
+                confirmButton.setText("Use location");
+            }
+
+            pendingLocation = hasInitialLocation ? new android.location.Location("preview_initial") : null;
+            if (pendingLocation != null) {
+                pendingLocation.setLatitude(initialLatLng.latitude);
+                pendingLocation.setLongitude(initialLatLng.longitude);
+            }
+
+            dialog.setOnShowListener(unused -> {
+                View mapHost = dialogView.findViewById(R.id.map_preview_fragment);
+                mapHost.post(() -> {
+                    if (!isAdded()) {
+                        return;
+                    }
+
+                    SupportMapFragment mapFragment = (SupportMapFragment) getChildFragmentManager()
+                            .findFragmentById(R.id.map_preview_fragment);
+                    if (mapFragment == null) {
+                        mapFragment = SupportMapFragment.newInstance();
+                        getChildFragmentManager()
+                                .beginTransaction()
+                                .replace(R.id.map_preview_fragment, mapFragment)
+                                .commitAllowingStateLoss();
+                        getChildFragmentManager().executePendingTransactions();
+                    }
+
+                    mapFragment.getMapAsync(map -> {
+                        map.getUiSettings().setZoomGesturesEnabled(true);
+                        map.getUiSettings().setScrollGesturesEnabled(true);
+                        map.getUiSettings().setRotateGesturesEnabled(true);
+                        map.getUiSettings().setTiltGesturesEnabled(true);
+                        map.getUiSettings().setCompassEnabled(true);
+
+                        final Marker[] markerRef = new Marker[1];
+                        map.moveCamera(CameraUpdateFactory.newLatLngZoom(initialLatLng, hasInitialLocation ? 15f : 10f));
+
+                        if (hasInitialLocation) {
+                            markerRef[0] = map.addMarker(
+                                    new MarkerOptions()
+                                            .position(initialLatLng)
+                                            .title(locationLabel)
+                            );
+                        }
+
+                        map.setOnMapLongClickListener(latLng -> {
+                            pendingLocation = new android.location.Location("selected_event_location");
+                            pendingLocation.setLatitude(latLng.latitude);
+                            pendingLocation.setLongitude(latLng.longitude);
+
+                            if (markerRef[0] != null) {
+                                markerRef[0].remove();
+                            }
+                            markerRef[0] = map.addMarker(
+                                    new MarkerOptions()
+                                            .position(latLng)
+                                            .title(locationLabel)
+                            );
+                            map.animateCamera(CameraUpdateFactory.newLatLng(latLng));
+                        });
+                    });
+                });
+            });
+
+            if (closeButton != null) {
+                closeButton.setOnClickListener(v -> dismiss());
+            }
+            if (backButton != null) {
+                backButton.setOnClickListener(v -> dismiss());
+            }
+            if (confirmButton != null) {
+                confirmButton.setOnClickListener(v -> {
+                    if (pendingLocation == null) {
+                        Toast.makeText(requireContext(), "Long press the map to choose a location", Toast.LENGTH_SHORT).show();
+                        return;
+                    }
+                    Bundle result = new Bundle();
+                    result.putDouble(RESULT_LATITUDE, pendingLocation.getLatitude());
+                    result.putDouble(RESULT_LONGITUDE, pendingLocation.getLongitude());
+                    getParentFragmentManager().setFragmentResult(REQUEST_KEY, result);
+                    dismiss();
+                });
+            }
+
+            return dialog;
+        }
     }
 }
