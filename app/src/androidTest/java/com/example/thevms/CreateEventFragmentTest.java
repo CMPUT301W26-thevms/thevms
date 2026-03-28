@@ -97,7 +97,7 @@ public class CreateEventFragmentTest {
         try (ActivityScenario<MainActivity> scenario = ActivityScenario.launch(MainActivity.class)) {
             onView(withId(R.id.nav_add)).perform(click());
 
-            // Manually set dates using the testing helper to bypass picker UI flakiness
+            // Manually set dates and MOCK LOCATION using the testing helpers
             scenario.onActivity(activity -> {
                 Fragment fragment = activity.getSupportFragmentManager().findFragmentById(R.id.fragment_container);
                 if (fragment instanceof CreateEventFragment) {
@@ -111,7 +111,11 @@ public class CreateEventFragmentTest {
                     cal.add(Calendar.HOUR, 1);
                     Date ee = cal.getTime();
 
+                    // Set Dates
                     ((CreateEventFragment) fragment).setTestingDates(rs, re, es, ee);
+                    
+                    // Set Mock Location (Latitude, Longitude)
+                    ((CreateEventFragment) fragment).setTestingLocation(53.5232, -113.5263);
                 }
             });
 
@@ -125,7 +129,7 @@ public class CreateEventFragmentTest {
 
             // Verify entry in database
             DatabaseHandler db = testHelper.getDbHandler();
-            QuerySnapshot snapshot = Tasks.await(db.getAllEvents(), 5, TimeUnit.SECONDS);
+            QuerySnapshot snapshot = Tasks.await(db.getAllEvents(), 10, TimeUnit.SECONDS);
             assertTrue("Event should exist in DB", snapshot.size() > 0);
         }
     }

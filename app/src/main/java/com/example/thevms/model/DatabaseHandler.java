@@ -2,6 +2,7 @@ package com.example.thevms.model;
 
 import com.google.android.gms.tasks.Task;
 import com.google.android.gms.tasks.Tasks;
+import com.google.firebase.Timestamp;
 import com.google.firebase.firestore.DocumentReference;
 import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.EventListener;
@@ -43,6 +44,7 @@ public class DatabaseHandler {
     public static final String STATUS_INVITED = "invited";
     public static final String STATUS_DECLINED = "declined";
     public static final String STATUS_CANCELLED = "cancelled";
+    public static final String STATUS_CO_ORGANIZER = "co-organizer";
 
     /**
      * Default constructor for DatabaseHandler.
@@ -208,7 +210,20 @@ public class DatabaseHandler {
                     for (QueryDocumentSnapshot doc : task.getResult()) {
                         // The document ID in the entrants sub-collection is the user's deviceId
                         if (doc.getId().equals(userId)) {
-                            tasks.add(doc.getReference().delete());
+                            String status = doc.getString("status");
+                            // If user was selected or accepted, trigger re-selection for the event
+                            if (STATUS_SELECTED.equals(status) || STATUS_ACCEPTED.equals(status)) {
+                                String eventPath = doc.getReference().getPath(); // e.g. "events/123/entrants/userId"
+                                String[] parts = eventPath.split("/");
+                                if (parts.length > 1) {
+                                    String eventId = parts[1];
+                                    tasks.add(doc.getReference().delete().continueWithTask(t -> selectAndInviteNextEntrant(eventId)));
+                                } else {
+                                    tasks.add(doc.getReference().delete());
+                                }
+                            } else {
+                                tasks.add(doc.getReference().delete());
+                            }
                         }
                     }
                     // Wait for all sub-collection deletions to finish
@@ -400,8 +415,32 @@ public class DatabaseHandler {
 
                     Map<String, Object> data = new HashMap<>();
                     data.put("status", STATUS_SELECTED);
-                    return updateEntrantStatus(eventId, next.getId(), data);
+                    data.put("isSecondChance", true); // Metadata to indicate this was a re-selection
+                    
+                    return updateEntrantStatus(eventId, next.getId(), data).continueWithTask(t -> {
+                        // Send a notification to the selected user
+                        return sendNotification(next.getId(), eventId, "Congratulations! You have been selected for a second chance for an event!");
+                    });
                 });
+    }
+
+    /**
+     * Sends a notification to a specific user.
+     *
+     * @param userId  The user ID.
+     * @param eventId The event ID associated with the notification.
+     * @param message The notification message.
+     * @return A Task representing the operation.
+     */
+    public Task<Void> sendNotification(String userId, String eventId, String message) {
+        Notification notification = new Notification();
+        notification.setReceiverId(userId);
+        notification.setEventId(eventId);
+        notification.setDescription(message);
+        notification.setTimestamp(new java.util.Date());
+        notification.setType(Notification.TYPE_GENERAL);
+
+        return sendNotification(notification);
     }
 
     /**
@@ -508,6 +547,52 @@ public class DatabaseHandler {
      */
     public Task<Void> deleteNotification(String notificationId) {
         return getDb().collection(COLLECTION_NOTIFICATIONS).document(notificationId).delete();
+    }
+
+    /**
+     * Assigns an entrant as a co-organizer for an event and notifies them.
+     *
+     * @param eventId        ID of the event.
+     * @param eventName      Human readable event name.
+     * @param organizerId    Device/user ID of the organizer sending the invite.
+     * @param organizerName  Organizer display name.
+     * @param userId         Device/user ID of the entrant being promoted.
+     * @param receiverName   Display name of the entrant for the notification body.
+     */
+    public Task<Void> assignCoOrganizer(String eventId, String eventName, String organizerId, String organizerName, String userId, String receiverName) {
+        Map<String, Object> statusData = new HashMap<>();
+        statusData.put("status", STATUS_CO_ORGANIZER);
+
+        Map<String, Object> eventUpdate = new HashMap<>();
+        eventUpdate.put("coOrganizers", com.google.firebase.firestore.FieldValue.arrayUnion(userId));
+
+        return getDb().collection(COLLECTION_EVENTS).document(eventId)
+                .update(eventUpdate)
+                .continueWithTask(task -> updateEntrantStatus(eventId, userId, statusData))
+                .continueWithTask(task -> {
+                    Notification invite = Notification.createCoOrganizerInvite(
+                            organizerId != null ? organizerId : "system",
+                            organizerName != null ? organizerName : "Organizer",
+                            userId,
+                            receiverName != null ? receiverName : "Entrant",
+                            eventId,
+                            eventName != null ? eventName : "Event"
+                    );
+                    return invite.send();
+                });
+    }
+
+    /**
+     * Checks if a user is a co-organizer for an event.
+     */
+    public Task<Boolean> isCoOrganizer(String eventId, String userId) {
+        return getDb().collection(COLLECTION_EVENTS).document(eventId).get().continueWith(task -> {
+            if (task.isSuccessful() && task.getResult().exists()) {
+                List<String> coOps = (List<String>) task.getResult().get("coOrganizers");
+                return coOps != null && coOps.contains(userId);
+            }
+            return false;
+        });
     }
 
     /**

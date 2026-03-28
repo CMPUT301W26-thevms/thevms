@@ -31,6 +31,7 @@ import com.example.thevms.model.DatabaseHandler;
 import com.example.thevms.model.Entrant;
 import com.example.thevms.model.Event;
 import com.example.thevms.model.Notification;
+import com.example.thevms.model.Organizer;
 import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.ListenerRegistration;
@@ -50,9 +51,9 @@ import java.util.Map;
  */
 public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAdapter.ViewHolder> {
 
-    // Display labels shown in the dropdown — must match Firestore status values exactly
+    // Display labels shown in the dropdown — matching the required terminology
     private static final String[] STATUS_LABELS = {
-            "Waiting", "Selected", "Accepted", "Rejected", "Cancelled", "Declined"
+            "Waiting", "Selected", "Accepted", "Not Selected", "Cancelled", "Declined"
     };
 
     private static final String[] STATUS_VALUES = {
@@ -243,9 +244,15 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
             dbHandler.getEntrantsForEvent(String.valueOf(event.getEventId()))
                     .addOnSuccessListener(queryDocumentSnapshots -> {
                         List<DocumentSnapshot> waitingList = new ArrayList<>();
+                        int currentSelectedOrAccepted = 0;
+
                         for (QueryDocumentSnapshot doc : queryDocumentSnapshots) {
-                            if (DatabaseHandler.STATUS_WAITING.equals(doc.getString("status"))) {
+                            String status = doc.getString("status");
+                            if (DatabaseHandler.STATUS_WAITING.equals(status)) {
                                 waitingList.add(doc);
+                            } else if (DatabaseHandler.STATUS_SELECTED.equals(status) || 
+                                       DatabaseHandler.STATUS_ACCEPTED.equals(status)) {
+                                currentSelectedOrAccepted++;
                             }
                         }
 
@@ -254,11 +261,19 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
                             return;
                         }
 
-                        java.util.Collections.shuffle(waitingList);
+                        // Use maxAttendees if specified, otherwise default to a small number
+                        int totalCapacity = (event.getMaxAttendees() != null && event.getMaxAttendees() > 0) ? event.getMaxAttendees() : 1;
+                        
+                        // IMPORTANT: Calculate remaining spots
+                        int spotsLeft = totalCapacity - currentSelectedOrAccepted;
 
-                        // Use maxAttendees if specified, otherwise pick a default (e.g., 3)
-                        int capacity = (event.getMaxAttendees() != null && event.getMaxAttendees() > 0) ? event.getMaxAttendees() : 3;
-                        int winnersCount = Math.min(waitingList.size(), capacity);
+                        if (spotsLeft <= 0) {
+                            Toast.makeText(itemView.getContext(), "Event is already at full capacity!", Toast.LENGTH_SHORT).show();
+                            return;
+                        }
+
+                        java.util.Collections.shuffle(waitingList);
+                        int winnersCount = Math.min(waitingList.size(), spotsLeft);
 
                         for (int i = 0; i < winnersCount; i++) {
                             DocumentSnapshot doc = waitingList.get(i);
@@ -267,7 +282,7 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
                             dbHandler.updateEntrantStatus(String.valueOf(event.getEventId()), doc.getId(), data);
                         }
 
-                        Toast.makeText(itemView.getContext(), "Selected " + winnersCount + " entrants!", Toast.LENGTH_SHORT).show();
+                        Toast.makeText(itemView.getContext(), "Selected " + winnersCount + " new entrants!", Toast.LENGTH_SHORT).show();
                         bind(event, dateFormat, null, null); // Refresh list
                     });
         }
@@ -287,6 +302,17 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
             currentEventName = event.getName() != null ? event.getName() : "Event";
             mapVisible = false;
             mapContainer.setVisibility(View.GONE);
+
+            Organizer organizer = event.getOrganizer();
+            String organizerDisplayName = buildFullName(
+                    organizer != null ? organizer.getFirstName() : null,
+                    organizer != null ? organizer.getLastName() : null,
+                    "Organizer");
+            String resolvedOrganizerId = organizer != null ? organizer.getDeviceId() : null;
+            if (resolvedOrganizerId == null) {
+                resolvedOrganizerId = Settings.Secure.getString(itemView.getContext().getContentResolver(), Settings.Secure.ANDROID_ID);
+            }
+            attendeeAdapter.setEventContext(eventId, currentEventName, resolvedOrganizerId, organizerDisplayName);
 
             nameText.setText(event.getName());
             descriptionText.setText(event.getDescription());
@@ -525,7 +551,7 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
 
             commentsListener = dbHandler.listenToComments(eventId, (value, error) -> {
                 if (error != null) {
-                    Log.w("OrganizerEventAdapter", "Listen failed.", error);
+                    Log.w("OrganizerEventAdapter", "Listen failed.");
                     return;
                 }
 
@@ -597,6 +623,23 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
             }
 
             dialog.show();
+        }
+
+        private String buildFullName(String first, String last, String fallback) {
+            StringBuilder builder = new StringBuilder();
+            if (first != null && !first.isEmpty()) {
+                builder.append(first);
+            }
+            if (last != null && !last.isEmpty()) {
+                if (builder.length() > 0) {
+                    builder.append(" ");
+                }
+                builder.append(last);
+            }
+            if (builder.length() == 0) {
+                return fallback;
+            }
+            return builder.toString();
         }
 
         /**

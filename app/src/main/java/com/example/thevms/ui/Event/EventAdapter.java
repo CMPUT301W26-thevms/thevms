@@ -328,7 +328,7 @@ public class EventAdapter extends RecyclerView.Adapter<EventAdapter.EventViewHol
 
             commentsListener = dbHandler.listenToComments(eventId, (value, error) -> {
                 if (error != null) {
-                    Log.w("EventAdapter", "Listen failed.", error);
+                    Log.w("EventAdapter", "Listen failed.");
                     return;
                 }
 
@@ -494,6 +494,9 @@ public class EventAdapter extends RecyclerView.Adapter<EventAdapter.EventViewHol
                         break;
                     case DatabaseHandler.STATUS_DECLINED:
                         statusPrefix = "Status: Declined";
+                        break;
+                    case DatabaseHandler.STATUS_CO_ORGANIZER:
+                        statusPrefix = "Status: Co-Organizer";
                         break;
                 }
             }
