@@ -135,7 +135,7 @@ public class NotificationAdapter extends RecyclerView.Adapter<NotificationAdapte
                 });
 
                 // Handle invite actions visibility
-                if (Notification.TYPE_INVITE.equals(notification.getType())) {
+                if (Notification.TYPE_INVITE.equals(notification.getType()) || Notification.TYPE_SELECTED.equals(notification.getType())) {
                     inviteActionsContainer.setVisibility(View.VISIBLE);
                     btnAccept.setOnClickListener(v -> {
                         if (inviteActionListener != null) {

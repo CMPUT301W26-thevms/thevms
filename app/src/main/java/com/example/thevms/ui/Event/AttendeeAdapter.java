@@ -93,6 +93,14 @@ public class AttendeeAdapter extends RecyclerView.Adapter<AttendeeAdapter.ViewHo
         if (hasObservers()) notifyDataSetChanged();
     }
 
+    /**
+     * Returns the currently filtered list of attendees.
+     * Used by OrganizerEventAdapter to know who will receive a notification.
+     */
+    public List<AttendeeItem> getFilteredAttendees() {
+        return new ArrayList<>(filteredAttendees);
+    }
+
     public void exportFilteredListAsCsv(Context context, String eventName) {
         if (filteredAttendees.isEmpty()) {
             Toast.makeText(context, "No entrants to export", Toast.LENGTH_SHORT).show();
@@ -195,10 +203,10 @@ public class AttendeeAdapter extends RecyclerView.Adapter<AttendeeAdapter.ViewHo
         if (eventId != null && ("waiting".equals(item.getStatus()) || "selected".equals(item.getStatus()))) {
             holder.assignCoOrganizerBtn.setVisibility(View.VISIBLE);
             holder.assignCoOrganizerBtn.setOnClickListener(v -> {
-                String safeEventName = eventName != null ? eventName : "Event";
-                String safeOrganizerId = organizerId != null ? organizerId : getDeviceId(holder.itemView.getContext());
+                String safeEventName     = eventName     != null ? eventName     : "Event";
+                String safeOrganizerId   = organizerId   != null ? organizerId   : getDeviceId(holder.itemView.getContext());
                 String safeOrganizerName = organizerName != null ? organizerName : "Organizer";
-                String receiverName = buildDisplayName(item);
+                String receiverName      = buildDisplayName(item);
 
                 if (safeOrganizerId == null) {
                     Toast.makeText(holder.itemView.getContext(), "Missing organizer info", Toast.LENGTH_SHORT).show();
@@ -207,13 +215,15 @@ public class AttendeeAdapter extends RecyclerView.Adapter<AttendeeAdapter.ViewHo
 
                 dbHandler.assignCoOrganizer(eventId, safeEventName, safeOrganizerId, safeOrganizerName,
                                 item.getEntrant().getDeviceId(), receiverName)
-                        .addOnSuccessListener(aVoid -> {
-                            Toast.makeText(holder.itemView.getContext(), "Assigned " + item.getEntrant().getFirstName() + " as co-organizer", Toast.LENGTH_SHORT).show();
-                            // Item will be filtered out next refresh due to status change
-                        })
-                        .addOnFailureListener(e -> {
-                            Toast.makeText(holder.itemView.getContext(), "Failed: " + e.getMessage(), Toast.LENGTH_SHORT).show();
-                        });
+                        .addOnSuccessListener(aVoid ->
+                                Toast.makeText(holder.itemView.getContext(),
+                                        "Assigned " + item.getEntrant().getFirstName() + " as co-organizer",
+                                        Toast.LENGTH_SHORT).show()
+                        )
+                        .addOnFailureListener(e ->
+                                Toast.makeText(holder.itemView.getContext(),
+                                        "Failed: " + e.getMessage(), Toast.LENGTH_SHORT).show()
+                        );
             });
         } else {
             holder.assignCoOrganizerBtn.setVisibility(View.GONE);
@@ -242,25 +252,20 @@ public class AttendeeAdapter extends RecyclerView.Adapter<AttendeeAdapter.ViewHo
 
         public ViewHolder(@NonNull View itemView) {
             super(itemView);
-            nameText = itemView.findViewById(R.id.tv_attendee_name);
-            statusIcon = itemView.findViewById(R.id.iv_status_icon);
-            cancelBtn = itemView.findViewById(R.id.btn_cancel_entrant);
+            nameText             = itemView.findViewById(R.id.tv_attendee_name);
+            statusIcon           = itemView.findViewById(R.id.iv_status_icon);
+            cancelBtn            = itemView.findViewById(R.id.btn_cancel_entrant);
             assignCoOrganizerBtn = itemView.findViewById(R.id.btn_assign_co_organizer);
         }
     }
 
     private String buildDisplayName(AttendeeItem item) {
         String first = item.getEntrant().getFirstName();
-        String last = item.getEntrant().getLastName();
-        if (first != null && last != null) {
-            return first + " " + last;
-        } else if (first != null) {
-            return first;
-        } else if (last != null) {
-            return last;
-        } else {
-            return item.getEntrant().getEmail() != null ? item.getEntrant().getEmail() : "Entrant";
-        }
+        String last  = item.getEntrant().getLastName();
+        if (first != null && last != null) return first + " " + last;
+        if (first != null) return first;
+        if (last  != null) return last;
+        return item.getEntrant().getEmail() != null ? item.getEntrant().getEmail() : "Entrant";
     }
 
     @SuppressLint("HardwareIds")

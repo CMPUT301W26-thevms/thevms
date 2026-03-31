@@ -12,6 +12,7 @@ import java.util.Date;
 public class Notification {
     public static final String TYPE_GENERAL = "general";
     public static final String TYPE_INVITE = "invite";
+    public static final String TYPE_SELECTED = "selected";
 
     private String id;
     private String title;
@@ -96,7 +97,7 @@ public class Notification {
                 receiverName,
                 new Date(),
                 "Congratulations! You have been selected to participate in " + eventName + ". Please accept or decline this invitation.",
-                TYPE_INVITE,
+                TYPE_SELECTED,
                 eventId
         );
     }
