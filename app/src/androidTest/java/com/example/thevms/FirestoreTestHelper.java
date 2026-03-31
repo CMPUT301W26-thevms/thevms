@@ -187,6 +187,7 @@ public class FirestoreTestHelper {
                 .set(data), 10, TimeUnit.SECONDS);
     }
 
+
     public void setMockLocation(double lat, double lng) throws Exception {
         LocationManager locationManager = (LocationManager) InstrumentationRegistry.getInstrumentation()
                 .getContext().getSystemService(Context.LOCATION_SERVICE);
