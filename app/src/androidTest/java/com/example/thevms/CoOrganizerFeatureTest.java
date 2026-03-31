@@ -75,7 +75,7 @@ public class CoOrganizerFeatureTest {
 
     @Test
     public void organizerAssignsCoOrganizer_andEntrantCannotRejoin() throws Exception {
-        onView(withId(R.id.rv_attendees))
+        onView(withId(R.id.rv_my_events))
                 .perform(RecyclerViewActions.actionOnItemAtPosition(0, clickChildViewWithId(R.id.btn_assign_co_organizer)));
 
         Thread.sleep(2000);
@@ -98,7 +98,7 @@ public class CoOrganizerFeatureTest {
                 .document(String.valueOf(eventId)).get(), 10, TimeUnit.SECONDS));
         Entrant entrant = new Entrant(ENTRANT_ID, "co@example.com", "Co", "Org", null, true, UserRole.ENTRANT);
         try {
-            Tasks.await(event.addEntrant(entrant));
+            Tasks.await(event.addEntrant(entrant, null));
             fail("Expected co-organizer join attempt to fail");
         } catch (ExecutionException ex) {
             assertEquals(IllegalStateException.class, ex.getCause().getClass());
