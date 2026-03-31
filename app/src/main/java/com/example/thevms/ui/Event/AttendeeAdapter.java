@@ -179,6 +179,10 @@ public class AttendeeAdapter extends RecyclerView.Adapter<AttendeeAdapter.ViewHo
                 iconRes = R.drawable.ic_status_cancelled;
                 tintColor = R.color.status_cancelled;
                 break;
+            case "declined":
+                iconRes = R.drawable.ic_status_rejected;
+                tintColor = R.color.status_declined;
+                break;
             case "waiting":
             default:
                 iconRes = R.drawable.ic_status_waitlisted;

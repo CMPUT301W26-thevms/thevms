@@ -148,13 +148,14 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
      */
     public static class ViewHolder extends RecyclerView.ViewHolder {
         TextView nameText, distanceText, waitlistText, dateText, descriptionText, exportCsvText, mapText;
-        Button cancelBtn, lotteryBtn, postCommentBtn, updatePosterBtn, inviteBtn;
+        Button cancelBtn, lotteryBtn, replacementBtn, postCommentBtn, updatePosterBtn, inviteBtn;
         RecyclerView attendeesRv, commentsRv;
         ImageView posterImage;
         Spinner statusSpinner;
         EditText commentEditText;
         AttendeeAdapter attendeeAdapter;
         CommentAdapter commentAdapter;
+        ReplacementAdapter replacementAdapter;
         DatabaseHandler dbHandler;
         FirebaseFirestore db;
         com.google.android.gms.maps.MapView mapView;
@@ -180,6 +181,7 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
             descriptionText = itemView.findViewById(R.id.tv_description);
             cancelBtn = itemView.findViewById(R.id.btn_cancel_event);
             lotteryBtn = itemView.findViewById(R.id.btn_run_lottery);
+            replacementBtn = itemView.findViewById(R.id.btn_pick_replacements);
             updatePosterBtn = itemView.findViewById(R.id.btn_update_poster);
             inviteBtn = itemView.findViewById(R.id.btn_invite_entrants);
             attendeesRv = itemView.findViewById(R.id.rv_attendees);
@@ -384,6 +386,7 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
             });
 
             lotteryBtn.setOnClickListener(v -> showWinnerSelectionDialog(event));
+            replacementBtn.setOnClickListener(v -> showReplacementDialog(event));
             mapText.setOnClickListener(v -> {
                 mapVisible = !mapVisible;
 
@@ -773,6 +776,74 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
                     .addOnSuccessListener(unused -> {
                         dbHandler.selectAndInviteNextEntrant(eventId);
                     });
+        }
+
+        private void showReplacementDialog(Event event) {
+            AlertDialog.Builder builder = new AlertDialog.Builder(itemView.getContext());
+            View dialogView = LayoutInflater.from(itemView.getContext()).inflate(R.layout.dialog_replacement_selection, null);
+            builder.setView(dialogView);
+
+            TextView emptyText = dialogView.findViewById(R.id.tv_declined_empty);
+            RecyclerView declinedRv = dialogView.findViewById(R.id.rv_declined_users);
+            Button notifyBtn = dialogView.findViewById(R.id.btn_notify_declined);
+
+            declinedRv.setLayoutManager(new LinearLayoutManager(itemView.getContext()));
+            replacementAdapter = new ReplacementAdapter();
+            declinedRv.setAdapter(replacementAdapter);
+
+            String eventId = String.valueOf(event.getEventId());
+
+            dbHandler.getEntrantsForEvent(eventId).addOnSuccessListener(queryDocumentSnapshots -> {
+                List<com.google.android.gms.tasks.Task<DocumentSnapshot>> profileTasks = new ArrayList<>();
+
+                for (QueryDocumentSnapshot doc : queryDocumentSnapshots) {
+                    if ("declined".equals(doc.getString("status"))) {
+                        String entrantId = doc.getString("entrantId");
+                        profileTasks.add(dbHandler.getUser(entrantId));
+                    }
+                }
+
+                if (profileTasks.isEmpty()) {
+                    emptyText.setVisibility(View.VISIBLE);
+                    declinedRv.setVisibility(View.GONE);
+                    notifyBtn.setEnabled(false);
+                } else {
+                    com.google.android.gms.tasks.Tasks.whenAllSuccess(profileTasks).addOnSuccessListener(profiles -> {
+                        List<ReplacementAdapter.ReplacementItem> items = new ArrayList<>();
+                        for (Object obj : profiles) {
+                            DocumentSnapshot profileDoc = (DocumentSnapshot) obj;
+                            Entrant entrant = Entrant.fromMap(profileDoc.getId(), profileDoc.getData());
+                            if (entrant != null) {
+                                items.add(new ReplacementAdapter.ReplacementItem(entrant));
+                            }
+                        }
+                        replacementAdapter.setItems(items, items.size());
+                        emptyText.setVisibility(View.GONE);
+                        declinedRv.setVisibility(View.VISIBLE);
+                        notifyBtn.setEnabled(true);
+                    });
+                }
+            });
+
+            AlertDialog dialog = builder.create();
+            notifyBtn.setOnClickListener(v -> {
+                List<ReplacementAdapter.ReplacementItem> selected = replacementAdapter.getSelectedItems();
+                if (selected.isEmpty()) {
+                    Toast.makeText(itemView.getContext(), "No one selected", Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                for (ReplacementAdapter.ReplacementItem item : selected) {
+                    Map<String, Object> data = new HashMap<>();
+                    data.put("status", DatabaseHandler.STATUS_SELECTED);
+                    dbHandler.updateEntrantStatus(eventId, item.entrant.getDeviceId(), data);
+                    Notification.createWaitingListInvite(
+                            Settings.Secure.getString(itemView.getContext().getContentResolver(), Settings.Secure.ANDROID_ID),
+                            "Organizer", item.entrant.getDeviceId(), eventId, eventId, event.getName()).send();
+                }
+                Toast.makeText(itemView.getContext(), "Notifications sent to " + selected.size() + " entrants", Toast.LENGTH_SHORT).show();
+                dialog.dismiss();
+            });
+            dialog.show();
         }
     }
 
