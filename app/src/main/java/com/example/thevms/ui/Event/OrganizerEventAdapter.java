@@ -23,6 +23,7 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.VisibleForTesting;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
@@ -39,8 +40,11 @@ import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.ListenerRegistration;
 import com.google.firebase.firestore.QueryDocumentSnapshot;
 
+import com.google.android.material.textfield.TextInputEditText;
+
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
@@ -142,7 +146,7 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
      * ViewHolder class for organizer event cards.
      * Manages nested RecyclerView for attendees and event management controls.
      */
-    static class ViewHolder extends RecyclerView.ViewHolder {
+    public static class ViewHolder extends RecyclerView.ViewHolder {
         TextView nameText, distanceText, waitlistText, dateText, descriptionText, exportCsvText, mapText;
         Button cancelBtn, lotteryBtn, postCommentBtn, updatePosterBtn, inviteBtn;
         RecyclerView attendeesRv, commentsRv;
@@ -242,7 +246,7 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
          *
          * @param event The event for which to run the lottery.
          */
-        private void runLottery(Event event) {
+        private void runLottery(Event event, int requestedWinners) {
             dbHandler.getEntrantsForEvent(String.valueOf(event.getEventId()))
                     .addOnSuccessListener(queryDocumentSnapshots -> {
                         List<DocumentSnapshot> waitingList = new ArrayList<>();
@@ -263,19 +267,18 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
                             return;
                         }
 
-                        // Use maxAttendees if specified, otherwise default to a small number
-                        int totalCapacity = (event.getMaxAttendees() != null && event.getMaxAttendees() > 0) ? event.getMaxAttendees() : 1;
-                        
-                        // IMPORTANT: Calculate remaining spots
-                        int spotsLeft = totalCapacity - currentSelectedOrAccepted;
+                        int winnersCount = determineWinnerCount(
+                                requestedWinners,
+                                waitingList.size(),
+                                event.getMaxAttendees(),
+                                currentSelectedOrAccepted);
 
-                        if (spotsLeft <= 0) {
-                            Toast.makeText(itemView.getContext(), "Event is already at full capacity!", Toast.LENGTH_SHORT).show();
+                        if (winnersCount <= 0) {
+                            Toast.makeText(itemView.getContext(), "Not enough spots available for new winners", Toast.LENGTH_SHORT).show();
                             return;
                         }
 
-                        java.util.Collections.shuffle(waitingList);
-                        int winnersCount = Math.min(waitingList.size(), spotsLeft);
+                        Collections.shuffle(waitingList);
 
                         for (int i = 0; i < winnersCount; i++) {
                             DocumentSnapshot doc = waitingList.get(i);
@@ -284,9 +287,46 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
                             dbHandler.updateEntrantStatus(String.valueOf(event.getEventId()), doc.getId(), data);
                         }
 
-                        Toast.makeText(itemView.getContext(), "Selected " + winnersCount + " new entrants!", Toast.LENGTH_SHORT).show();
+                        Toast.makeText(itemView.getContext(), "Selected " + winnersCount + " entrant(s)!", Toast.LENGTH_SHORT).show();
                         bind(event, dateFormat, null, null); // Refresh list
                     });
+        }
+
+        private void showWinnerSelectionDialog(Event event) {
+            AlertDialog.Builder builder = new AlertDialog.Builder(itemView.getContext());
+            View dialogView = LayoutInflater.from(itemView.getContext()).inflate(R.layout.dialog_pick_winners, null);
+            TextInputEditText input = dialogView.findViewById(R.id.et_winner_count);
+
+            builder.setTitle("Select winners")
+                    .setView(dialogView)
+                    .setNegativeButton("Cancel", (dialog, which) -> dialog.dismiss())
+                    .setPositiveButton("Select", null);
+
+            AlertDialog dialog = builder.create();
+            dialog.setOnShowListener(d -> {
+                Button positive = dialog.getButton(AlertDialog.BUTTON_POSITIVE);
+                positive.setOnClickListener(v -> {
+                    String raw = input.getText() != null ? input.getText().toString().trim() : "";
+                    if (raw.isEmpty()) {
+                        input.setError("Required");
+                        return;
+                    }
+                    int requested;
+                    try {
+                        requested = Integer.parseInt(raw);
+                    } catch (NumberFormatException ex) {
+                        input.setError("Enter a whole number");
+                        return;
+                    }
+                    if (requested <= 0) {
+                        input.setError("Must be greater than 0");
+                        return;
+                    }
+                    dialog.dismiss();
+                    runLottery(event, requested);
+                });
+            });
+            dialog.show();
         }
 
         /**
@@ -343,6 +383,7 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
                 if (cancelListener != null) cancelListener.onCancel(event);
             });
 
+            lotteryBtn.setOnClickListener(v -> showWinnerSelectionDialog(event));
             mapText.setOnClickListener(v -> {
                 mapVisible = !mapVisible;
 
@@ -421,8 +462,6 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
                 }
             });
 
-            lotteryBtn.setOnClickListener(v -> runLottery(event));
-
             updatePosterBtn.setOnClickListener(v -> {
                 if (updatePosterListener != null) updatePosterListener.onUpdatePoster(event);
             });
@@ -475,6 +514,23 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
             });
 
             setupComments(eventId);
+        }
+
+        @VisibleForTesting
+        public static int determineWinnerCount(int requested, int waitingCount, Integer maxAttendees, int currentSelected) {
+            if (requested <= 0 || waitingCount <= 0) {
+                return 0;
+            }
+
+            int capped = Math.min(requested, waitingCount);
+            if (maxAttendees != null && maxAttendees > 0) {
+                int spotsLeft = maxAttendees - currentSelected;
+                if (spotsLeft <= 0) {
+                    return 0;
+                }
+                capped = Math.min(capped, spotsLeft);
+            }
+            return capped;
         }
 
         private void showInviteDialog(Event event) {
@@ -594,8 +650,8 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
                     commentEditText.setText("");
                     Toast.makeText(itemView.getContext(), "Comment posted", Toast.LENGTH_SHORT).show();
                 });
-                });
-            }
+            });
+        }
 
         private void renderMapMarkers(com.google.android.gms.maps.GoogleMap googleMap,
                                       Event event,

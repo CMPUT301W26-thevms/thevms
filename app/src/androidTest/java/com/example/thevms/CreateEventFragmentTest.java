@@ -7,7 +7,9 @@ import static androidx.test.espresso.action.ViewActions.replaceText;
 import static androidx.test.espresso.action.ViewActions.scrollTo;
 import static androidx.test.espresso.assertion.ViewAssertions.matches;
 import static androidx.test.espresso.matcher.ViewMatchers.hasErrorText;
+import static androidx.test.espresso.matcher.ViewMatchers.isDisplayed;
 import static androidx.test.espresso.matcher.ViewMatchers.withId;
+import static androidx.test.espresso.matcher.ViewMatchers.withText;
 import static org.junit.Assert.assertTrue;
 
 import android.provider.Settings;
@@ -131,6 +133,28 @@ public class CreateEventFragmentTest {
             DatabaseHandler db = testHelper.getDbHandler();
             QuerySnapshot snapshot = Tasks.await(db.getAllEvents(), 10, TimeUnit.SECONDS);
             assertTrue("Event should exist in DB", snapshot.size() > 0);
+        }
+    }
+
+    @Test
+    public void testPreviewLocation() {
+        try (ActivityScenario<MainActivity> scenario = ActivityScenario.launch(MainActivity.class)) {
+            onView(withId(R.id.nav_add)).perform(click());
+
+            scenario.onActivity(activity -> {
+                Fragment fragment = activity.getSupportFragmentManager().findFragmentById(R.id.fragment_container);
+                if (fragment instanceof CreateEventFragment) {
+                    ((CreateEventFragment) fragment).setTestingLocation(53.5232, -113.5263);
+                }
+            });
+
+            onView(withId(R.id.et_event_location))
+                    .perform(replaceText("University of Alberta"), closeSoftKeyboard());
+
+            onView(withId(R.id.btn_preview_location)).perform(scrollTo(), click());
+
+            onView(withText("Location Preview")).check(matches(isDisplayed()));
+            onView(withId(R.id.map_preview_fragment)).check(matches(isDisplayed()));
         }
     }
 }

@@ -1,6 +1,8 @@
 package com.example.thevms.ui;
 
 import android.annotation.SuppressLint;
+import android.Manifest;
+import android.content.pm.PackageManager;
 import android.os.Bundle;
 import android.provider.Settings;
 import android.util.Log;
@@ -12,6 +14,8 @@ import android.widget.TextView;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.fragment.app.Fragment;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
@@ -34,6 +38,26 @@ public class EntrantEventsFragment extends Fragment {
     private RecyclerView recyclerView;
     private ProgressBar loadingBar;
     private TextView emptyText;
+    private Runnable pendingLocationPermissionGrantedAction;
+    private Runnable pendingLocationPermissionDeniedAction;
+    private final ActivityResultLauncher<String[]> locationPermissionLauncher = registerForActivityResult(
+            new ActivityResultContracts.RequestMultiplePermissions(),
+            result -> {
+                boolean granted = false;
+                for (Boolean value : result.values()) {
+                    if (Boolean.TRUE.equals(value)) {
+                        granted = true;
+                        break;
+                    }
+                }
+                Runnable action = granted ? pendingLocationPermissionGrantedAction : pendingLocationPermissionDeniedAction;
+                pendingLocationPermissionGrantedAction = null;
+                pendingLocationPermissionDeniedAction = null;
+                if (action != null) {
+                    action.run();
+                }
+            }
+    );
 
     @Nullable
     @Override
@@ -74,6 +98,18 @@ public class EntrantEventsFragment extends Fragment {
      */
     private void setupEntrantView(Entrant entrant) {
         EventAdapter adapter = new EventAdapter();
+        adapter.setLocationPermissionRequester((requiredForJoin, onGranted, onDenied) -> {
+            if (hasLocationPermission()) {
+                onGranted.run();
+                return;
+            }
+            pendingLocationPermissionGrantedAction = onGranted;
+            pendingLocationPermissionDeniedAction = onDenied;
+            locationPermissionLauncher.launch(new String[]{
+                    Manifest.permission.ACCESS_FINE_LOCATION,
+                    Manifest.permission.ACCESS_COARSE_LOCATION
+            });
+        });
         recyclerView.setAdapter(adapter);
 
         entrant.getRegisteredEvents().addOnSuccessListener(events -> {
@@ -113,5 +149,16 @@ public class EntrantEventsFragment extends Fragment {
             emptyText.setText(message);
             emptyText.setVisibility(View.VISIBLE);
         }
+    }
+
+    private boolean hasLocationPermission() {
+        return androidx.core.content.ContextCompat.checkSelfPermission(
+                requireContext(),
+                Manifest.permission.ACCESS_FINE_LOCATION
+        ) == PackageManager.PERMISSION_GRANTED
+                || androidx.core.content.ContextCompat.checkSelfPermission(
+                requireContext(),
+                Manifest.permission.ACCESS_COARSE_LOCATION
+        ) == PackageManager.PERMISSION_GRANTED;
     }
 }
