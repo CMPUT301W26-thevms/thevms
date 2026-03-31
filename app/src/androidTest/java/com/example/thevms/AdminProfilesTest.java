@@ -346,13 +346,13 @@ public class AdminProfilesTest {
         String userIdA = "user_waiting";
         Entrant userA = new Entrant(userIdA, "waiting@test.com", "Waiting", "User", null);
         Tasks.await(userA.save(), 5, TimeUnit.SECONDS);
-        Tasks.await(event.addEntrant(userA), 5, TimeUnit.SECONDS);
+        Tasks.await(event.addEntrant(userA, null), 5, TimeUnit.SECONDS);
 
         // User B (accepted/selected)
         String userIdB = "user_accepted";
         Entrant userB = new Entrant(userIdB, "accepted@test.com", "Accepted", "User", null);
         Tasks.await(userB.save(), 5, TimeUnit.SECONDS);
-        Tasks.await(event.addEntrant(userB), 5, TimeUnit.SECONDS);
+        Tasks.await(event.addEntrant(userB, null), 5, TimeUnit.SECONDS);
         // Explicitly set status to 'selected' for User B
         java.util.Map<String, Object> selectedStatus = new java.util.HashMap<>();
         selectedStatus.put("status", "selected");

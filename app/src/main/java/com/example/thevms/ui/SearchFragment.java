@@ -1,8 +1,10 @@
 package com.example.thevms.ui;
 
 import android.annotation.SuppressLint;
+import android.Manifest;
 import android.app.AlertDialog;
 import android.app.TimePickerDialog;
+import android.content.pm.PackageManager;
 import android.os.Bundle;
 import android.provider.Settings;
 import android.text.Editable;
@@ -21,6 +23,8 @@ import android.widget.TextView;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.annotation.VisibleForTesting;
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.core.util.Pair;
 import androidx.fragment.app.Fragment;
 import androidx.recyclerview.widget.RecyclerView;
@@ -58,6 +62,26 @@ public class SearchFragment extends Fragment {
     private RecyclerView eventsRecyclerView;
     private EventAdapter eventAdapter;
     private ImageButton btnAdminBurger;
+    private Runnable pendingLocationPermissionGrantedAction;
+    private Runnable pendingLocationPermissionDeniedAction;
+    private final ActivityResultLauncher<String[]> locationPermissionLauncher = registerForActivityResult(
+            new ActivityResultContracts.RequestMultiplePermissions(),
+            result -> {
+                boolean granted = false;
+                for (Boolean value : result.values()) {
+                    if (Boolean.TRUE.equals(value)) {
+                        granted = true;
+                        break;
+                    }
+                }
+                Runnable action = granted ? pendingLocationPermissionGrantedAction : pendingLocationPermissionDeniedAction;
+                pendingLocationPermissionGrantedAction = null;
+                pendingLocationPermissionDeniedAction = null;
+                if (action != null) {
+                    action.run();
+                }
+            }
+    );
 
     private List<Event> allEvents = new ArrayList<>();
     private List<Event> filteredEvents = new ArrayList<>();
@@ -91,6 +115,18 @@ public class SearchFragment extends Fragment {
         btnAdminBurger = view.findViewById(R.id.btn_admin_burger);
 
         eventAdapter = new EventAdapter();
+        eventAdapter.setLocationPermissionRequester((requiredForJoin, onGranted, onDenied) -> {
+            if (hasLocationPermission()) {
+                onGranted.run();
+                return;
+            }
+            pendingLocationPermissionGrantedAction = onGranted;
+            pendingLocationPermissionDeniedAction = onDenied;
+            locationPermissionLauncher.launch(new String[]{
+                    Manifest.permission.ACCESS_FINE_LOCATION,
+                    Manifest.permission.ACCESS_COARSE_LOCATION
+            });
+        });
         eventsRecyclerView.setAdapter(eventAdapter);
 
         setupListeners();
@@ -267,6 +303,17 @@ public class SearchFragment extends Fragment {
             }
             applyFilters();
         });
+    }
+
+    private boolean hasLocationPermission() {
+        return androidx.core.content.ContextCompat.checkSelfPermission(
+                requireContext(),
+                Manifest.permission.ACCESS_FINE_LOCATION
+        ) == PackageManager.PERMISSION_GRANTED
+                || androidx.core.content.ContextCompat.checkSelfPermission(
+                requireContext(),
+                Manifest.permission.ACCESS_COARSE_LOCATION
+        ) == PackageManager.PERMISSION_GRANTED;
     }
 
     /**

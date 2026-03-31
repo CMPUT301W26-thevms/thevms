@@ -113,6 +113,32 @@
                 android:background="@android:color/black"
                 app:layout_constraintTop_toBottomOf="@id/et_event_location" />
 
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btn_preview_location"
+                style="@style/Widget.MaterialComponents.Button.TextButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:backgroundTint="#F0F0F0"
+                android:text="Preview location"
+                android:textAllCaps="false"
+                android:textColor="@android:color/black"
+                app:cornerRadius="16dp"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintTop_toBottomOf="@id/divider_location" />
+
+            <TextView
+                android:id="@+id/tv_location_hint"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:text="Enter an address and preview it before creating the event."
+                android:textColor="#666666"
+                android:textSize="14sp"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintTop_toBottomOf="@id/btn_preview_location" />
+
             <EditText
                 android:id="@+id/et_event_description"
                 android:layout_width="match_parent"
@@ -125,7 +151,7 @@
                 android:scrollbars="vertical"
                 android:textColor="@android:color/black"
                 android:textSize="16sp"
-                app:layout_constraintTop_toBottomOf="@id/divider_location" />
+                app:layout_constraintTop_toBottomOf="@id/tv_location_hint" />
 
             <View
                 android:id="@+id/divider_description"

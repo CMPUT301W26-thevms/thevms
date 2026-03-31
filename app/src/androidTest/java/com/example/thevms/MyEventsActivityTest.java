@@ -1,6 +1,7 @@
 package com.example.thevms;
 
 import static androidx.test.espresso.Espresso.onView;
+import static androidx.test.espresso.action.ViewActions.click;
 import static androidx.test.espresso.assertion.ViewAssertions.matches;
 import static androidx.test.espresso.matcher.ViewMatchers.isDisplayed;
 import static androidx.test.espresso.matcher.ViewMatchers.withId;
@@ -11,6 +12,9 @@ import android.content.Context;
 import android.provider.Settings;
 
 import androidx.test.core.app.ActivityScenario;
+import androidx.test.espresso.UiController;
+import androidx.test.espresso.ViewAction;
+import androidx.test.espresso.contrib.RecyclerViewActions;
 import androidx.test.ext.junit.runners.AndroidJUnit4;
 import androidx.test.filters.LargeTest;
 import androidx.test.platform.app.InstrumentationRegistry;
@@ -25,6 +29,10 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
+
+import android.view.View;
+
+import org.hamcrest.Matcher;
 
 import java.util.Date;
 import java.util.HashMap;
@@ -80,12 +88,13 @@ public class MyEventsActivityTest {
         Tasks.await(event.save(), 10, TimeUnit.SECONDS);
 
         // Seed users who signed up
-        seedUserAndEntrant(event.getEventId(), "user1", "John", "Doe");
-        seedUserAndEntrant(event.getEventId(), "user2", "Jane", "Smith");
-        seedUserAndEntrant(event.getEventId(), "user3", "Bob", "Johnson");
+        seedUserAndEntrant(event.getEventId(), "user1", "John", "Doe", 53.5232, -113.5263);
+        seedUserAndEntrant(event.getEventId(), "user2", "Jane", "Smith", 53.5245, -113.5208);
+        seedUserAndEntrant(event.getEventId(), "user3", "Bob", "Johnson", 53.5271, -113.5174);
     }
 
-    private void seedUserAndEntrant(long eventId, String userId, String firstName, String lastName) throws Exception {
+    private void seedUserAndEntrant(long eventId, String userId, String firstName, String lastName,
+                                    double lat, double lng) throws Exception {
         DatabaseHandler db = testHelper.getDbHandler();
         
         // 1. Create User Profile
@@ -101,6 +110,8 @@ public class MyEventsActivityTest {
         registrationData.put("entrantId", userId);
         registrationData.put("status", "waiting");
         registrationData.put("registrationTime", new Date());
+        registrationData.put("entrantLat", lat);
+        registrationData.put("entrantLng", lng);
         
         Tasks.await(db.getDb().collection(DatabaseHandler.COLLECTION_EVENTS)
                 .document(String.valueOf(eventId))
@@ -121,6 +132,45 @@ public class MyEventsActivityTest {
         onView(withText("John Doe")).check(matches(isDisplayed()));
         onView(withText("Jane Smith")).check(matches(isDisplayed()));
         onView(withText("Bob Johnson")).check(matches(isDisplayed()));
+    }
+
+    @Test
+    public void testMapButton() throws InterruptedException {
+        Thread.sleep(2000);
+
+        onView(withId(R.id.rv_my_events))
+                .check(matches(MainActivityTest.hasDescendant(withText("John Doe"))));
+        onView(withId(R.id.rv_my_events))
+                .check(matches(MainActivityTest.hasDescendant(withId(R.id.tv_view_map))));
+
+        onView(withId(R.id.rv_my_events))
+                .perform(RecyclerViewActions.actionOnItemAtPosition(0, clickChildViewWithId(R.id.tv_view_map)));
+
+        Thread.sleep(1500);
+
+        onView(withId(R.id.map_container_inline)).check(matches(isDisplayed()));
+    }
+
+    private static ViewAction clickChildViewWithId(final int id) {
+        return new ViewAction() {
+            @Override
+            public Matcher<View> getConstraints() {
+                return null;
+            }
+
+            @Override
+            public String getDescription() {
+                return "Click on a child view with specified id.";
+            }
+
+            @Override
+            public void perform(UiController uiController, View view) {
+                View target = view.findViewById(id);
+                if (target != null) {
+                    target.performClick();
+                }
+            }
+        };
     }
 
 }

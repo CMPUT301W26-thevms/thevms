@@ -39,7 +39,7 @@ public class EventTest {
 
         Entrant entrant = new Entrant("device123", "test@example.com", "First", "Last", null);
 
-        Task<Void> task = event.addEntrant(entrant);
+        Task<Void> task = event.addEntrant(entrant, null);
 
         assertTrue("Task should be completed", task.isComplete());
         assertTrue("Task should have failed", !task.isSuccessful());
@@ -73,7 +73,7 @@ public class EventTest {
 
         Entrant entrant = new Entrant("device123", "test@example.com", "First", "Last", null);
 
-        Task<Void> task = event.addEntrant(entrant);
+        Task<Void> task = event.addEntrant(entrant, null);
 
         assertTrue("Task should be completed", task.isComplete());
         assertTrue("Task should have failed", !task.isSuccessful());
