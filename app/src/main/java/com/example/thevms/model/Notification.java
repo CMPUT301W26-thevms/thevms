@@ -12,7 +12,6 @@ import java.util.Date;
 public class Notification {
     public static final String TYPE_GENERAL = "general";
     public static final String TYPE_INVITE = "invite";
-    public static final String TYPE_SELECTED = "selected";
 
     private String id;
     private String title;

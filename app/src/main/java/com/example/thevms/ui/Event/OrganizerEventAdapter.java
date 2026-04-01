@@ -529,26 +529,12 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
          * Maps the dropdown index to a Firestore notification type string.
          * Lottery Win and Waiting List Invite are TYPE_INVITE since they require a user action.
          */
-        private String getNotificationType(int typeIndex) {
-            switch (typeIndex) {
-                case 1: // Lottery Win
-                    return Notification.TYPE_SELECTED;
-                case 3: // Waiting List Invite
-                    return Notification.TYPE_INVITE;
-                default: // General, Lottery Loss
-                    return Notification.TYPE_GENERAL;
-            }
-        }
 
         private void sendNotificationsToFilteredList(
                 List<AttendeeItem> recipients, String message, int typeIndex) {
 
             String organizerId = Settings.Secure.getString(
                     itemView.getContext().getContentResolver(), Settings.Secure.ANDROID_ID);
-
-            // Title = event name, type = based on dropdown selection
-            String title            = currentEventName;
-            String notificationType = getNotificationType(typeIndex);
 
             List<com.google.android.gms.tasks.Task<Void>> sendTasks = new ArrayList<>();
 
@@ -559,19 +545,44 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
                         item.getEntrant().getLastName(),
                         "Entrant");
 
-                Notification notification = new Notification(
-                        null,                                          // id — Firestore generates
-                        title,                                         // title = event name
-                        organizerId,                                   // senderId
-                        currentEventName,                              // senderName
-                        com.example.thevms.model.UserRole.ORGANIZER,  // senderRole
-                        receiverId,                                    // receiverId
-                        receiverName,                                  // receiverName
-                        new java.util.Date(),                          // timestamp
-                        message,                                       // description
-                        notificationType,                              // type from dropdown
-                        currentEventId                                 // eventId
-                );
+                Notification notification;
+                switch (typeIndex) {
+                    case 1: // Lottery Win
+                        notification = Notification.createLotteryWin(
+                                organizerId, currentEventName,
+                                receiverId, receiverName,
+                                currentEventId, currentEventName);
+                        break;
+                    case 2: // Lottery Loss
+                        notification = Notification.createLotteryLoss(
+                                organizerId, currentEventName,
+                                receiverId, receiverName,
+                                currentEventId, currentEventName);
+                        break;
+                    case 3: // Waiting List Invite
+                        notification = Notification.createWaitingListInvite(
+                                organizerId, currentEventName,
+                                receiverId, receiverName,
+                                currentEventId, currentEventName);
+                        break;
+                    default: // General — no factory method, use constructor directly
+                        notification = new Notification(
+                                null,
+                                currentEventName,
+                                organizerId,
+                                currentEventName,
+                                com.example.thevms.model.UserRole.ORGANIZER,
+                                receiverId,
+                                receiverName,
+                                new java.util.Date(),
+                                message,
+                                Notification.TYPE_GENERAL,
+                                currentEventId);
+                        break;
+                }
+
+                // Override the description with the organizer's (possibly edited) message
+                notification.setDescription(message);
 
                 sendTasks.add(notification.send());
             }
