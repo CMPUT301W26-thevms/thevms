@@ -35,7 +35,7 @@ public class DatabaseHandler {
     public static final String COLLECTION_ENTRANTS = "entrants";
     public static final String COLLECTION_COMMENTS = "comments";
     public static final String COLLECTION_NOTIFICATIONS = "notifications";
-    
+
     // Entrant status constants
     public static final String STATUS_WAITING = "waiting";
     public static final String STATUS_SELECTED = "selected";
@@ -600,6 +600,19 @@ public class DatabaseHandler {
      *
      * @return The FirebaseFirestore instance.
      */
+    /**
+     * Retrieves all entrants with locations for a specific event.
+     * @param eventId The event ID.
+     * @return A Task that resolves with the QuerySnapshot of entrants with locations.
+     */
+    public Task<QuerySnapshot> getEntrantsWithLocations(String eventId) {
+        return getDb().collection(COLLECTION_EVENTS)
+                .document(eventId)
+                .collection(COLLECTION_ENTRANTS)
+                .whereGreaterThan("entrantLat", -90.0)
+                .get();
+    }
+
     public FirebaseFirestore getDb() {
         if (db == null) {
             db = FirebaseFirestore.getInstance();

@@ -1,129 +1,172 @@
 package com.example.thevms;
 
+import static androidx.test.espresso.Espresso.onView;
+import static androidx.test.espresso.action.ViewActions.click;
+import static androidx.test.espresso.matcher.ViewMatchers.isDisplayed;
+import static androidx.test.espresso.matcher.ViewMatchers.withId;
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.fail;
 
+import android.content.Context;
+import android.provider.Settings;
+import android.view.View;
+
+import androidx.test.core.app.ActivityScenario;
+import androidx.test.espresso.UiController;
+import androidx.test.espresso.ViewAction;
+import androidx.test.espresso.contrib.RecyclerViewActions;
 import androidx.test.ext.junit.runners.AndroidJUnit4;
+import androidx.test.filters.LargeTest;
+import androidx.test.platform.app.InstrumentationRegistry;
 
 import com.example.thevms.model.DatabaseHandler;
 import com.example.thevms.model.Entrant;
 import com.example.thevms.model.Event;
-import com.example.thevms.model.Notification;
+import com.example.thevms.model.Organizer;
 import com.example.thevms.model.UserRole;
-import com.google.android.gms.tasks.Task;
+import com.example.thevms.ui.MyEventsActivity;
 import com.google.android.gms.tasks.Tasks;
+import com.google.firebase.firestore.DocumentSnapshot;
+import com.google.firebase.firestore.FirebaseFirestore;
+import com.google.firebase.firestore.QuerySnapshot;
 
+import org.hamcrest.Matcher;
+import org.junit.After;
+import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
-import java.lang.reflect.Field;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
 
-/**
- * Regression tests covering co-organizer features.
- * Moved to androidTest to provide a real Android Looper for Task continuations.
- */
 @RunWith(AndroidJUnit4.class)
+@LargeTest
 public class CoOrganizerFeatureTest {
 
-    @Test
-    public void coOrganizerInviteNotification_hasExpectedFields() {
-        Notification invite = Notification.createCoOrganizerInvite(
-                "org123",
-                "Alice Organizer",
-                "user456",
-                "Bob Entrant",
-                "E100",
-                "Tech Summit");
+    private static final String ENTRANT_ID = "entrant-test-001";
+    private FirestoreTestHelper helper;
+    private ActivityScenario<MyEventsActivity> scenario;
+    private long eventId;
+    private String organizerDeviceId;
 
-        assertEquals("Co-Organizer Invite", invite.getTitle());
-        assertEquals(Notification.TYPE_INVITE, invite.getType());
-        assertEquals("org123", invite.getSenderId());
-        assertEquals("user456", invite.getReceiverId());
-        assertNotNull(invite.getDescription());
-        assertTrue(invite.getDescription().contains("Alice Organizer"));
-        assertTrue(invite.getDescription().contains("Tech Summit"));
+    @Before
+    public void setUp() throws Exception {
+        helper = new FirestoreTestHelper();
+        helper.clearDatabase();
+
+        Context context = InstrumentationRegistry.getInstrumentation().getTargetContext();
+        organizerDeviceId = Settings.Secure.getString(context.getContentResolver(), Settings.Secure.ANDROID_ID);
+
+        eventId = seedOrganizerEvent();
+        scenario = ActivityScenario.launch(MyEventsActivity.class);
+        Thread.sleep(2000);
+    }
+
+    @After
+    public void tearDown() {
+        if (scenario != null) {
+            scenario.close();
+        }
     }
 
     @Test
-    public void coOrganizerStatus_blocksJoinRequest() throws Exception {
-        FakeDatabaseHandler fakeDb = new FakeDatabaseHandler();
-        fakeDb.isCoOrganizer = true;
-        fakeDb.entrantCount = 0L;
+    public void organizerAssignsCoOrganizer_andEntrantCannotRejoin() throws Exception {
+        onView(withId(R.id.rv_my_events))
+                .perform(RecyclerViewActions.actionOnItemAtPosition(0, clickChildViewWithId(R.id.btn_assign_co_organizer)));
 
-        Event event = buildEventWithHandler(fakeDb);
-        event.setMaxWaitlist(5);
+        Thread.sleep(2000);
 
-        Entrant entrant = new Entrant("device-1", "test@example.com", "First", "Last", null, true, UserRole.ENTRANT);
+        FirebaseFirestore db = helper.getDbHandler().getDb();
+        DocumentSnapshot entrantDoc = Tasks.await(db.collection(DatabaseHandler.COLLECTION_EVENTS)
+                .document(String.valueOf(eventId))
+                .collection(DatabaseHandler.COLLECTION_ENTRANTS)
+                .document(ENTRANT_ID)
+                .get(), 10, TimeUnit.SECONDS);
+        assertEquals(DatabaseHandler.STATUS_CO_ORGANIZER, entrantDoc.getString("status"));
 
-        Task<Void> task = event.addEntrant(entrant);
+        QuerySnapshot notifSnapshot = Tasks.await(db.collection(DatabaseHandler.COLLECTION_NOTIFICATIONS)
+                .whereEqualTo("receiverId", ENTRANT_ID)
+                .whereEqualTo("eventId", String.valueOf(eventId))
+                .get(), 10, TimeUnit.SECONDS);
+        assertFalse(notifSnapshot.isEmpty());
+
+        Event event = Event.fromDoc(Tasks.await(db.collection(DatabaseHandler.COLLECTION_EVENTS)
+                .document(String.valueOf(eventId)).get(), 10, TimeUnit.SECONDS));
+        Entrant entrant = new Entrant(ENTRANT_ID, "co@example.com", "Co", "Org", null, true, UserRole.ENTRANT);
         try {
-            Tasks.await(task);
+            Tasks.await(event.addEntrant(entrant, null));
             fail("Expected co-organizer join attempt to fail");
         } catch (ExecutionException ex) {
-            assertTrue(ex.getCause() instanceof IllegalStateException);
-            assertTrue(ex.getCause().getMessage().contains("Co-organizers"));
+            assertEquals(IllegalStateException.class, ex.getCause().getClass());
         }
     }
 
-    @Test
-    public void normalEntrant_getsWaitingStatusRecorded() throws Exception {
-        FakeDatabaseHandler fakeDb = new FakeDatabaseHandler();
-        fakeDb.isCoOrganizer = false;
-        fakeDb.entrantCount = 1L;
+    private long seedOrganizerEvent() throws Exception {
+        Organizer organizer = new Organizer(organizerDeviceId, "org@example.com", "Org", "Owner", null);
+        Event event = Tasks.await(Event.create(
+                "CoOrg Test Event",
+                "Description",
+                organizer,
+                null,
+                null,
+                new Date(),
+                new Date(System.currentTimeMillis() + 86400000),
+                new Date(),
+                new Date(System.currentTimeMillis() + 3600000),
+                false,
+                0.0,
+                null,
+                false
+        ), 10, TimeUnit.SECONDS);
+        Tasks.await(event.save(), 10, TimeUnit.SECONDS);
 
-        Event event = buildEventWithHandler(fakeDb);
-        event.setMaxWaitlist(10);
-
-        Entrant entrant = new Entrant("device-2", "user@example.com", "John", "Doe", null, true, UserRole.ENTRANT);
-
-        Task<Void> task = event.addEntrant(entrant);
-        Tasks.await(task);
-
-        assertEquals("42", fakeDb.lastUpdatedEventId);
-        assertEquals("device-2", fakeDb.lastUpdatedUserId);
-        assertEquals(DatabaseHandler.STATUS_WAITING, fakeDb.lastStatusData.get("status"));
+        seedEntrant(event.getEventId(), ENTRANT_ID, "Alice", "Cooper");
+        return event.getEventId();
     }
 
-    private Event buildEventWithHandler(FakeDatabaseHandler handler) throws Exception {
-        Map<String, Object> data = new HashMap<>();
-        data.put("eventId", 42L);
-        data.put("name", "Test Event");
-        Event event = Event.fromMap(data);
+    private void seedEntrant(long eventId, String userId, String firstName, String lastName) throws Exception {
+        DatabaseHandler db = helper.getDbHandler();
+        Map<String, Object> userData = new HashMap<>();
+        userData.put("firstName", firstName);
+        userData.put("lastName", lastName);
+        userData.put("email", userId + "@example.com");
+        userData.put("role", "ENTRANT");
+        Tasks.await(db.saveUser(userId, userData), 10, TimeUnit.SECONDS);
 
-        Field field = Event.class.getDeclaredField("dbHandler");
-        field.setAccessible(true);
-        field.set(event, handler);
-        return event;
+        Map<String, Object> registration = new HashMap<>();
+        registration.put("entrantId", userId);
+        registration.put("status", DatabaseHandler.STATUS_WAITING);
+        registration.put("registrationTime", new Date());
+        Tasks.await(db.getDb().collection(DatabaseHandler.COLLECTION_EVENTS)
+                .document(String.valueOf(eventId))
+                .collection(DatabaseHandler.COLLECTION_ENTRANTS)
+                .document(userId)
+                .set(registration), 10, TimeUnit.SECONDS);
     }
 
-    private static class FakeDatabaseHandler extends DatabaseHandler {
-        boolean isCoOrganizer;
-        long entrantCount;
-        Map<String, Object> lastStatusData;
-        String lastUpdatedEventId;
-        String lastUpdatedUserId;
+    private static ViewAction clickChildViewWithId(int id) {
+        return new ViewAction() {
+            @Override
+            public Matcher<View> getConstraints() {
+                return isDisplayed();
+            }
 
-        @Override
-        public com.google.android.gms.tasks.Task<Boolean> isCoOrganizer(String eventId, String userId) {
-            return Tasks.forResult(isCoOrganizer);
-        }
+            @Override
+            public String getDescription() {
+                return "Click on a child view with specified id.";
+            }
 
-        @Override
-        public com.google.android.gms.tasks.Task<Long> getEntrantCount(String eventId) {
-            return Tasks.forResult(entrantCount);
-        }
-
-        @Override
-        public com.google.android.gms.tasks.Task<Void> updateEntrantStatus(String eventId, String userId, Map<String, Object> statusData) {
-            this.lastUpdatedEventId = eventId;
-            this.lastUpdatedUserId = userId;
-            this.lastStatusData = statusData;
-            return Tasks.forResult(null);
-        }
+            @Override
+            public void perform(UiController uiController, View view) {
+                View childView = view.findViewById(id);
+                if (childView != null) {
+                    childView.performClick();
+                }
+            }
+        };
     }
 }

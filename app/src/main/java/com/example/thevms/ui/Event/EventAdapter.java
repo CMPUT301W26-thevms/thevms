@@ -19,6 +19,7 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
@@ -45,6 +46,9 @@ import java.util.Set;
  * Handles event binding, expansion, and user interactions such as joining or leaving an event.
  */
 public class EventAdapter extends RecyclerView.Adapter<EventAdapter.EventViewHolder> {
+    public interface LocationPermissionRequester {
+        void requestLocationPermission(boolean requiredForJoin, @NonNull Runnable onGranted, @NonNull Runnable onDenied);
+    }
 
     private List<Event> events = new ArrayList<>();
     private boolean isAdmin = false;
@@ -54,6 +58,7 @@ public class EventAdapter extends RecyclerView.Adapter<EventAdapter.EventViewHol
     private final Set<Long> expandedEventIds = new HashSet<>();
     private final Set<Long> expandedCommentIds = new HashSet<>();
     public static android.location.Location testLocation = null;
+    private LocationPermissionRequester locationPermissionRequester;
 
     /**
      * Updates the list of events to be displayed.
@@ -85,6 +90,10 @@ public class EventAdapter extends RecyclerView.Adapter<EventAdapter.EventViewHol
         notifyDataSetChanged();
     }
 
+    public void setLocationPermissionRequester(@Nullable LocationPermissionRequester locationPermissionRequester) {
+        this.locationPermissionRequester = locationPermissionRequester;
+    }
+
     /**
      * Sets a test location for geolocation checks.
      *
@@ -108,6 +117,7 @@ public class EventAdapter extends RecyclerView.Adapter<EventAdapter.EventViewHol
         boolean isCommentsExpanded = expandedCommentIds.contains(event.getEventId());
 
         holder.bind(event, dateFormat, fullDateFormat, isAdmin, managementMode, isExpanded, isCommentsExpanded,
+                locationPermissionRequester,
                 () -> {
                     int currentPos = holder.getAdapterPosition();
                     if (currentPos != RecyclerView.NO_POSITION) {
@@ -164,6 +174,7 @@ public class EventAdapter extends RecyclerView.Adapter<EventAdapter.EventViewHol
         EditText commentEditText;
         CommentAdapter commentAdapter;
         ListenerRegistration commentsListener;
+        private LocationPermissionRequester locationPermissionRequester;
 
         /**
          * Initializes the ViewHolder with the item view and finds all necessary subviews.
@@ -192,7 +203,7 @@ public class EventAdapter extends RecyclerView.Adapter<EventAdapter.EventViewHol
             eventStartTextView = itemView.findViewById(R.id.event_start_details);
             eventEndTextView = itemView.findViewById(R.id.event_end_details);
             expandButton = itemView.findViewById(R.id.btn_expand_details);
-            
+
             viewCommentsButton = itemView.findViewById(R.id.btn_view_comments);
             commentsSection = itemView.findViewById(R.id.comments_section);
             commentsRecyclerView = itemView.findViewById(R.id.comments_recycler_view);
@@ -230,11 +241,13 @@ public class EventAdapter extends RecyclerView.Adapter<EventAdapter.EventViewHol
          * @param onToggleExpand Callback for toggling the expansion state.
          * @param onToggleComments Callback for toggling the comments expansion state.
          */
-        public void bind(Event event, SimpleDateFormat dateFormat, SimpleDateFormat fullDateFormat, 
+        public void bind(Event event, SimpleDateFormat dateFormat, SimpleDateFormat fullDateFormat,
                          boolean isAdmin, boolean managementMode, boolean isExpanded, boolean isCommentsExpanded,
+                         @Nullable LocationPermissionRequester locationPermissionRequester,
                          Runnable onDelete,
                          java.util.function.Consumer<Boolean> onToggleExpand,
                          java.util.function.Consumer<Boolean> onToggleComments) {
+            this.locationPermissionRequester = locationPermissionRequester;
 
             if (nameTextView != null) nameTextView.setText(event.getName());
             if (timeTextView != null && event.getEventStartTime() != null) {
@@ -323,9 +336,9 @@ public class EventAdapter extends RecyclerView.Adapter<EventAdapter.EventViewHol
             if (commentsListener != null) {
                 commentsListener.remove();
             }
-            
+
             commentAdapter.setShowDeleteButton(isAdmin);
-            
+
             commentsListener = dbHandler.listenToComments(eventId, (value, error) -> {
                 if (error != null) {
                     Log.w("EventAdapter", "Listen failed.");
@@ -428,7 +441,7 @@ public class EventAdapter extends RecyclerView.Adapter<EventAdapter.EventViewHol
                     if (maxWaitlist != null) {
                         waitlistTextView.setVisibility(View.VISIBLE);
                         waitlistTextView.setText(String.format(Locale.getDefault(), "Waitlist: %d/%d", count, maxWaitlist));
-                        
+
                         // Grey out join button if waitlist is full
                         if (count >= maxWaitlist && joinButton.getVisibility() == View.VISIBLE) {
                             joinButton.setEnabled(false);
@@ -592,10 +605,11 @@ public class EventAdapter extends RecyclerView.Adapter<EventAdapter.EventViewHol
          *
          * @param event    The event to join.
          * @param deviceId The unique ID of the device.
+         * @param joiningLocation The location captured when the entrant joins, if available.
          */
-        private void joinEvent(Event event, String deviceId) {
+        private void joinEvent(Event event, String deviceId, android.location.Location joiningLocation) {
             Entrant.getOrCreate(deviceId).addOnSuccessListener(entrant -> {
-                event.addEntrant(entrant).addOnSuccessListener(aVoid -> {
+                event.addEntrant(entrant, joiningLocation).addOnSuccessListener(aVoid -> {
                     Toast.makeText(itemView.getContext(), "Successfully joined " + event.getName(), Toast.LENGTH_SHORT).show();
                     updateEntrantInfo(event, null);
                     joinButton.setVisibility(View.GONE);
@@ -629,11 +643,48 @@ public class EventAdapter extends RecyclerView.Adapter<EventAdapter.EventViewHol
             double radiusInMeters = event.getRadius() * 1000;
 
             if (distanceInMeters <= radiusInMeters) {
-                joinEvent(event, deviceId);
+                joinEvent(event, deviceId, currentLoc);
             } else {
                 Toast.makeText(itemView.getContext(),
                         "Out of location requirement", Toast.LENGTH_LONG).show();
             }
+        }
+
+        private void joinEventWithBestEffortLocation(Event event, String deviceId) {
+            if (EventAdapter.testLocation != null) {
+                joinEvent(event, deviceId, EventAdapter.testLocation);
+                return;
+            }
+
+            boolean hasFineLocation = androidx.core.content.ContextCompat.checkSelfPermission(
+                    itemView.getContext(),
+                    android.Manifest.permission.ACCESS_FINE_LOCATION
+            ) == android.content.pm.PackageManager.PERMISSION_GRANTED;
+            boolean hasCoarseLocation = androidx.core.content.ContextCompat.checkSelfPermission(
+                    itemView.getContext(),
+                    android.Manifest.permission.ACCESS_COARSE_LOCATION
+            ) == android.content.pm.PackageManager.PERMISSION_GRANTED;
+
+            if (!hasFineLocation && !hasCoarseLocation) {
+                joinEvent(event, deviceId, null);
+                return;
+            }
+
+            fusedLocationClient.getLastLocation()
+                    .addOnSuccessListener(location -> joinEvent(event, deviceId, location))
+                    .addOnFailureListener(e -> joinEvent(event, deviceId, null));
+        }
+
+        private boolean hasLocationPermission() {
+            boolean hasFineLocation = androidx.core.content.ContextCompat.checkSelfPermission(
+                    itemView.getContext(),
+                    android.Manifest.permission.ACCESS_FINE_LOCATION
+            ) == android.content.pm.PackageManager.PERMISSION_GRANTED;
+            boolean hasCoarseLocation = androidx.core.content.ContextCompat.checkSelfPermission(
+                    itemView.getContext(),
+                    android.Manifest.permission.ACCESS_COARSE_LOCATION
+            ) == android.content.pm.PackageManager.PERMISSION_GRANTED;
+            return hasFineLocation || hasCoarseLocation;
         }
 
         /**
@@ -644,7 +695,15 @@ public class EventAdapter extends RecyclerView.Adapter<EventAdapter.EventViewHol
          */
         private void checkLocation(Event event, String deviceId) {
             if (!event.isGeolocationRequired()) {
-                joinEvent(event, deviceId);
+                if (!hasLocationPermission() && locationPermissionRequester != null) {
+                    locationPermissionRequester.requestLocationPermission(
+                            false,
+                            () -> joinEventWithBestEffortLocation(event, deviceId),
+                            () -> joinEvent(event, deviceId, null)
+                    );
+                    return;
+                }
+                joinEventWithBestEffortLocation(event, deviceId);
                 return;
             }
 
@@ -659,14 +718,14 @@ public class EventAdapter extends RecyclerView.Adapter<EventAdapter.EventViewHol
                 return;
             }
 
-            if (androidx.core.content.ContextCompat.checkSelfPermission(itemView.getContext(),
-                    android.Manifest.permission.ACCESS_FINE_LOCATION) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
-                if (itemView.getContext() instanceof android.app.Activity) {
-                    androidx.core.app.ActivityCompat.requestPermissions(
-                            (android.app.Activity) itemView.getContext(),
-                            new String[]{android.Manifest.permission.ACCESS_FINE_LOCATION, android.Manifest.permission.ACCESS_COARSE_LOCATION},
-                            77
+            if (!hasLocationPermission()) {
+                if (locationPermissionRequester != null) {
+                    locationPermissionRequester.requestLocationPermission(
+                            true,
+                            () -> checkLocation(event, deviceId),
+                            () -> Toast.makeText(itemView.getContext(), "Location permission is required to join this event.", Toast.LENGTH_LONG).show()
                     );
+                } else {
                     Toast.makeText(itemView.getContext(), "Please give permission to access your location.", Toast.LENGTH_LONG).show();
                 }
                 return;
@@ -695,7 +754,7 @@ public class EventAdapter extends RecyclerView.Adapter<EventAdapter.EventViewHol
                         double radiusInMeters = event.getRadius() * 1000;
 
                         if (distanceInMeters <= radiusInMeters) {
-                            joinEvent(event, deviceId);
+                            joinEvent(event, deviceId, currentLoc);
                         } else {
                             Toast.makeText(itemView.getContext(), "Out of location requirement", Toast.LENGTH_LONG).show();
                         }

@@ -3,6 +3,8 @@ package com.example.thevms.ui.Event;
 import android.app.AlertDialog;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
+import android.graphics.Canvas;
+import android.graphics.Paint;
 import android.provider.Settings;
 import android.text.Editable;
 import android.text.TextWatcher;
@@ -14,12 +16,14 @@ import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.VisibleForTesting;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
@@ -31,6 +35,7 @@ import com.example.thevms.model.Entrant;
 import com.example.thevms.model.Event;
 import com.example.thevms.model.Notification;
 import com.example.thevms.model.Organizer;
+import com.google.android.material.textfield.TextInputEditText;
 import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.ListenerRegistration;
@@ -43,6 +48,7 @@ import com.journeyapps.barcodescanner.BarcodeEncoder;
 
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
@@ -145,20 +151,25 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
      * Manages nested RecyclerView for attendees and event management controls.
      */
     static class ViewHolder extends RecyclerView.ViewHolder {
-        TextView nameText, distanceText, waitlistText, dateText, descriptionText, exportCsvText;
-        Button cancelBtn, lotteryBtn, postCommentBtn, updatePosterBtn, inviteBtn, showQrBtn;
+        TextView nameText, distanceText, waitlistText, dateText, descriptionText, exportCsvText, mapText;
+        Button cancelBtn, lotteryBtn, postCommentBtn, updatePosterBtn, inviteBtn, showQrBtn, replacementBtn;
         RecyclerView attendeesRv, commentsRv;
         ImageView posterImage;
         Spinner statusSpinner;
         EditText commentEditText;
         AttendeeAdapter attendeeAdapter;
         CommentAdapter commentAdapter;
+        ReplacementAdapter replacementAdapter;
         DatabaseHandler dbHandler;
         FirebaseFirestore db;
+        com.google.android.gms.maps.MapView mapView;
+        FrameLayout mapContainer;
         ListenerRegistration commentsListener;
 
         // Stored so the CSV export can use it for the filename
         String currentEventName = "";
+        boolean mapVisible = false;
+        boolean mapInitialized = false;
 
         /**
          * Initializes the ViewHolder and sets up nested UI components like the attendee list and status spinner.
@@ -174,6 +185,7 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
             descriptionText = itemView.findViewById(R.id.tv_description);
             cancelBtn = itemView.findViewById(R.id.btn_cancel_event);
             lotteryBtn = itemView.findViewById(R.id.btn_run_lottery);
+            replacementBtn = itemView.findViewById(R.id.btn_pick_replacements);
             updatePosterBtn = itemView.findViewById(R.id.btn_update_poster);
             inviteBtn = itemView.findViewById(R.id.btn_invite_entrants);
             showQrBtn = itemView.findViewById(R.id.btn_show_qr);
@@ -182,6 +194,8 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
             posterImage = itemView.findViewById(R.id.iv_event_poster);
             statusSpinner = itemView.findViewById(R.id.spinner_attendee_status);
             exportCsvText = itemView.findViewById(R.id.tv_export_csv);
+            mapText = itemView.findViewById(R.id.tv_view_map);
+            mapContainer = itemView.findViewById(R.id.map_container_inline);
             commentEditText = itemView.findViewById(R.id.et_organizer_comment);
             postCommentBtn = itemView.findViewById(R.id.btn_post_organizer_comment);
 
@@ -239,7 +253,7 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
          *
          * @param event The event for which to run the lottery.
          */
-        private void runLottery(Event event) {
+        private void runLottery(Event event, int requestedWinners) {
             dbHandler.getEntrantsForEvent(String.valueOf(event.getEventId()))
                     .addOnSuccessListener(queryDocumentSnapshots -> {
                         List<DocumentSnapshot> waitingList = new ArrayList<>();
@@ -249,8 +263,8 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
                             String status = doc.getString("status");
                             if (DatabaseHandler.STATUS_WAITING.equals(status)) {
                                 waitingList.add(doc);
-                            } else if (DatabaseHandler.STATUS_SELECTED.equals(status) || 
-                                       DatabaseHandler.STATUS_ACCEPTED.equals(status)) {
+                            } else if (DatabaseHandler.STATUS_SELECTED.equals(status) ||
+                                    DatabaseHandler.STATUS_ACCEPTED.equals(status)) {
                                 currentSelectedOrAccepted++;
                             }
                         }
@@ -260,19 +274,18 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
                             return;
                         }
 
-                        // Use maxAttendees if specified, otherwise default to a small number
-                        int totalCapacity = (event.getMaxAttendees() != null && event.getMaxAttendees() > 0) ? event.getMaxAttendees() : 1;
-                        
-                        // IMPORTANT: Calculate remaining spots
-                        int spotsLeft = totalCapacity - currentSelectedOrAccepted;
+                        int winnersCount = determineWinnerCount(
+                                requestedWinners,
+                                waitingList.size(),
+                                event.getMaxAttendees(),
+                                currentSelectedOrAccepted);
 
-                        if (spotsLeft <= 0) {
-                            Toast.makeText(itemView.getContext(), "Event is already at full capacity!", Toast.LENGTH_SHORT).show();
+                        if (winnersCount <= 0) {
+                            Toast.makeText(itemView.getContext(), "Not enough spots available for new winners", Toast.LENGTH_SHORT).show();
                             return;
                         }
 
-                        java.util.Collections.shuffle(waitingList);
-                        int winnersCount = Math.min(waitingList.size(), spotsLeft);
+                        Collections.shuffle(waitingList);
 
                         for (int i = 0; i < winnersCount; i++) {
                             DocumentSnapshot doc = waitingList.get(i);
@@ -281,9 +294,46 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
                             dbHandler.updateEntrantStatus(String.valueOf(event.getEventId()), doc.getId(), data);
                         }
 
-                        Toast.makeText(itemView.getContext(), "Selected " + winnersCount + " new entrants!", Toast.LENGTH_SHORT).show();
+                        Toast.makeText(itemView.getContext(), "Selected " + winnersCount + " entrant(s)!", Toast.LENGTH_SHORT).show();
                         bind(event, dateFormat, null, null); // Refresh list
                     });
+        }
+
+        private void showWinnerSelectionDialog(Event event) {
+            AlertDialog.Builder builder = new AlertDialog.Builder(itemView.getContext());
+            View dialogView = LayoutInflater.from(itemView.getContext()).inflate(R.layout.dialog_pick_winners, null);
+            TextInputEditText input = dialogView.findViewById(R.id.et_winner_count);
+
+            builder.setTitle("Select winners")
+                    .setView(dialogView)
+                    .setNegativeButton("Cancel", (dialog, which) -> dialog.dismiss())
+                    .setPositiveButton("Select", null);
+
+            AlertDialog dialog = builder.create();
+            dialog.setOnShowListener(d -> {
+                Button positive = dialog.getButton(AlertDialog.BUTTON_POSITIVE);
+                positive.setOnClickListener(v -> {
+                    String raw = input.getText() != null ? input.getText().toString().trim() : "";
+                    if (raw.isEmpty()) {
+                        input.setError("Required");
+                        return;
+                    }
+                    int requested;
+                    try {
+                        requested = Integer.parseInt(raw);
+                    } catch (NumberFormatException ex) {
+                        input.setError("Enter a whole number");
+                        return;
+                    }
+                    if (requested <= 0) {
+                        input.setError("Must be greater than 0");
+                        return;
+                    }
+                    dialog.dismiss();
+                    runLottery(event, requested);
+                });
+            });
+            dialog.show();
         }
 
         /**
@@ -299,6 +349,8 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
             itemView.setTag(eventId);
 
             currentEventName = event.getName() != null ? event.getName() : "Event";
+            mapVisible = false;
+            mapContainer.setVisibility(View.GONE);
 
             Organizer organizer = event.getOrganizer();
             String organizerDisplayName = buildFullName(
@@ -338,7 +390,85 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
                 if (cancelListener != null) cancelListener.onCancel(event);
             });
 
-            lotteryBtn.setOnClickListener(v -> runLottery(event));
+            lotteryBtn.setOnClickListener(v -> showWinnerSelectionDialog(event));
+            replacementBtn.setOnClickListener(v -> showReplacementDialog(event));
+            mapText.setOnClickListener(v -> {
+                mapVisible = !mapVisible;
+
+                if (mapVisible) {
+                    if (!mapInitialized) {
+                        mapView = new InterceptableMapView(itemView.getContext());
+                        mapView.onCreate(null);
+                        mapContainer.removeAllViews();
+                        mapContainer.addView(mapView, new FrameLayout.LayoutParams(
+                                ViewGroup.LayoutParams.MATCH_PARENT,
+                                ViewGroup.LayoutParams.MATCH_PARENT
+                        ));
+                        mapInitialized = true;
+                    }
+                    mapView.onResume();
+                    mapContainer.setVisibility(View.VISIBLE);
+                    mapView.getMapAsync(googleMap -> {
+                        googleMap.getUiSettings().setZoomGesturesEnabled(true);
+                        googleMap.getUiSettings().setScrollGesturesEnabled(true);
+                        googleMap.getUiSettings().setRotateGesturesEnabled(true);
+                        googleMap.getUiSettings().setTiltGesturesEnabled(true);
+                        googleMap.getUiSettings().setCompassEnabled(true);
+                        googleMap.clear();
+                        dbHandler.getEntrantsWithLocations(eventId)
+                                .addOnSuccessListener(querySnapshot -> {
+                                    List<com.google.android.gms.maps.model.LatLng> entrantPositions = new ArrayList<>();
+                                    com.google.android.gms.maps.model.LatLngBounds.Builder boundsBuilder =
+                                            new com.google.android.gms.maps.model.LatLngBounds.Builder();
+                                    int count = 0;
+                                    com.google.android.gms.maps.model.LatLng eventPos = null;
+                                    if (event.getGeoLocation() != null) {
+                                        eventPos = new com.google.android.gms.maps.model.LatLng(
+                                                event.getGeoLocation().getLatitude(),
+                                                event.getGeoLocation().getLongitude()
+                                        );
+                                        googleMap.addMarker(
+                                                new com.google.android.gms.maps.model.MarkerOptions()
+                                                        .position(eventPos)
+                                                        .title(event.getName())
+                                        );
+                                        boundsBuilder.include(eventPos);
+                                        count++;
+                                    }
+                                    for (QueryDocumentSnapshot doc : querySnapshot) {
+                                        Double lat = doc.getDouble("entrantLat");
+                                        Double lng = doc.getDouble("entrantLng");
+                                        if (lat == null || lng == null) continue;
+                                        com.google.android.gms.maps.model.LatLng pos =
+                                                new com.google.android.gms.maps.model.LatLng(lat, lng);
+                                        entrantPositions.add(pos);
+                                        boundsBuilder.include(pos);
+                                        count++;
+                                    }
+
+                                    renderMapMarkers(googleMap, event, entrantPositions);
+                                    List<com.google.android.gms.maps.model.LatLng> finalEntrantPositions = new ArrayList<>(entrantPositions);
+                                    googleMap.setOnCameraIdleListener(() ->
+                                            renderMapMarkers(googleMap, event, finalEntrantPositions));
+
+                                    if (count > 0) {
+                                        int pad = (int) (40 * itemView.getContext()
+                                                .getResources().getDisplayMetrics().density);
+                                        mapContainer.post(() ->
+                                                googleMap.animateCamera(
+                                                        com.google.android.gms.maps.CameraUpdateFactory
+                                                                .newLatLngBounds(boundsBuilder.build(), pad))
+                                        );
+                                    }
+                                });
+                    });
+                } else {
+                    if (mapView != null) {
+                        mapView.onPause();
+                    }
+                    mapContainer.setVisibility(View.GONE);
+                }
+            });
 
             updatePosterBtn.setOnClickListener(v -> {
                 if (updatePosterListener != null) updatePosterListener.onUpdatePoster(event);
@@ -427,6 +557,23 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
             AlertDialog dialog = builder.create();
             closeBtn.setOnClickListener(v -> dialog.dismiss());
             dialog.show();
+        }
+
+        @VisibleForTesting
+        public static int determineWinnerCount(int requested, int waitingCount, Integer maxAttendees, int currentSelected) {
+            if (requested <= 0 || waitingCount <= 0) {
+                return 0;
+            }
+
+            int capped = Math.min(requested, waitingCount);
+            if (maxAttendees != null && maxAttendees > 0) {
+                int spotsLeft = maxAttendees - currentSelected;
+                if (spotsLeft <= 0) {
+                    return 0;
+                }
+                capped = Math.min(capped, spotsLeft);
+            }
+            return capped;
         }
 
         private void showInviteDialog(Event event) {
@@ -549,6 +696,61 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
             });
         }
 
+        private void renderMapMarkers(com.google.android.gms.maps.GoogleMap googleMap,
+                                      Event event,
+                                      List<com.google.android.gms.maps.model.LatLng> entrantPositions) {
+            googleMap.clear();
+
+            if (event.getGeoLocation() != null) {
+                com.google.android.gms.maps.model.LatLng eventPos =
+                        new com.google.android.gms.maps.model.LatLng(
+                                event.getGeoLocation().getLatitude(),
+                                event.getGeoLocation().getLongitude()
+                        );
+                googleMap.addMarker(
+                        new com.google.android.gms.maps.model.MarkerOptions()
+                                .position(eventPos)
+                                .title(event.getName())
+                );
+            }
+
+            float zoom = googleMap.getCameraPosition().zoom;
+            for (com.google.android.gms.maps.model.LatLng pos : entrantPositions) {
+                googleMap.addMarker(
+                        new com.google.android.gms.maps.model.MarkerOptions()
+                                .position(pos)
+                                .anchor(0.5f, 0.5f)
+                                .icon(createUserLocationIcon(zoom))
+                );
+            }
+        }
+
+        private com.google.android.gms.maps.model.BitmapDescriptor createUserLocationIcon(float zoom) {
+            float density = itemView.getContext().getResources().getDisplayMetrics().density;
+            float clampedZoom = Math.max(8f, Math.min(20f, zoom));
+            float sizeDp = 18f + ((clampedZoom - 8f) / 12f) * 8f;
+            int sizePx = Math.max(Math.round(18f * density), Math.round(sizeDp * density));
+            float center = sizePx / 2f;
+            float radius = sizePx * 0.24f;
+
+            Bitmap bitmap = Bitmap.createBitmap(sizePx, sizePx, Bitmap.Config.ARGB_8888);
+            Canvas canvas = new Canvas(bitmap);
+
+            Paint fillPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+            fillPaint.setColor(android.graphics.Color.parseColor("#3B82F6"));
+            fillPaint.setStyle(Paint.Style.FILL);
+
+            Paint strokePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+            strokePaint.setColor(android.graphics.Color.WHITE);
+            strokePaint.setStyle(Paint.Style.STROKE);
+            strokePaint.setStrokeWidth(Math.max(2.5f, density * 1.5f));
+
+            canvas.drawCircle(center, center, radius, fillPaint);
+            canvas.drawCircle(center, center, radius, strokePaint);
+
+            return com.google.android.gms.maps.model.BitmapDescriptorFactory.fromBitmap(bitmap);
+        }
+
         private void showDeleteCommentConfirmation(String eventId, String commentId) {
             AlertDialog.Builder builder = new AlertDialog.Builder(itemView.getContext());
             View dialogView = LayoutInflater.from(itemView.getContext()).inflate(R.layout.dialog_cancel_confirmation, null);
@@ -614,6 +816,100 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
                     .addOnSuccessListener(unused -> {
                         dbHandler.selectAndInviteNextEntrant(eventId);
                     });
+        }
+
+        private void showReplacementDialog(Event event) {
+            AlertDialog.Builder builder = new AlertDialog.Builder(itemView.getContext());
+            View dialogView = LayoutInflater.from(itemView.getContext()).inflate(R.layout.dialog_replacement_selection, null);
+            builder.setView(dialogView);
+
+            TextView emptyText = dialogView.findViewById(R.id.tv_declined_empty);
+            RecyclerView declinedRv = dialogView.findViewById(R.id.rv_declined_users);
+            Button notifyBtn = dialogView.findViewById(R.id.btn_notify_declined);
+
+            declinedRv.setLayoutManager(new LinearLayoutManager(itemView.getContext()));
+            replacementAdapter = new ReplacementAdapter();
+            declinedRv.setAdapter(replacementAdapter);
+
+            String eventId = String.valueOf(event.getEventId());
+
+            dbHandler.getEntrantsForEvent(eventId).addOnSuccessListener(queryDocumentSnapshots -> {
+                List<com.google.android.gms.tasks.Task<DocumentSnapshot>> profileTasks = new ArrayList<>();
+
+                for (QueryDocumentSnapshot doc : queryDocumentSnapshots) {
+                    if ("declined".equals(doc.getString("status"))) {
+                        String entrantId = doc.getString("entrantId");
+                        profileTasks.add(dbHandler.getUser(entrantId));
+                    }
+                }
+
+                if (profileTasks.isEmpty()) {
+                    emptyText.setVisibility(View.VISIBLE);
+                    declinedRv.setVisibility(View.GONE);
+                    notifyBtn.setEnabled(false);
+                } else {
+                    com.google.android.gms.tasks.Tasks.whenAllSuccess(profileTasks).addOnSuccessListener(profiles -> {
+                        List<ReplacementAdapter.ReplacementItem> items = new ArrayList<>();
+                        for (Object obj : profiles) {
+                            DocumentSnapshot profileDoc = (DocumentSnapshot) obj;
+                            Entrant entrant = Entrant.fromMap(profileDoc.getId(), profileDoc.getData());
+                            if (entrant != null) {
+                                items.add(new ReplacementAdapter.ReplacementItem(entrant));
+                            }
+                        }
+                        replacementAdapter.setItems(items, items.size());
+                        emptyText.setVisibility(View.GONE);
+                        declinedRv.setVisibility(View.VISIBLE);
+                        notifyBtn.setEnabled(true);
+                    });
+                }
+            });
+
+            AlertDialog dialog = builder.create();
+            notifyBtn.setOnClickListener(v -> {
+                List<ReplacementAdapter.ReplacementItem> selected = replacementAdapter.getSelectedItems();
+                if (selected.isEmpty()) {
+                    Toast.makeText(itemView.getContext(), "No one selected", Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                for (ReplacementAdapter.ReplacementItem item : selected) {
+                    Map<String, Object> data = new HashMap<>();
+                    data.put("status", DatabaseHandler.STATUS_SELECTED);
+                    dbHandler.updateEntrantStatus(eventId, item.entrant.getDeviceId(), data);
+                    Notification.createWaitingListInvite(
+                            Settings.Secure.getString(itemView.getContext().getContentResolver(), Settings.Secure.ANDROID_ID),
+                            "Organizer", item.entrant.getDeviceId(), eventId, eventId, event.getName()).send();
+                }
+                Toast.makeText(itemView.getContext(), "Notifications sent to " + selected.size() + " entrants", Toast.LENGTH_SHORT).show();
+                dialog.dismiss();
+            });
+            dialog.show();
+        }
+    }
+
+    static class InterceptableMapView extends com.google.android.gms.maps.MapView {
+
+        public InterceptableMapView(android.content.Context context) {
+            super(context);
+        }
+
+        @Override
+        public boolean dispatchTouchEvent(android.view.MotionEvent event) {
+            int action = event.getActionMasked();
+            boolean disallow = action == android.view.MotionEvent.ACTION_DOWN
+                    || action == android.view.MotionEvent.ACTION_MOVE;
+            if (action == android.view.MotionEvent.ACTION_UP
+                    || action == android.view.MotionEvent.ACTION_CANCEL) {
+                disallow = false;
+            }
+
+            android.view.ViewParent parent = getParent();
+            while (parent != null) {
+                parent.requestDisallowInterceptTouchEvent(disallow);
+                parent = parent.getParent();
+            }
+
+            return super.dispatchTouchEvent(event);
         }
     }
 }

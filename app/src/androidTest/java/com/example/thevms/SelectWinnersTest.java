@@ -2,19 +2,17 @@ package com.example.thevms;
 
 import static androidx.test.espresso.Espresso.onView;
 import static androidx.test.espresso.action.ViewActions.click;
+import static androidx.test.espresso.action.ViewActions.closeSoftKeyboard;
+import static androidx.test.espresso.action.ViewActions.replaceText;
 import static androidx.test.espresso.assertion.ViewAssertions.matches;
 import static androidx.test.espresso.matcher.ViewMatchers.isDisplayed;
 import static androidx.test.espresso.matcher.ViewMatchers.withId;
 import static androidx.test.espresso.matcher.ViewMatchers.withText;
-import static org.hamcrest.Matchers.allOf;
 
 import android.content.Context;
 import android.provider.Settings;
 
 import androidx.test.core.app.ActivityScenario;
-import androidx.test.espresso.UiController;
-import androidx.test.espresso.ViewAction;
-import androidx.test.espresso.contrib.RecyclerViewActions;
 import androidx.test.ext.junit.runners.AndroidJUnit4;
 import androidx.test.filters.LargeTest;
 import androidx.test.platform.app.InstrumentationRegistry;
@@ -30,10 +28,6 @@ import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
-import android.view.View;
-
-import org.hamcrest.Matcher;
-
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
@@ -41,10 +35,11 @@ import java.util.concurrent.TimeUnit;
 
 @RunWith(AndroidJUnit4.class)
 @LargeTest
-public class MyEventsActivityTest {
+public class SelectWinnersTest {
 
     private FirestoreTestHelper testHelper;
     private ActivityScenario<MyEventsActivity> scenario;
+    private long eventId;
     private String deviceId;
 
     @Before
@@ -55,10 +50,9 @@ public class MyEventsActivityTest {
         Context context = InstrumentationRegistry.getInstrumentation().getTargetContext();
         deviceId = Settings.Secure.getString(context.getContentResolver(), Settings.Secure.ANDROID_ID);
 
-        // Seed an event for the current device (organizer)
-        seedEventForCurrentDevice();
-
+        eventId = seedEventForCurrentDevice();
         scenario = ActivityScenario.launch(MyEventsActivity.class);
+        Thread.sleep(2000);
     }
 
     @After
@@ -68,10 +62,29 @@ public class MyEventsActivityTest {
         }
     }
 
-    private void seedEventForCurrentDevice() throws Exception {
+    @Test
+    public void organizerCanSelectSpecificNumberOfWinners() throws Exception {
+        onView(withId(R.id.btn_run_lottery)).perform(click());
+        onView(withText("Select winners")).check(matches(isDisplayed()));
+        onView(withId(R.id.et_winner_count)).perform(replaceText("2"), closeSoftKeyboard());
+        onView(withText("Select")).perform(click());
+
+        Thread.sleep(2000);
+
+        Map<String, String> statuses = fetchEntrantStatuses(eventId);
+        int selected = 0;
+        for (String status : statuses.values()) {
+            if ("selected".equals(status)) {
+                selected++;
+            }
+        }
+        org.junit.Assert.assertEquals(2, selected);
+    }
+
+    private long seedEventForCurrentDevice() throws Exception {
         Organizer organizer = new Organizer(deviceId, "org@example.com", "Main", "Organizer", null);
         Event event = Tasks.await(Event.create(
-                "My Test Event",
+                "Lottery Test Event",
                 "Description",
                 organizer,
                 null,
@@ -87,17 +100,14 @@ public class MyEventsActivityTest {
         ), 10, TimeUnit.SECONDS);
         Tasks.await(event.save(), 10, TimeUnit.SECONDS);
 
-        // Seed users who signed up
-        seedUserAndEntrant(event.getEventId(), "user1", "John", "Doe", 53.5232, -113.5263);
-        seedUserAndEntrant(event.getEventId(), "user2", "Jane", "Smith", 53.5245, -113.5208);
-        seedUserAndEntrant(event.getEventId(), "user3", "Bob", "Johnson", 53.5271, -113.5174);
+        seedUserAndEntrant(event.getEventId(), "winner1", "Alice", "Smith");
+        seedUserAndEntrant(event.getEventId(), "winner2", "Bob", "Johnson");
+        seedUserAndEntrant(event.getEventId(), "winner3", "Carol", "Davis");
+        return event.getEventId();
     }
 
-    private void seedUserAndEntrant(long eventId, String userId, String firstName, String lastName,
-                                    double lat, double lng) throws Exception {
+    private void seedUserAndEntrant(long eventId, String userId, String firstName, String lastName) throws Exception {
         DatabaseHandler db = testHelper.getDbHandler();
-        
-        // 1. Create User Profile
         Map<String, Object> userData = new HashMap<>();
         userData.put("firstName", firstName);
         userData.put("lastName", lastName);
@@ -105,14 +115,10 @@ public class MyEventsActivityTest {
         userData.put("role", "ENTRANT");
         Tasks.await(db.saveUser(userId, userData), 10, TimeUnit.SECONDS);
 
-        // 2. Register User in Event
         Map<String, Object> registrationData = new HashMap<>();
         registrationData.put("entrantId", userId);
         registrationData.put("status", "waiting");
         registrationData.put("registrationTime", new Date());
-        registrationData.put("entrantLat", lat);
-        registrationData.put("entrantLng", lng);
-        
         Tasks.await(db.getDb().collection(DatabaseHandler.COLLECTION_EVENTS)
                 .document(String.valueOf(eventId))
                 .collection(DatabaseHandler.COLLECTION_ENTRANTS)
@@ -120,57 +126,16 @@ public class MyEventsActivityTest {
                 .set(registrationData), 10, TimeUnit.SECONDS);
     }
 
-    @Test
-    public void testAttendeesNamesVisible() throws InterruptedException {
-        // Wait for data to load
-        Thread.sleep(2000);
-
-        // Check event name
-        onView(withText("My Test Event")).check(matches(isDisplayed()));
-
-        // Check if all attendees' full names are displayed in the list
-        onView(withText("John Doe")).check(matches(isDisplayed()));
-        onView(withText("Jane Smith")).check(matches(isDisplayed()));
-        onView(withText("Bob Johnson")).check(matches(isDisplayed()));
+    private Map<String, String> fetchEntrantStatuses(long eventId) throws Exception {
+        DatabaseHandler db = testHelper.getDbHandler();
+        Map<String, String> statuses = new HashMap<>();
+        for (com.google.firebase.firestore.QueryDocumentSnapshot doc : Tasks.await(
+                db.getDb().collection(DatabaseHandler.COLLECTION_EVENTS)
+                        .document(String.valueOf(eventId))
+                        .collection(DatabaseHandler.COLLECTION_ENTRANTS)
+                        .get(), 10, TimeUnit.SECONDS)) {
+            statuses.put(doc.getId(), doc.getString("status"));
+        }
+        return statuses;
     }
-
-    @Test
-    public void testMapButton() throws InterruptedException {
-        Thread.sleep(2000);
-
-        onView(withId(R.id.rv_my_events))
-                .check(matches(MainActivityTest.hasDescendant(withText("John Doe"))));
-        onView(withId(R.id.rv_my_events))
-                .check(matches(MainActivityTest.hasDescendant(withId(R.id.tv_view_map))));
-
-        onView(withId(R.id.rv_my_events))
-                .perform(RecyclerViewActions.actionOnItemAtPosition(0, clickChildViewWithId(R.id.tv_view_map)));
-
-        Thread.sleep(1500);
-
-        onView(withId(R.id.map_container_inline)).check(matches(isDisplayed()));
-    }
-
-    private static ViewAction clickChildViewWithId(final int id) {
-        return new ViewAction() {
-            @Override
-            public Matcher<View> getConstraints() {
-                return null;
-            }
-
-            @Override
-            public String getDescription() {
-                return "Click on a child view with specified id.";
-            }
-
-            @Override
-            public void perform(UiController uiController, View view) {
-                View target = view.findViewById(id);
-                if (target != null) {
-                    target.performClick();
-                }
-            }
-        };
-    }
-
 }

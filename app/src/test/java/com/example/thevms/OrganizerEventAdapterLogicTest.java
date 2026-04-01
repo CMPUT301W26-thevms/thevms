@@ -2,6 +2,7 @@ package com.example.thevms;
 
 import com.example.thevms.model.AttendeeItem;
 import com.example.thevms.model.Entrant;
+import com.example.thevms.ui.Event.OrganizerEventAdapter;
 
 import org.junit.Test;
 
@@ -197,5 +198,32 @@ public class OrganizerEventAdapterLogicTest {
             // cancelled entrant should not be re-promoted
             assertEquals("cancelled", items.get(0).getStatus());
         }
+    }
+
+    // ── Winner count helper ───────────────────────────────────────────────────
+
+    @Test
+    public void determineWinnerCount_limitsToRequestedAndWaiting() {
+        int winners = OrganizerEventAdapter.ViewHolder.determineWinnerCount(3, 10, null, 0);
+        assertEquals(3, winners);
+
+        winners = OrganizerEventAdapter.ViewHolder.determineWinnerCount(8, 5, null, 0);
+        assertEquals(5, winners);
+    }
+
+    @Test
+    public void determineWinnerCount_respectsCapacity() {
+        int winners = OrganizerEventAdapter.ViewHolder.determineWinnerCount(5, 10, 12, 9);
+        // Only 3 spots remain
+        assertEquals(3, winners);
+    }
+
+    @Test
+    public void determineWinnerCount_returnsZeroWhenFullOrInvalid() {
+        int winners = OrganizerEventAdapter.ViewHolder.determineWinnerCount(5, 0, 10, 2);
+        assertEquals(0, winners);
+
+        winners = OrganizerEventAdapter.ViewHolder.determineWinnerCount(5, 10, 10, 10);
+        assertEquals(0, winners);
     }
 }

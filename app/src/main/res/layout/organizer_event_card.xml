@@ -40,22 +40,22 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_gravity="bottom"
-                android:orientation="horizontal"
-                android:padding="8dp"
-                android:gravity="center">
+                android:layout_margin="12dp"
+                android:gravity="center"
+                android:orientation="horizontal">
 
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/btn_run_lottery"
                     style="@style/Widget.MaterialComponents.Button.UnelevatedButton"
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
+                    android:layout_marginEnd="8dp"
                     android:layout_weight="1"
-                    android:layout_marginEnd="4dp"
                     android:backgroundTint="#2D2D2D"
-                    android:text="Run Lottery"
+                    android:text="Select Winners"
                     android:textAllCaps="false"
                     android:textColor="@android:color/white"
-                    android:textSize="12sp"
+                    android:textSize="16sp"
                     app:cornerRadius="8dp" />
 
                 <com.google.android.material.button.MaterialButton
@@ -73,19 +73,32 @@
                     app:cornerRadius="8dp" />
 
                 <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btn_pick_replacements"
+                    style="@style/Widget.MaterialComponents.Button.UnelevatedButton"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginEnd="8dp"
+                    android:layout_weight="1"
+                    android:backgroundTint="#2D2D2D"
+                    android:text="Replacements"
+                    android:textAllCaps="false"
+                    android:textColor="@android:color/white"
+                    android:textSize="16sp"
+                    app:cornerRadius="8dp" />
+
+                <com.google.android.material.button.MaterialButton
                     android:id="@+id/btn_update_poster"
                     style="@style/Widget.MaterialComponents.Button.UnelevatedButton"
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
-                    android:layout_weight="1.2"
+                    android:layout_weight="1"
                     android:backgroundTint="#2D2D2D"
                     android:text="Update Poster"
                     android:textAllCaps="false"
                     android:textColor="@android:color/white"
-                    android:textSize="12sp"
+                    android:textSize="16sp"
                     app:cornerRadius="8dp" />
             </LinearLayout>
-
         </FrameLayout>
 
         <!-- Event Details Row -->
@@ -266,12 +279,15 @@
                             android:textSize="20sp" />
 
                         <TextView
+                            android:id="@+id/tv_view_map"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:padding="4dp"
                             android:text="🗺"
                             android:textColor="#808080"
-                            android:textSize="20sp" />
+                            android:textSize="20sp"
+                            android:clickable="true"
+                            android:focusable="true" />
                     </LinearLayout>
                 </LinearLayout>
             </androidx.constraintlayout.widget.ConstraintLayout>
@@ -291,6 +307,13 @@
                 android:nestedScrollingEnabled="false"
                 tools:listitem="@layout/item_attendee"
                 tools:itemCount="3" />
+
+            <FrameLayout
+                android:id="@+id/map_container_inline"
+                android:layout_width="match_parent"
+                android:layout_height="300dp"
+                android:layout_marginTop="8dp"
+                android:visibility="gone" />
 
             <TextView
                 android:id="@+id/tv_more_indicator"

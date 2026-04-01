@@ -5,6 +5,7 @@ import android.os.Bundle;
 import android.view.View;
 import android.widget.Toast;
 
+import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
 
@@ -21,7 +22,7 @@ import java.util.Locale;
  * Reuses the binding logic from {@link EventAdapter.EventViewHolder} to ensure consistent behavior.
  * Supports launching via deep links (e.g., from a scanned QR code).
  */
-public class EventDetailActivity extends AppCompatActivity {
+public class EventDetailActivity extends AppCompatActivity implements EventAdapter.LocationPermissionRequester {
 
     private Event event;
     private EventAdapter.EventViewHolder viewHolder;
@@ -88,6 +89,7 @@ public class EventDetailActivity extends AppCompatActivity {
         if (event == null || viewHolder == null) return;
 
         viewHolder.bind(event, dateFormat, fullDateFormat, isAdmin, false, isExpanded, isCommentsExpanded,
+                this, // LocationPermissionRequester
                 () -> {
                     // On event deletion (admin mode)
                     Toast.makeText(this, "Event deleted", Toast.LENGTH_SHORT).show();
@@ -102,5 +104,19 @@ public class EventDetailActivity extends AppCompatActivity {
                     updateUI();
                 }
         );
+    }
+
+    @Override
+    public void requestLocationPermission(boolean requiredForJoin, @NonNull Runnable onGranted, @NonNull Runnable onDenied) {
+        if (androidx.core.content.ContextCompat.checkSelfPermission(this,
+                android.Manifest.permission.ACCESS_FINE_LOCATION) == android.content.pm.PackageManager.PERMISSION_GRANTED) {
+            onGranted.run();
+        } else {
+            androidx.core.app.ActivityCompat.requestPermissions(this,
+                    new String[]{android.Manifest.permission.ACCESS_FINE_LOCATION}, 77);
+            
+            // In a production app, we would handle the result in onRequestPermissionsResult
+            Toast.makeText(this, "Location permission is required to proceed", Toast.LENGTH_SHORT).show();
+        }
     }
 }
