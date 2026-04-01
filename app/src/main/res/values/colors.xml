@@ -9,5 +9,6 @@
     <color name="status_accepted">#10B981</color>      <!-- green  — check_circle icon -->
     <color name="status_rejected">#EF4444</color>      <!-- red    — cancel icon       -->
     <color name="status_cancelled">#F59E0B</color>     <!-- amber  — block icon        -->
+    <color name="status_declined">#F97316</color>      <!-- orange — decline indicator  -->
 
 </resources>

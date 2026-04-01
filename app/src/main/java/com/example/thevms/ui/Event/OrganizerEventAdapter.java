@@ -77,23 +77,54 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
     private OnEventCancelListener cancelListener;
     private OnEventUpdatePosterListener updatePosterListener;
 
+    /**
+     * Interface for listening to event cancellation actions.
+     */
     public interface OnEventCancelListener {
+        /**
+         * Called when an event is cancelled by the organizer.
+         *
+         * @param event The event being cancelled.
+         */
         void onCancel(Event event);
     }
 
+    /**
+     * Interface for listening to update poster actions.
+     */
     public interface OnEventUpdatePosterListener {
+        /**
+         * Called when the organizer wants to update the event poster.
+         *
+         * @param event The event whose poster is being updated.
+         */
         void onUpdatePoster(Event event);
     }
 
+    /**
+     * Updates the list of events to be displayed.
+     *
+     * @param events The new list of events.
+     */
     public void setEvents(List<Event> events) {
         this.events = events;
         notifyDataSetChanged();
     }
 
+    /**
+     * Sets the listener for event cancellation actions.
+     *
+     * @param cancelListener The listener to set.
+     */
     public void setOnEventCancelListener(OnEventCancelListener cancelListener) {
         this.cancelListener = cancelListener;
     }
 
+    /**
+     * Sets the listener for update poster actions.
+     *
+     * @param updatePosterListener The listener to set.
+     */
     public void setOnEventUpdatePosterListener(OnEventUpdatePosterListener updatePosterListener) {
         this.updatePosterListener = updatePosterListener;
     }
@@ -117,47 +148,59 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
         return events.size();
     }
 
+    /**
+     * ViewHolder class for organizer event cards.
+     * Manages nested RecyclerView for attendees and event management controls.
+     */
     public static class ViewHolder extends RecyclerView.ViewHolder {
         TextView nameText, distanceText, waitlistText, dateText, descriptionText, exportCsvText, mapText;
         // ── NEW: bell icon for sending notifications ──────────────────────────
         TextView notifyBellText;
-        Button cancelBtn, lotteryBtn, postCommentBtn, updatePosterBtn, inviteBtn;
+        Button cancelBtn, lotteryBtn, replacementBtn, postCommentBtn, updatePosterBtn, inviteBtn;
         RecyclerView attendeesRv, commentsRv;
         ImageView posterImage;
         Spinner statusSpinner;
         EditText commentEditText;
         AttendeeAdapter attendeeAdapter;
         CommentAdapter commentAdapter;
+        ReplacementAdapter replacementAdapter;
         DatabaseHandler dbHandler;
         FirebaseFirestore db;
         com.google.android.gms.maps.MapView mapView;
         FrameLayout mapContainer;
         ListenerRegistration commentsListener;
 
+        // Stored so the CSV export can use it for the filename
         String currentEventName = "";
         // ── NEW: store eventId for notification sending ───────────────────────
         String currentEventId = "";
         boolean mapVisible = false;
         boolean mapInitialized = false;
 
+        /**
+         * Initializes the ViewHolder and sets up nested UI components like the attendee list and status spinner.
+         *
+         * @param itemView The view representing a single organizer event card.
+         */
         public ViewHolder(@NonNull View itemView) {
             super(itemView);
-            nameText        = itemView.findViewById(R.id.tv_event_name);
-            distanceText    = itemView.findViewById(R.id.tv_distance);
-            waitlistText    = itemView.findViewById(R.id.tv_waitlist_count);
-            dateText        = itemView.findViewById(R.id.tv_event_date);
+            nameText = itemView.findViewById(R.id.tv_event_name);
+            distanceText = itemView.findViewById(R.id.tv_distance);
+            waitlistText = itemView.findViewById(R.id.tv_waitlist_count);
+            dateText = itemView.findViewById(R.id.tv_event_date);
             descriptionText = itemView.findViewById(R.id.tv_description);
-            cancelBtn       = itemView.findViewById(R.id.btn_cancel_event);
-            lotteryBtn      = itemView.findViewById(R.id.btn_run_lottery);
+            cancelBtn = itemView.findViewById(R.id.btn_cancel_event);
+            lotteryBtn = itemView.findViewById(R.id.btn_run_lottery);
+            replacementBtn = itemView.findViewById(R.id.btn_pick_replacements);
             updatePosterBtn = itemView.findViewById(R.id.btn_update_poster);
-            inviteBtn       = itemView.findViewById(R.id.btn_invite_entrants);
-            attendeesRv     = itemView.findViewById(R.id.rv_attendees);
-            commentsRv      = itemView.findViewById(R.id.rv_comments);
-            posterImage     = itemView.findViewById(R.id.iv_event_poster);
-            statusSpinner   = itemView.findViewById(R.id.spinner_attendee_status);
-            exportCsvText   = itemView.findViewById(R.id.tv_export_csv);
-            mapText         = itemView.findViewById(R.id.tv_view_map);
-            mapContainer    = itemView.findViewById(R.id.map_container_inline);
+            inviteBtn = itemView.findViewById(R.id.btn_invite_entrants);
+            attendeesRv = itemView.findViewById(R.id.rv_attendees);
+            commentsRv = itemView.findViewById(R.id.rv_comments);
+            posterImage = itemView.findViewById(R.id.iv_event_poster);
+            statusSpinner = itemView.findViewById(R.id.spinner_attendee_status);
+            exportCsvText = itemView.findViewById(R.id.tv_export_csv);
+            mapText = itemView.findViewById(R.id.tv_view_map);
+            mapContainer = itemView.findViewById(R.id.map_container_inline);
             commentEditText = itemView.findViewById(R.id.et_organizer_comment);
             postCommentBtn  = itemView.findViewById(R.id.btn_post_organizer_comment);
             notifyBellText  = itemView.findViewById(R.id.tv_notify_bell);
@@ -174,6 +217,7 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
             dbHandler = new DatabaseHandler();
             db = FirebaseFirestore.getInstance();
 
+            // Wire cancel listener — cancels entrant and promotes next waitlisted randomly
             attendeeAdapter.setOnCancelEntrantListener(item -> {
                 if (!item.isCancellable()) return;
                 String eventId = (String) itemView.getTag();
@@ -188,11 +232,14 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
             );
             spinnerAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
             statusSpinner.setAdapter(spinnerAdapter);
+
+            // Filter attendee list when organizer picks a status
             statusSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
                 @Override
                 public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
                     attendeeAdapter.filterByStatus(STATUS_VALUES[position]);
                 }
+
                 @Override
                 public void onNothingSelected(AdapterView<?> parent) {}
             });
@@ -208,6 +255,11 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
             }
         }
 
+        /**
+         * Executes the lottery for an event, randomly selecting winners from the waiting list.
+         *
+         * @param event The event for which to run the lottery.
+         */
         private void runLottery(Event event, int requestedWinners) {
             String organizerId = Settings.Secure.getString(
                     itemView.getContext().getContentResolver(), Settings.Secure.ANDROID_ID);
@@ -222,7 +274,7 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
                             if (DatabaseHandler.STATUS_WAITING.equals(status)) {
                                 waitingList.add(doc);
                             } else if (DatabaseHandler.STATUS_SELECTED.equals(status) ||
-                                    DatabaseHandler.STATUS_ACCEPTED.equals(status)) {
+                                       DatabaseHandler.STATUS_ACCEPTED.equals(status)) {
                                 currentSelectedOrAccepted++;
                             }
                         }
@@ -336,6 +388,14 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
             dialog.show();
         }
 
+        /**
+         * Binds an event's data to the ViewHolder and fetches the list of entrants.
+         *
+         * @param event                The event to bind.
+         * @param dateFormat           The date format for the event date.
+         * @param cancelListener       The listener for event cancellation.
+         * @param updatePosterListener The listener for poster update.
+         */
         public void bind(Event event, SimpleDateFormat dateFormat, OnEventCancelListener cancelListener, OnEventUpdatePosterListener updatePosterListener) {
             currentEventId   = String.valueOf(event.getEventId());
             currentEventName = event.getName() != null ? event.getName() : "Event";
@@ -385,6 +445,7 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
 
             lotteryBtn.setOnClickListener(v -> showWinnerSelectionDialog(event));
 
+            replacementBtn.setOnClickListener(v -> showReplacementDialog(event));
             mapText.setOnClickListener(v -> {
                 mapVisible = !mapVisible;
                 if (mapVisible) {
@@ -434,6 +495,7 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
                                         boundsBuilder.include(pos);
                                         count++;
                                     }
+
                                     renderMapMarkers(googleMap, event, entrantPositions);
                                     List<com.google.android.gms.maps.model.LatLng> finalPositions = new ArrayList<>(entrantPositions);
                                     googleMap.setOnCameraIdleListener(() ->
@@ -470,7 +532,7 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
 
                 for (QueryDocumentSnapshot doc : queryDocumentSnapshots) {
                     String entrantId = doc.getString("entrantId");
-                    String status    = doc.getString("status");
+                    String status = doc.getString("status");
                     if (entrantId != null) {
                         statusMap.put(entrantId, status);
                         profileTasks.add(dbHandler.getUser(entrantId));
@@ -691,21 +753,31 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
                 @Override
                 public void onTextChanged(CharSequence s, int start, int before, int count) {
                     String query = s.toString().toLowerCase();
-                    if (query.isEmpty()) { inviteAdapter.setEntrants(new ArrayList<>()); return; }
+                    if (query.isEmpty()) {
+                        inviteAdapter.setEntrants(new ArrayList<>());
+                        return;
+                    }
                     List<Entrant> filtered = new ArrayList<>();
                     for (Entrant u : allUsers) {
-                        boolean matchesName  = (u.getFirstName() != null && u.getFirstName().toLowerCase().contains(query))
-                                || (u.getLastName()  != null && u.getLastName().toLowerCase().contains(query));
+                        boolean matchesName = (u.getFirstName() != null && u.getFirstName().toLowerCase().contains(query))
+                                || (u.getLastName() != null && u.getLastName().toLowerCase().contains(query));
                         boolean matchesEmail = u.getEmail() != null && u.getEmail().toLowerCase().contains(query);
                         boolean matchesPhone = u.getPhoneNumber() != null && u.getPhoneNumber().contains(query);
-                        if (matchesName || matchesEmail || matchesPhone) filtered.add(u);
+
+                        if (matchesName || matchesEmail || matchesPhone) {
+                            filtered.add(u);
+                        }
                     }
                     inviteAdapter.setEntrants(filtered);
                 }
-                @Override public void afterTextChanged(Editable s) {}
+
+                @Override
+                public void afterTextChanged(Editable s) {
+                }
             });
 
             inviteAdapter.setOnInviteClickListener(entrant -> {
+                // Invite logic
                 Map<String, Object> registrationData = new HashMap<>();
                 registrationData.put("entrantId", entrant.getDeviceId());
                 registrationData.put("status", DatabaseHandler.STATUS_WAITING);
@@ -742,8 +814,9 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
                 commentAdapter.setComments(comments, commentIds);
             });
 
-            commentAdapter.setOnCommentDeleteListener((comment, commentId) ->
-                    showDeleteCommentConfirmation(eventId, commentId));
+            commentAdapter.setOnCommentDeleteListener((comment, commentId) -> {
+                showDeleteCommentConfirmation(eventId, commentId);
+            });
         }
 
         private void postOrganizerComment(String eventId) {
@@ -754,9 +827,10 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
                     itemView.getContext().getContentResolver(), Settings.Secure.ANDROID_ID);
             dbHandler.getUser(deviceId).addOnSuccessListener(userDoc -> {
                 String firstName = userDoc.getString("firstName");
-                String lastName  = userDoc.getString("lastName");
+                String lastName = userDoc.getString("lastName");
                 if (firstName == null) firstName = "Organizer";
-                if (lastName  == null) lastName  = "";
+                if (lastName == null) lastName = "";
+
                 Comment comment = new Comment(deviceId, firstName, lastName, text, new Date(), true);
                 dbHandler.addComment(eventId, comment).addOnSuccessListener(aVoid -> {
                     commentEditText.setText("");
@@ -769,18 +843,28 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
                                       Event event,
                                       List<com.google.android.gms.maps.model.LatLng> entrantPositions) {
             googleMap.clear();
+
             if (event.getGeoLocation() != null) {
                 com.google.android.gms.maps.model.LatLng eventPos =
                         new com.google.android.gms.maps.model.LatLng(
                                 event.getGeoLocation().getLatitude(),
-                                event.getGeoLocation().getLongitude());
-                googleMap.addMarker(new com.google.android.gms.maps.model.MarkerOptions()
-                        .position(eventPos).title(event.getName()));
+                                event.getGeoLocation().getLongitude()
+                        );
+                googleMap.addMarker(
+                        new com.google.android.gms.maps.model.MarkerOptions()
+                                .position(eventPos)
+                                .title(event.getName())
+                );
             }
+
             float zoom = googleMap.getCameraPosition().zoom;
             for (com.google.android.gms.maps.model.LatLng pos : entrantPositions) {
-                googleMap.addMarker(new com.google.android.gms.maps.model.MarkerOptions()
-                        .position(pos).anchor(0.5f, 0.5f).icon(createUserLocationIcon(zoom)));
+                googleMap.addMarker(
+                        new com.google.android.gms.maps.model.MarkerOptions()
+                                .position(pos)
+                                .anchor(0.5f, 0.5f)
+                                .icon(createUserLocationIcon(zoom))
+                );
             }
         }
 
@@ -812,8 +896,7 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
 
         private void showDeleteCommentConfirmation(String eventId, String commentId) {
             AlertDialog.Builder builder = new AlertDialog.Builder(itemView.getContext());
-            View dialogView = LayoutInflater.from(itemView.getContext())
-                    .inflate(R.layout.dialog_cancel_confirmation, null);
+            View dialogView = LayoutInflater.from(itemView.getContext()).inflate(R.layout.dialog_cancel_confirmation, null);
             builder.setView(dialogView);
 
             AlertDialog dialog = builder.create();
@@ -821,25 +904,27 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
                 dialog.getWindow().setBackgroundDrawableResource(android.R.color.transparent);
             }
 
-            TextView title   = dialogView.findViewById(R.id.tv_dialog_title);
+            TextView title = dialogView.findViewById(R.id.tv_dialog_title);
             TextView message = dialogView.findViewById(R.id.tv_dialog_message);
-            Button btnBack   = dialogView.findViewById(R.id.btn_dialog_back);
-            Button btnYes    = dialogView.findViewById(R.id.btn_dialog_yes);
+            Button btnBack = dialogView.findViewById(R.id.btn_dialog_back);
+            Button btnYes = dialogView.findViewById(R.id.btn_dialog_yes);
             ImageView ivClose = dialogView.findViewById(R.id.iv_close);
 
-            if (title   != null) title.setText(R.string.delete_comment_title);
+            if (title != null) title.setText(R.string.delete_comment_title);
             if (message != null) message.setText(R.string.delete_comment_message);
-            if (btnYes  != null) btnYes.setText(R.string.delete_comment_confirm);
+            if (btnYes != null) btnYes.setText(R.string.delete_comment_confirm);
             if (btnBack != null) btnBack.setText(R.string.delete_comment_cancel);
 
-            if (btnBack  != null) btnBack.setOnClickListener(v -> dialog.dismiss());
-            if (ivClose  != null) ivClose.setOnClickListener(v -> dialog.dismiss());
-            if (btnYes   != null) btnYes.setOnClickListener(v ->
+            if (btnBack != null) btnBack.setOnClickListener(v -> dialog.dismiss());
+            if (ivClose != null) ivClose.setOnClickListener(v -> dialog.dismiss());
+            if (btnYes != null) {
+                btnYes.setOnClickListener(v -> {
                     dbHandler.deleteComment(eventId, commentId).addOnSuccessListener(aVoid -> {
-                        Toast.makeText(itemView.getContext(),
-                                R.string.comment_deleted_toast, Toast.LENGTH_SHORT).show();
+                        Toast.makeText(itemView.getContext(), R.string.comment_deleted_toast, Toast.LENGTH_SHORT).show();
                         dialog.dismiss();
-                    }));
+                    });
+                });
+            }
 
             dialog.show();
         }
@@ -854,6 +939,12 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
             return sb.length() == 0 ? fallback : sb.toString();
         }
 
+        /**
+         * Cancels a specific entrant's selection and automatically invites the next person from the waiting list.
+         *
+         * @param eventId            The ID of the event.
+         * @param cancelledEntrantId The ID of the entrant to cancel.
+         */
         private void cancelEntrantAndSelectNext(String eventId, String cancelledEntrantId) {
             Map<String, Object> cancelData = new HashMap<>();
             cancelData.put("status", DatabaseHandler.STATUS_CANCELLED);
@@ -899,6 +990,74 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
                                 });
                     });
         }
+
+        private void showReplacementDialog(Event event) {
+            AlertDialog.Builder builder = new AlertDialog.Builder(itemView.getContext());
+            View dialogView = LayoutInflater.from(itemView.getContext()).inflate(R.layout.dialog_replacement_selection, null);
+            builder.setView(dialogView);
+
+            TextView emptyText = dialogView.findViewById(R.id.tv_declined_empty);
+            RecyclerView declinedRv = dialogView.findViewById(R.id.rv_declined_users);
+            Button notifyBtn = dialogView.findViewById(R.id.btn_notify_declined);
+
+            declinedRv.setLayoutManager(new LinearLayoutManager(itemView.getContext()));
+            replacementAdapter = new ReplacementAdapter();
+            declinedRv.setAdapter(replacementAdapter);
+
+            String eventId = String.valueOf(event.getEventId());
+
+            dbHandler.getEntrantsForEvent(eventId).addOnSuccessListener(queryDocumentSnapshots -> {
+                List<com.google.android.gms.tasks.Task<DocumentSnapshot>> profileTasks = new ArrayList<>();
+
+                for (QueryDocumentSnapshot doc : queryDocumentSnapshots) {
+                    if ("declined".equals(doc.getString("status"))) {
+                        String entrantId = doc.getString("entrantId");
+                        profileTasks.add(dbHandler.getUser(entrantId));
+                    }
+                }
+
+                if (profileTasks.isEmpty()) {
+                    emptyText.setVisibility(View.VISIBLE);
+                    declinedRv.setVisibility(View.GONE);
+                    notifyBtn.setEnabled(false);
+                } else {
+                    com.google.android.gms.tasks.Tasks.whenAllSuccess(profileTasks).addOnSuccessListener(profiles -> {
+                        List<ReplacementAdapter.ReplacementItem> items = new ArrayList<>();
+                        for (Object obj : profiles) {
+                            DocumentSnapshot profileDoc = (DocumentSnapshot) obj;
+                            Entrant entrant = Entrant.fromMap(profileDoc.getId(), profileDoc.getData());
+                            if (entrant != null) {
+                                items.add(new ReplacementAdapter.ReplacementItem(entrant));
+                            }
+                        }
+                        replacementAdapter.setItems(items, items.size());
+                        emptyText.setVisibility(View.GONE);
+                        declinedRv.setVisibility(View.VISIBLE);
+                        notifyBtn.setEnabled(true);
+                    });
+                }
+            });
+
+            AlertDialog dialog = builder.create();
+            notifyBtn.setOnClickListener(v -> {
+                List<ReplacementAdapter.ReplacementItem> selected = replacementAdapter.getSelectedItems();
+                if (selected.isEmpty()) {
+                    Toast.makeText(itemView.getContext(), "No one selected", Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                for (ReplacementAdapter.ReplacementItem item : selected) {
+                    Map<String, Object> data = new HashMap<>();
+                    data.put("status", DatabaseHandler.STATUS_SELECTED);
+                    dbHandler.updateEntrantStatus(eventId, item.entrant.getDeviceId(), data);
+                    Notification.createWaitingListInvite(
+                            Settings.Secure.getString(itemView.getContext().getContentResolver(), Settings.Secure.ANDROID_ID),
+                            "Organizer", item.entrant.getDeviceId(), eventId, eventId, event.getName()).send();
+                }
+                Toast.makeText(itemView.getContext(), "Notifications sent to " + selected.size() + " entrants", Toast.LENGTH_SHORT).show();
+                dialog.dismiss();
+            });
+            dialog.show();
+        }
     }
 
     static class InterceptableMapView extends com.google.android.gms.maps.MapView {
@@ -913,11 +1072,13 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
                     || action == android.view.MotionEvent.ACTION_CANCEL) {
                 disallow = false;
             }
+
             android.view.ViewParent parent = getParent();
             while (parent != null) {
                 parent.requestDisallowInterceptTouchEvent(disallow);
                 parent = parent.getParent();
             }
+
             return super.dispatchTouchEvent(event);
         }
     }
