@@ -209,6 +209,9 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
         }
 
         private void runLottery(Event event, int requestedWinners) {
+            String organizerId = Settings.Secure.getString(
+                    itemView.getContext().getContentResolver(), Settings.Secure.ANDROID_ID);
+
             dbHandler.getEntrantsForEvent(String.valueOf(event.getEventId()))
                     .addOnSuccessListener(queryDocumentSnapshots -> {
                         List<DocumentSnapshot> waitingList = new ArrayList<>();
@@ -225,7 +228,8 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
                         }
 
                         if (waitingList.isEmpty()) {
-                            Toast.makeText(itemView.getContext(), "No one in waiting list", Toast.LENGTH_SHORT).show();
+                            Toast.makeText(itemView.getContext(),
+                                    "No one in waiting list", Toast.LENGTH_SHORT).show();
                             return;
                         }
 
@@ -236,21 +240,69 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
                                 currentSelectedOrAccepted);
 
                         if (winnersCount <= 0) {
-                            Toast.makeText(itemView.getContext(), "Not enough spots available for new winners", Toast.LENGTH_SHORT).show();
+                            Toast.makeText(itemView.getContext(),
+                                    "Not enough spots available for new winners",
+                                    Toast.LENGTH_SHORT).show();
                             return;
                         }
 
                         Collections.shuffle(waitingList);
 
-                        for (int i = 0; i < winnersCount; i++) {
-                            DocumentSnapshot doc = waitingList.get(i);
-                            Map<String, Object> data = new HashMap<>();
-                            data.put("status", DatabaseHandler.STATUS_SELECTED);
-                            dbHandler.updateEntrantStatus(String.valueOf(event.getEventId()), doc.getId(), data);
-                        }
+                        // Split into winners and losers
+                        List<DocumentSnapshot> winners = waitingList.subList(0, winnersCount);
+                        List<DocumentSnapshot> losers  = waitingList.subList(winnersCount, waitingList.size());
 
-                        Toast.makeText(itemView.getContext(), "Selected " + winnersCount + " entrant(s)!", Toast.LENGTH_SHORT).show();
-                        bind(event, dateFormat, null, null);
+                        // Fetch organizer name once, then send all notifications
+                        dbHandler.getUser(organizerId).addOnSuccessListener(organizerDoc -> {
+                            String organizerFirst = organizerDoc.getString("firstName");
+                            String organizerLast  = organizerDoc.getString("lastName");
+                            String organizerName  = buildFullName(organizerFirst, organizerLast, "Organizer");
+
+                            List<com.google.android.gms.tasks.Task<Void>> allTasks = new ArrayList<>();
+
+                            for (DocumentSnapshot doc : winners) {
+                                // Update status
+                                Map<String, Object> data = new HashMap<>();
+                                data.put("status", DatabaseHandler.STATUS_SELECTED);
+                                allTasks.add(dbHandler.updateEntrantStatus(
+                                        String.valueOf(event.getEventId()), doc.getId(), data));
+
+                                // Fetch winner's profile to get their name for the notification
+                                dbHandler.getUser(doc.getId()).addOnSuccessListener(winnerDoc -> {
+                                    String receiverName = buildFullName(
+                                            winnerDoc.getString("firstName"),
+                                            winnerDoc.getString("lastName"),
+                                            "Entrant");
+
+                                    Notification win = Notification.createLotteryWin(
+                                            organizerId, organizerName,
+                                            doc.getId(), receiverName,
+                                            String.valueOf(event.getEventId()), event.getName());
+                                    allTasks.add(win.send());
+                                });
+                            }
+
+                            for (DocumentSnapshot doc : losers) {
+                                // Losers stay on waiting list — just notify them
+                                dbHandler.getUser(doc.getId()).addOnSuccessListener(loserDoc -> {
+                                    String receiverName = buildFullName(
+                                            loserDoc.getString("firstName"),
+                                            loserDoc.getString("lastName"),
+                                            "Entrant");
+
+                                    Notification loss = Notification.createLotteryLoss(
+                                            organizerId, organizerName,
+                                            doc.getId(), receiverName,
+                                            String.valueOf(event.getEventId()), event.getName());
+                                    allTasks.add(loss.send());
+                                });
+                            }
+
+                            Toast.makeText(itemView.getContext(),
+                                    "Selected " + winnersCount + " entrant(s)!",
+                                    Toast.LENGTH_SHORT).show();
+                            bind(event, dateFormat, null, null); // Refresh list
+                        });
                     });
         }
 
