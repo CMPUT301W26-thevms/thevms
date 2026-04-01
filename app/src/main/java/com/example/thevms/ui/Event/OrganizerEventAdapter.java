@@ -858,9 +858,46 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
             Map<String, Object> cancelData = new HashMap<>();
             cancelData.put("status", DatabaseHandler.STATUS_CANCELLED);
             dbHandler.updateEntrantStatus(eventId, cancelledEntrantId, cancelData)
-                    .addOnSuccessListener(unused ->
-                            dbHandler.selectAndInviteNextEntrant(eventId)
-                    );
+                    .addOnSuccessListener(unused -> {
+                        dbHandler.selectAndInviteNextEntrant(eventId)
+                                .addOnSuccessListener(v -> {
+                                    // Refresh the attendee list so the UI reflects the new statuses
+                                    dbHandler.getEntrantsForEvent(eventId).addOnSuccessListener(queryDocumentSnapshots -> {
+                                        Map<String, String> statusMap = new HashMap<>();
+                                        List<com.google.android.gms.tasks.Task<DocumentSnapshot>> profileTasks = new ArrayList<>();
+
+                                        for (QueryDocumentSnapshot doc : queryDocumentSnapshots) {
+                                            String entrantId = doc.getString("entrantId");
+                                            String status    = doc.getString("status");
+                                            if (entrantId != null) {
+                                                statusMap.put(entrantId, status);
+                                                profileTasks.add(dbHandler.getUser(entrantId));
+                                            }
+                                        }
+
+                                        if (!profileTasks.isEmpty()) {
+                                            Tasks.whenAllSuccess(profileTasks).addOnSuccessListener(profiles -> {
+                                                List<AttendeeItem> attendeeItems = new ArrayList<>();
+                                                for (Object obj : profiles) {
+                                                    DocumentSnapshot profileDoc = (DocumentSnapshot) obj;
+                                                    if (profileDoc.exists()) {
+                                                        Map<String, Object> data = profileDoc.getData();
+                                                        if (data != null) {
+                                                            Entrant entrant = Entrant.fromMap(profileDoc.getId(), data);
+                                                            String status = statusMap.get(profileDoc.getId());
+                                                            attendeeItems.add(new AttendeeItem(entrant, status));
+                                                        }
+                                                    }
+                                                }
+                                                // Push fresh list to adapter — UI updates instantly
+                                                attendeeAdapter.setAttendees(attendeeItems);
+                                            });
+                                        } else {
+                                            attendeeAdapter.setAttendees(new ArrayList<>());
+                                        }
+                                    });
+                                });
+                    });
         }
     }
 
