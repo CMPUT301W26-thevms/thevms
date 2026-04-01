@@ -96,7 +96,7 @@ public class Notification {
                 receiverName,
                 new Date(),
                 "Congratulations! You have been selected to participate in " + eventName + ". Please accept or decline this invitation.",
-                TYPE_SELECTED,
+                TYPE_INVITE,
                 eventId
         );
     }
