@@ -377,10 +377,6 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
                 posterImage.setAlpha(0.3f);
             }
 
-            event.fetchEntrantCount().addOnSuccessListener(count ->
-                    waitlistText.setText(count + " people in waitlist")
-            );
-
             cancelBtn.setOnClickListener(v -> {
                 if (cancelListener != null) cancelListener.onCancel(event);
             });
@@ -480,6 +476,7 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
             // Step 1: fetch all entrant docs from events/{eventId}/entrants/
             dbHandler.getEntrantsForEvent(eventId).addOnSuccessListener(queryDocumentSnapshots -> {
 
+                int waitingCount = 0;
                 // Map entrantId → status (scoped to this event)
                 Map<String, String> statusMap = new HashMap<>();
                 List<com.google.android.gms.tasks.Task<DocumentSnapshot>> profileTasks = new ArrayList<>();
@@ -491,7 +488,15 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
                         statusMap.put(entrantId, status);
                         profileTasks.add(dbHandler.getUser(entrantId));
                     }
+                    if (DatabaseHandler.STATUS_WAITING.equals(status)) {
+                        waitingCount++;
+                    }
                 }
+
+                String label = waitingCount == 1
+                        ? "1 person in waitlist"
+                        : waitingCount + " people in waitlist";
+                waitlistText.setText(label);
 
                 if (!profileTasks.isEmpty()) {
                     // Step 2: fetch user profiles in parallel
