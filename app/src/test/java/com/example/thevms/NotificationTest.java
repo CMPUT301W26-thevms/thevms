@@ -49,7 +49,7 @@ public class NotificationTest {
     public void testCreateLotteryLoss() {
         Notification loss = Notification.createLotteryLoss("sId", "Org", "rId", "User", "eId", "My Event");
         assertEquals("Lottery Results", loss.getTitle());
-        assertEquals(Notification.TYPE_GENERAL, loss.getType());
+        assertEquals(Notification.TYPE_INVITE, loss.getType());
         assertTrue(loss.getDescription().contains("My Event"));
         assertTrue(loss.getDescription().contains("not selected"));
     }
