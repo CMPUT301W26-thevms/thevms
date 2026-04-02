@@ -115,7 +115,7 @@ public class Notification {
                 receiverName,
                 new Date(),
                 "We regret to inform you that you were not selected for " + eventName + " this time. Better luck next time!",
-                TYPE_GENERAL,
+                TYPE_INVITE,
                 eventId
         );
     }

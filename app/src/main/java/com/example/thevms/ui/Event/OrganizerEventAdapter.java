@@ -35,6 +35,7 @@ import com.example.thevms.model.Entrant;
 import com.example.thevms.model.Event;
 import com.example.thevms.model.Notification;
 import com.example.thevms.model.Organizer;
+import com.google.android.gms.tasks.Tasks;
 import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.ListenerRegistration;
@@ -64,6 +65,11 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
 
     private static final String[] STATUS_VALUES = {
             "waiting", "selected", "accepted", "rejected", "cancelled", "declined"
+    };
+
+    // Notification type labels shown in the send notification dialog
+    private static final String[] NOTIFICATION_TYPE_LABELS = {
+            "General", "Lottery Win", "Lottery Loss", "Waiting List Invite"
     };
 
     private List<Event> events = new ArrayList<>();
@@ -148,6 +154,8 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
      */
     public static class ViewHolder extends RecyclerView.ViewHolder {
         TextView nameText, distanceText, waitlistText, dateText, descriptionText, exportCsvText, mapText;
+        // ── NEW: bell icon for sending notifications ──────────────────────────
+        TextView notifyBellText;
         Button cancelBtn, lotteryBtn, replacementBtn, postCommentBtn, updatePosterBtn, inviteBtn;
         RecyclerView attendeesRv, commentsRv;
         ImageView posterImage;
@@ -164,6 +172,8 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
 
         // Stored so the CSV export can use it for the filename
         String currentEventName = "";
+        // ── NEW: store eventId for notification sending ───────────────────────
+        String currentEventId = "";
         boolean mapVisible = false;
         boolean mapInitialized = false;
 
@@ -192,7 +202,8 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
             mapText = itemView.findViewById(R.id.tv_view_map);
             mapContainer = itemView.findViewById(R.id.map_container_inline);
             commentEditText = itemView.findViewById(R.id.et_organizer_comment);
-            postCommentBtn = itemView.findViewById(R.id.btn_post_organizer_comment);
+            postCommentBtn  = itemView.findViewById(R.id.btn_post_organizer_comment);
+            notifyBellText  = itemView.findViewById(R.id.tv_notify_bell);
 
             attendeesRv.setLayoutManager(new LinearLayoutManager(itemView.getContext()));
             attendeeAdapter = new AttendeeAdapter();
@@ -213,7 +224,7 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
                 cancelEntrantAndSelectNext(eventId, item.getEntrant().getDeviceId());
             });
 
-            // Set up spinner with status labels
+            // Status filter spinner
             ArrayAdapter<String> spinnerAdapter = new ArrayAdapter<>(
                     itemView.getContext(),
                     android.R.layout.simple_spinner_item,
@@ -230,17 +241,18 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
                 }
 
                 @Override
-                public void onNothingSelected(AdapterView<?> parent) {
-                }
+                public void onNothingSelected(AdapterView<?> parent) {}
             });
 
-            // Wire export CSV button — exports whatever is currently filtered in the list
+            // Export CSV
             exportCsvText.setOnClickListener(v ->
-                    attendeeAdapter.exportFilteredListAsCsv(
-                            itemView.getContext(),
-                            currentEventName
-                    )
+                    attendeeAdapter.exportFilteredListAsCsv(itemView.getContext(), currentEventName)
             );
+
+            // ── NEW: bell → show send notification dialog ─────────────────────
+            if (notifyBellText != null) {
+                notifyBellText.setOnClickListener(v -> showNotificationDialog());
+            }
         }
 
         /**
@@ -249,6 +261,9 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
          * @param event The event for which to run the lottery.
          */
         private void runLottery(Event event, int requestedWinners) {
+            String organizerId = Settings.Secure.getString(
+                    itemView.getContext().getContentResolver(), Settings.Secure.ANDROID_ID);
+
             dbHandler.getEntrantsForEvent(String.valueOf(event.getEventId()))
                     .addOnSuccessListener(queryDocumentSnapshots -> {
                         List<DocumentSnapshot> waitingList = new ArrayList<>();
@@ -258,14 +273,15 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
                             String status = doc.getString("status");
                             if (DatabaseHandler.STATUS_WAITING.equals(status)) {
                                 waitingList.add(doc);
-                            } else if (DatabaseHandler.STATUS_SELECTED.equals(status) || 
+                            } else if (DatabaseHandler.STATUS_SELECTED.equals(status) ||
                                        DatabaseHandler.STATUS_ACCEPTED.equals(status)) {
                                 currentSelectedOrAccepted++;
                             }
                         }
 
                         if (waitingList.isEmpty()) {
-                            Toast.makeText(itemView.getContext(), "No one in waiting list", Toast.LENGTH_SHORT).show();
+                            Toast.makeText(itemView.getContext(),
+                                    "No one in waiting list", Toast.LENGTH_SHORT).show();
                             return;
                         }
 
@@ -276,29 +292,90 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
                                 currentSelectedOrAccepted);
 
                         if (winnersCount <= 0) {
-                            Toast.makeText(itemView.getContext(), "Not enough spots available for new winners", Toast.LENGTH_SHORT).show();
+                            Toast.makeText(itemView.getContext(),
+                                    "Not enough spots available for new winners",
+                                    Toast.LENGTH_SHORT).show();
                             return;
                         }
 
+                        Collections.shuffle(waitingList);
                         winnersCount = Math.min(winnersCount, waitingList.size());
                         final int winnersToSelect = winnersCount;
-                        Collections.shuffle(waitingList);
 
-                        List<com.google.android.gms.tasks.Task<Void>> updateTasks = new ArrayList<>();
-                        for (int i = 0; i < winnersToSelect; i++) {
-                            DocumentSnapshot doc = waitingList.get(i);
-                            Map<String, Object> data = new HashMap<>();
-                            data.put("status", DatabaseHandler.STATUS_SELECTED);
-                            updateTasks.add(dbHandler.updateEntrantStatus(String.valueOf(event.getEventId()), doc.getId(), data));
-                        }
+                        List<DocumentSnapshot> winners = new ArrayList<>(waitingList.subList(0, winnersToSelect));
+                        List<DocumentSnapshot> losers = winnersToSelect < waitingList.size()
+                                ? new ArrayList<>(waitingList.subList(winnersToSelect, waitingList.size()))
+                                : Collections.emptyList();
 
-                        com.google.android.gms.tasks.Tasks.whenAllSuccess(updateTasks)
-                                .addOnSuccessListener(unused -> {
-                                    Toast.makeText(itemView.getContext(), "Selected " + winnersToSelect + " entrant(s)!", Toast.LENGTH_SHORT).show();
-                                    bind(event, dateFormat, null, null); // Refresh list only after Firestore updates apply
+                        dbHandler.getUser(organizerId)
+                                .addOnSuccessListener(organizerDoc -> {
+                                    String organizerFirst = organizerDoc.getString("firstName");
+                                    String organizerLast = organizerDoc.getString("lastName");
+                                    String organizerName = buildFullName(organizerFirst, organizerLast, "Organizer");
+
+                                    List<com.google.android.gms.tasks.Task<?>> tasks = new ArrayList<>();
+
+                                    for (DocumentSnapshot doc : winners) {
+                                        Map<String, Object> data = new HashMap<>();
+                                        data.put("status", DatabaseHandler.STATUS_SELECTED);
+                                        tasks.add(dbHandler.updateEntrantStatus(
+                                                String.valueOf(event.getEventId()), doc.getId(), data));
+
+                                        tasks.add(dbHandler.getUser(doc.getId())
+                                                .continueWithTask(userTask -> {
+                                                    if (!userTask.isSuccessful()) {
+                                                        throw userTask.getException();
+                                                    }
+                                                    DocumentSnapshot winnerDoc = userTask.getResult();
+                                                    String receiverName = buildFullName(
+                                                            winnerDoc.getString("firstName"),
+                                                            winnerDoc.getString("lastName"),
+                                                            "Entrant");
+
+                                                    Notification win = Notification.createLotteryWin(
+                                                            organizerId, organizerName,
+                                                            doc.getId(), receiverName,
+                                                            String.valueOf(event.getEventId()), event.getName());
+                                                    return win.send();
+                                                }));
+                                    }
+
+                                    for (DocumentSnapshot doc : losers) {
+                                        tasks.add(dbHandler.getUser(doc.getId())
+                                                .continueWithTask(userTask -> {
+                                                    if (!userTask.isSuccessful()) {
+                                                        throw userTask.getException();
+                                                    }
+                                                    DocumentSnapshot loserDoc = userTask.getResult();
+                                                    String receiverName = buildFullName(
+                                                            loserDoc.getString("firstName"),
+                                                            loserDoc.getString("lastName"),
+                                                            "Entrant");
+
+                                                    Notification loss = Notification.createLotteryLoss(
+                                                            organizerId, organizerName,
+                                                            doc.getId(), receiverName,
+                                                            String.valueOf(event.getEventId()), event.getName());
+                                                    loss.setType(Notification.TYPE_GENERAL);
+                                                    return loss.send();
+                                                }));
+                                    }
+
+                                    com.google.android.gms.tasks.Tasks.whenAll(tasks)
+                                            .addOnSuccessListener(unused -> {
+                                                Toast.makeText(itemView.getContext(),
+                                                        "Selected " + winnersToSelect + " entrant(s)!",
+                                                        Toast.LENGTH_SHORT).show();
+                                                bind(event, dateFormat, null, null);
+                                            })
+                                            .addOnFailureListener(e ->
+                                                    Toast.makeText(itemView.getContext(),
+                                                            "Failed to select winners. Try again.",
+                                                            Toast.LENGTH_SHORT).show());
                                 })
                                 .addOnFailureListener(e ->
-                                        Toast.makeText(itemView.getContext(), "Failed to select winners. Try again.", Toast.LENGTH_SHORT).show());
+                                        Toast.makeText(itemView.getContext(),
+                                                "Unable to fetch organizer profile", Toast.LENGTH_SHORT).show());
                     });
         }
 
@@ -317,21 +394,14 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
                 Button positive = dialog.getButton(AlertDialog.BUTTON_POSITIVE);
                 positive.setOnClickListener(v -> {
                     String raw = input.getText() != null ? input.getText().toString().trim() : "";
-                    if (raw.isEmpty()) {
-                        input.setError("Required");
-                        return;
-                    }
+                    if (raw.isEmpty()) { input.setError("Required"); return; }
                     int requested;
                     try {
                         requested = Integer.parseInt(raw);
                     } catch (NumberFormatException ex) {
-                        input.setError("Enter a whole number");
-                        return;
+                        input.setError("Enter a whole number"); return;
                     }
-                    if (requested <= 0) {
-                        input.setError("Must be greater than 0");
-                        return;
-                    }
+                    if (requested <= 0) { input.setError("Must be greater than 0"); return; }
                     dialog.dismiss();
                     runLottery(event, requested);
                 });
@@ -348,10 +418,10 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
          * @param updatePosterListener The listener for poster update.
          */
         public void bind(Event event, SimpleDateFormat dateFormat, OnEventCancelListener cancelListener, OnEventUpdatePosterListener updatePosterListener) {
-            String eventId = String.valueOf(event.getEventId());
-            itemView.setTag(eventId);
-
+            currentEventId   = String.valueOf(event.getEventId());
             currentEventName = event.getName() != null ? event.getName() : "Event";
+            itemView.setTag(currentEventId);
+
             mapVisible = false;
             mapContainer.setVisibility(View.GONE);
 
@@ -362,9 +432,10 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
                     "Organizer");
             String resolvedOrganizerId = organizer != null ? organizer.getDeviceId() : null;
             if (resolvedOrganizerId == null) {
-                resolvedOrganizerId = Settings.Secure.getString(itemView.getContext().getContentResolver(), Settings.Secure.ANDROID_ID);
+                resolvedOrganizerId = Settings.Secure.getString(
+                        itemView.getContext().getContentResolver(), Settings.Secure.ANDROID_ID);
             }
-            attendeeAdapter.setEventContext(eventId, currentEventName, resolvedOrganizerId, organizerDisplayName);
+            attendeeAdapter.setEventContext(currentEventId, currentEventName, resolvedOrganizerId, organizerDisplayName);
 
             nameText.setText(event.getName());
             descriptionText.setText(event.getDescription());
@@ -390,10 +461,10 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
             });
 
             lotteryBtn.setOnClickListener(v -> showWinnerSelectionDialog(event));
+
             replacementBtn.setOnClickListener(v -> showReplacementDialog(event));
             mapText.setOnClickListener(v -> {
                 mapVisible = !mapVisible;
-
                 if (mapVisible) {
                     if (!mapInitialized) {
                         mapView = new InterceptableMapView(itemView.getContext());
@@ -414,23 +485,20 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
                         googleMap.getUiSettings().setTiltGesturesEnabled(true);
                         googleMap.getUiSettings().setCompassEnabled(true);
                         googleMap.clear();
-                        dbHandler.getEntrantsWithLocations(eventId)
+                        dbHandler.getEntrantsWithLocations(currentEventId)
                                 .addOnSuccessListener(querySnapshot -> {
                                     List<com.google.android.gms.maps.model.LatLng> entrantPositions = new ArrayList<>();
                                     com.google.android.gms.maps.model.LatLngBounds.Builder boundsBuilder =
                                             new com.google.android.gms.maps.model.LatLngBounds.Builder();
                                     int count = 0;
-                                    com.google.android.gms.maps.model.LatLng eventPos = null;
                                     if (event.getGeoLocation() != null) {
-                                        eventPos = new com.google.android.gms.maps.model.LatLng(
-                                                event.getGeoLocation().getLatitude(),
-                                                event.getGeoLocation().getLongitude()
-                                        );
+                                        com.google.android.gms.maps.model.LatLng eventPos =
+                                                new com.google.android.gms.maps.model.LatLng(
+                                                        event.getGeoLocation().getLatitude(),
+                                                        event.getGeoLocation().getLongitude());
                                         googleMap.addMarker(
                                                 new com.google.android.gms.maps.model.MarkerOptions()
-                                                        .position(eventPos)
-                                                        .title(event.getName())
-                                        );
+                                                        .position(eventPos).title(event.getName()));
                                         boundsBuilder.include(eventPos);
                                         count++;
                                     }
@@ -446,25 +514,20 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
                                     }
 
                                     renderMapMarkers(googleMap, event, entrantPositions);
-                                    List<com.google.android.gms.maps.model.LatLng> finalEntrantPositions = new ArrayList<>(entrantPositions);
+                                    List<com.google.android.gms.maps.model.LatLng> finalPositions = new ArrayList<>(entrantPositions);
                                     googleMap.setOnCameraIdleListener(() ->
-                                            renderMapMarkers(googleMap, event, finalEntrantPositions));
-
+                                            renderMapMarkers(googleMap, event, finalPositions));
                                     if (count > 0) {
-                                        int pad = (int) (40 * itemView.getContext()
-                                                .getResources().getDisplayMetrics().density);
+                                        int pad = (int) (40 * itemView.getContext().getResources().getDisplayMetrics().density);
                                         mapContainer.post(() ->
                                                 googleMap.animateCamera(
                                                         com.google.android.gms.maps.CameraUpdateFactory
-                                                                .newLatLngBounds(boundsBuilder.build(), pad))
-                                        );
+                                                                .newLatLngBounds(boundsBuilder.build(), pad)));
                                     }
                                 });
                     });
                 } else {
-                    if (mapView != null) {
-                        mapView.onPause();
-                    }
+                    if (mapView != null) mapView.onPause();
                     mapContainer.setVisibility(View.GONE);
                 }
             });
@@ -476,13 +539,12 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
             inviteBtn.setVisibility(event.isPrivate() ? View.VISIBLE : View.GONE);
             inviteBtn.setOnClickListener(v -> showInviteDialog(event));
 
-            postCommentBtn.setOnClickListener(v -> postOrganizerComment(eventId));
+            postCommentBtn.setOnClickListener(v -> postOrganizerComment(currentEventId));
 
-            // Reset spinner to "Waiting" each time a card is bound
             statusSpinner.setSelection(0);
 
             // Step 1: fetch all entrant docs from events/{eventId}/entrants/
-            dbHandler.getEntrantsForEvent(eventId).addOnSuccessListener(queryDocumentSnapshots -> {
+            dbHandler.getEntrantsForEvent(currentEventId).addOnSuccessListener(queryDocumentSnapshots -> {
 
                 int waitingCount = 0;
                 // Map entrantId → status (scoped to this event)
@@ -507,7 +569,6 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
                 waitlistText.setText(label);
 
                 if (!profileTasks.isEmpty()) {
-                    // Step 2: fetch user profiles in parallel
                     com.google.android.gms.tasks.Tasks.whenAllSuccess(profileTasks)
                             .addOnSuccessListener(profiles -> {
                                 List<AttendeeItem> attendeeItems = new ArrayList<>();
@@ -529,21 +590,167 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
                 }
             });
 
-            setupComments(eventId);
+            setupComments(currentEventId);
         }
 
-        @VisibleForTesting
-        public static int determineWinnerCount(int requested, int waitingCount, Integer maxAttendees, int currentSelected) {
-            if (requested <= 0 || waitingCount <= 0) {
-                return 0;
+        private void showNotificationDialog() {
+            List<AttendeeItem> recipients = attendeeAdapter.getFilteredAttendees();
+
+            if (recipients.isEmpty()) {
+                Toast.makeText(itemView.getContext(),
+                        "No entrants in the current list to notify",
+                        Toast.LENGTH_SHORT).show();
+                return;
             }
 
+            View dialogView = LayoutInflater.from(itemView.getContext())
+                    .inflate(R.layout.dialog_send_notification, null);
+
+            Spinner typeSpinner    = dialogView.findViewById(R.id.spinner_notification_type);
+            EditText messageEdit   = dialogView.findViewById(R.id.et_notification_message);
+            TextView recipientText = dialogView.findViewById(R.id.tv_recipient_count);
+
+            recipientText.setText("Will be sent to " + recipients.size() + " entrant(s)");
+
+            ArrayAdapter<String> typeAdapter = new ArrayAdapter<>(
+                    itemView.getContext(),
+                    android.R.layout.simple_spinner_item,
+                    NOTIFICATION_TYPE_LABELS
+            );
+            typeAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+            typeSpinner.setAdapter(typeAdapter);
+
+            // Pre-fill message when type changes
+            typeSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+                @Override
+                public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                    messageEdit.setText(getDefaultMessage(position));
+                }
+                @Override public void onNothingSelected(AdapterView<?> parent) {}
+            });
+
+            messageEdit.setText(getDefaultMessage(0));
+
+            new AlertDialog.Builder(itemView.getContext())
+                    .setTitle("Send Notification")
+                    .setView(dialogView)
+                    .setPositiveButton("Send", (dialog, which) -> {
+                        String message = messageEdit.getText().toString().trim();
+                        if (message.isEmpty()) {
+                            Toast.makeText(itemView.getContext(),
+                                    "Message cannot be empty", Toast.LENGTH_SHORT).show();
+                            return;
+                        }
+                        // Pass the selected type index so title and type are set correctly
+                        int selectedTypeIndex = typeSpinner.getSelectedItemPosition();
+                        sendNotificationsToFilteredList(recipients, message, selectedTypeIndex);
+                    })
+                    .setNegativeButton("Cancel", null)
+                    .show();
+        }
+
+        /**
+         * Returns a default message based on the selected notification type index.
+         */
+        private String getDefaultMessage(int typeIndex) {
+            switch (typeIndex) {
+                case 1: // Lottery Win
+                    return "Congratulations! You have been selected to participate in "
+                            + currentEventName
+                            + ". Please accept or decline this invitation.";
+                case 2: // Lottery Loss
+                    return "We regret to inform you that you were not selected for "
+                            + currentEventName
+                            + " this time. Better luck next time!";
+                case 3: // Waiting List Invite
+                    return "You have been invited to join the waiting list for: "
+                            + currentEventName + ".";
+                default: // General
+                    return "You have a new update regarding " + currentEventName + ".";
+            }
+        }
+        /**
+         * Maps the dropdown index to a Firestore notification type string.
+         * Lottery Win and Waiting List Invite are TYPE_INVITE since they require a user action.
+         */
+
+        private void sendNotificationsToFilteredList(
+                List<AttendeeItem> recipients, String message, int typeIndex) {
+
+            String organizerId = Settings.Secure.getString(
+                    itemView.getContext().getContentResolver(), Settings.Secure.ANDROID_ID);
+
+            List<com.google.android.gms.tasks.Task<Void>> sendTasks = new ArrayList<>();
+
+            for (AttendeeItem item : recipients) {
+                String receiverId   = item.getEntrant().getDeviceId();
+                String receiverName = buildFullName(
+                        item.getEntrant().getFirstName(),
+                        item.getEntrant().getLastName(),
+                        "Entrant");
+
+                Notification notification;
+                switch (typeIndex) {
+                    case 1: // Lottery Win
+                        notification = Notification.createLotteryWin(
+                                organizerId, currentEventName,
+                                receiverId, receiverName,
+                                currentEventId, currentEventName);
+                        break;
+                    case 2: // Lottery Loss
+                        notification = Notification.createLotteryLoss(
+                                organizerId, currentEventName,
+                                receiverId, receiverName,
+                                currentEventId, currentEventName);
+                        notification.setType(Notification.TYPE_GENERAL);
+                        break;
+                    case 3: // Waiting List Invite
+                        notification = Notification.createWaitingListInvite(
+                                organizerId, currentEventName,
+                                receiverId, receiverName,
+                                currentEventId, currentEventName);
+                        break;
+                    default: // General — no factory method, use constructor directly
+                        notification = new Notification(
+                                null,
+                                currentEventName,
+                                organizerId,
+                                currentEventName,
+                                com.example.thevms.model.UserRole.ORGANIZER,
+                                receiverId,
+                                receiverName,
+                                new java.util.Date(),
+                                message,
+                                Notification.TYPE_GENERAL,
+                                currentEventId);
+                        break;
+                }
+
+                // Override the description with the organizer's (possibly edited) message
+                notification.setDescription(message);
+
+                sendTasks.add(notification.send());
+            }
+
+            Tasks.whenAll(sendTasks)
+                    .addOnSuccessListener(unused ->
+                            Toast.makeText(itemView.getContext(),
+                                    "Notification sent to " + recipients.size() + " entrant(s)",
+                                    Toast.LENGTH_SHORT).show()
+                    )
+                    .addOnFailureListener(e ->
+                            Toast.makeText(itemView.getContext(),
+                                    "Failed to send some notifications: " + e.getMessage(),
+                                    Toast.LENGTH_LONG).show()
+                    );
+        }
+        @VisibleForTesting
+        public static int determineWinnerCount(int requested, int waitingCount, Integer maxAttendees, int currentSelected) {
+            if (requested <= 0 || waitingCount <= 0) return 0;
             int capped = Math.min(requested, waitingCount);
             if (maxAttendees != null && maxAttendees > 0) {
                 int spotsLeft = maxAttendees - currentSelected;
-                if (spotsLeft <= 0) {
-                    return 0;
-                }
+                if (spotsLeft <= 0) return 0;
                 capped = Math.min(capped, spotsLeft);
             }
             return capped;
@@ -573,10 +780,7 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
             });
 
             searchEt.addTextChangedListener(new TextWatcher() {
-                @Override
-                public void beforeTextChanged(CharSequence s, int start, int count, int after) {
-                }
-
+                @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
                 @Override
                 public void onTextChanged(CharSequence s, int start, int before, int count) {
                     String query = s.toString().toLowerCase();
@@ -624,16 +828,10 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
         }
 
         private void setupComments(String eventId) {
-            if (commentsListener != null) {
-                commentsListener.remove();
-            }
+            if (commentsListener != null) commentsListener.remove();
 
             commentsListener = dbHandler.listenToComments(eventId, (value, error) -> {
-                if (error != null) {
-                    Log.w("OrganizerEventAdapter", "Listen failed.");
-                    return;
-                }
-
+                if (error != null) { Log.w("OrganizerEventAdapter", "Listen failed."); return; }
                 if (value == null) return;
 
                 List<Comment> comments = new ArrayList<>();
@@ -654,7 +852,8 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
             String text = commentEditText.getText().toString().trim();
             if (text.isEmpty()) return;
 
-            String deviceId = Settings.Secure.getString(itemView.getContext().getContentResolver(), Settings.Secure.ANDROID_ID);
+            String deviceId = Settings.Secure.getString(
+                    itemView.getContext().getContentResolver(), Settings.Secure.ANDROID_ID);
             dbHandler.getUser(deviceId).addOnSuccessListener(userDoc -> {
                 String firstName = userDoc.getString("firstName");
                 String lastName = userDoc.getString("lastName");
@@ -760,20 +959,13 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
         }
 
         private String buildFullName(String first, String last, String fallback) {
-            StringBuilder builder = new StringBuilder();
-            if (first != null && !first.isEmpty()) {
-                builder.append(first);
+            StringBuilder sb = new StringBuilder();
+            if (first != null && !first.isEmpty()) sb.append(first);
+            if (last  != null && !last.isEmpty()) {
+                if (sb.length() > 0) sb.append(" ");
+                sb.append(last);
             }
-            if (last != null && !last.isEmpty()) {
-                if (builder.length() > 0) {
-                    builder.append(" ");
-                }
-                builder.append(last);
-            }
-            if (builder.length() == 0) {
-                return fallback;
-            }
-            return builder.toString();
+            return sb.length() == 0 ? fallback : sb.toString();
         }
 
         /**
@@ -787,7 +979,44 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
             cancelData.put("status", DatabaseHandler.STATUS_CANCELLED);
             dbHandler.updateEntrantStatus(eventId, cancelledEntrantId, cancelData)
                     .addOnSuccessListener(unused -> {
-                        dbHandler.selectAndInviteNextEntrant(eventId);
+                        dbHandler.selectAndInviteNextEntrant(eventId)
+                                .addOnSuccessListener(v -> {
+                                    // Refresh the attendee list so the UI reflects the new statuses
+                                    dbHandler.getEntrantsForEvent(eventId).addOnSuccessListener(queryDocumentSnapshots -> {
+                                        Map<String, String> statusMap = new HashMap<>();
+                                        List<com.google.android.gms.tasks.Task<DocumentSnapshot>> profileTasks = new ArrayList<>();
+
+                                        for (QueryDocumentSnapshot doc : queryDocumentSnapshots) {
+                                            String entrantId = doc.getString("entrantId");
+                                            String status    = doc.getString("status");
+                                            if (entrantId != null) {
+                                                statusMap.put(entrantId, status);
+                                                profileTasks.add(dbHandler.getUser(entrantId));
+                                            }
+                                        }
+
+                                        if (!profileTasks.isEmpty()) {
+                                            Tasks.whenAllSuccess(profileTasks).addOnSuccessListener(profiles -> {
+                                                List<AttendeeItem> attendeeItems = new ArrayList<>();
+                                                for (Object obj : profiles) {
+                                                    DocumentSnapshot profileDoc = (DocumentSnapshot) obj;
+                                                    if (profileDoc.exists()) {
+                                                        Map<String, Object> data = profileDoc.getData();
+                                                        if (data != null) {
+                                                            Entrant entrant = Entrant.fromMap(profileDoc.getId(), data);
+                                                            String status = statusMap.get(profileDoc.getId());
+                                                            attendeeItems.add(new AttendeeItem(entrant, status));
+                                                        }
+                                                    }
+                                                }
+                                                // Push fresh list to adapter — UI updates instantly
+                                                attendeeAdapter.setAttendees(attendeeItems);
+                                            });
+                                        } else {
+                                            attendeeAdapter.setAttendees(new ArrayList<>());
+                                        }
+                                    });
+                                });
                     });
         }
 
@@ -879,10 +1108,7 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
     }
 
     static class InterceptableMapView extends com.google.android.gms.maps.MapView {
-
-        public InterceptableMapView(android.content.Context context) {
-            super(context);
-        }
+        public InterceptableMapView(android.content.Context context) { super(context); }
 
         @Override
         public boolean dispatchTouchEvent(android.view.MotionEvent event) {
