@@ -788,7 +788,7 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
             View dialogView = LayoutInflater.from(itemView.getContext()).inflate(R.layout.dialog_replacement_selection, null);
             builder.setView(dialogView);
 
-            TextView emptyText = dialogView.findViewById(R.id.tv_declined_empty);
+            TextView emptyText = dialogView.findViewById(R.id.tv_replacement_empty);
             RecyclerView declinedRv = dialogView.findViewById(R.id.rv_declined_users);
             Button notifyBtn = dialogView.findViewById(R.id.btn_notify_declined);
 
@@ -798,36 +798,54 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
 
             String eventId = String.valueOf(event.getEventId());
 
+            notifyBtn.setEnabled(false);
             dbHandler.getEntrantsForEvent(eventId).addOnSuccessListener(queryDocumentSnapshots -> {
-                List<com.google.android.gms.tasks.Task<DocumentSnapshot>> profileTasks = new ArrayList<>();
+                List<com.google.android.gms.tasks.Task<DocumentSnapshot>> waitingProfileTasks = new ArrayList<>();
+                final int[] declinedOrCancelled = {0};
 
                 for (QueryDocumentSnapshot doc : queryDocumentSnapshots) {
-                    if ("declined".equals(doc.getString("status"))) {
-                        String entrantId = doc.getString("entrantId");
-                        profileTasks.add(dbHandler.getUser(entrantId));
+                    String status = doc.getString("status");
+                    String entrantId = doc.getString("entrantId");
+                    if (DatabaseHandler.STATUS_WAITING.equals(status) && entrantId != null) {
+                        waitingProfileTasks.add(dbHandler.getUser(entrantId));
+                    }
+                    if (DatabaseHandler.STATUS_DECLINED.equals(status) ||
+                            DatabaseHandler.STATUS_CANCELLED.equals(status)) {
+                        declinedOrCancelled[0]++;
                     }
                 }
 
-                if (profileTasks.isEmpty()) {
+                if (waitingProfileTasks.isEmpty()) {
+                    emptyText.setText(R.string.replacement_empty_waiting);
                     emptyText.setVisibility(View.VISIBLE);
                     declinedRv.setVisibility(View.GONE);
                     notifyBtn.setEnabled(false);
-                } else {
-                    com.google.android.gms.tasks.Tasks.whenAllSuccess(profileTasks).addOnSuccessListener(profiles -> {
-                        List<ReplacementAdapter.ReplacementItem> items = new ArrayList<>();
-                        for (Object obj : profiles) {
-                            DocumentSnapshot profileDoc = (DocumentSnapshot) obj;
-                            Entrant entrant = Entrant.fromMap(profileDoc.getId(), profileDoc.getData());
-                            if (entrant != null) {
-                                items.add(new ReplacementAdapter.ReplacementItem(entrant));
-                            }
-                        }
-                        replacementAdapter.setItems(items, items.size());
-                        emptyText.setVisibility(View.GONE);
-                        declinedRv.setVisibility(View.VISIBLE);
-                        notifyBtn.setEnabled(true);
-                    });
+                    return;
                 }
+
+                com.google.android.gms.tasks.Tasks.whenAllSuccess(waitingProfileTasks).addOnSuccessListener(profiles -> {
+                    List<ReplacementAdapter.ReplacementItem> items = new ArrayList<>();
+                    for (Object obj : profiles) {
+                        DocumentSnapshot profileDoc = (DocumentSnapshot) obj;
+                        Entrant entrant = Entrant.fromMap(profileDoc.getId(), profileDoc.getData());
+                        if (entrant != null) {
+                            items.add(new ReplacementAdapter.ReplacementItem(entrant));
+                        }
+                    }
+
+                    int allowedSelections = Math.min(items.size(), declinedOrCancelled[0]);
+                    replacementAdapter.setItems(items, allowedSelections);
+                    declinedRv.setVisibility(View.VISIBLE);
+
+                    if (allowedSelections <= 0) {
+                        emptyText.setText(R.string.replacement_empty_no_declines);
+                        emptyText.setVisibility(View.VISIBLE);
+                        notifyBtn.setEnabled(false);
+                    } else {
+                        emptyText.setVisibility(View.GONE);
+                        notifyBtn.setEnabled(true);
+                    }
+                });
             });
 
             AlertDialog dialog = builder.create();
