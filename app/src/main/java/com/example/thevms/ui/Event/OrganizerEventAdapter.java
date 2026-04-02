@@ -305,62 +305,83 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
                         }
 
                         Collections.shuffle(waitingList);
+                        winnersCount = Math.min(winnersCount, waitingList.size());
+                        final int winnersToSelect = winnersCount;
 
-                        // Split into winners and losers
-                        List<DocumentSnapshot> winners = waitingList.subList(0, winnersCount);
-                        List<DocumentSnapshot> losers = waitingList.subList(winnersCount, waitingList.size());
+                        List<DocumentSnapshot> winners = new ArrayList<>(waitingList.subList(0, winnersToSelect));
+                        List<DocumentSnapshot> losers = winnersToSelect < waitingList.size()
+                                ? new ArrayList<>(waitingList.subList(winnersToSelect, waitingList.size()))
+                                : Collections.emptyList();
 
-                        // Fetch organizer name once, then send all notifications
-                        dbHandler.getUser(organizerId).addOnSuccessListener(organizerDoc -> {
-                            String organizerFirst = organizerDoc.getString("firstName");
-                            String organizerLast = organizerDoc.getString("lastName");
-                            String organizerName = buildFullName(organizerFirst, organizerLast, "Organizer");
+                        dbHandler.getUser(organizerId)
+                                .addOnSuccessListener(organizerDoc -> {
+                                    String organizerFirst = organizerDoc.getString("firstName");
+                                    String organizerLast = organizerDoc.getString("lastName");
+                                    String organizerName = buildFullName(organizerFirst, organizerLast, "Organizer");
 
-                            List<com.google.android.gms.tasks.Task<Void>> allTasks = new ArrayList<>();
+                                    List<com.google.android.gms.tasks.Task<?>> tasks = new ArrayList<>();
 
-                            for (DocumentSnapshot doc : winners) {
-                                // Update status
-                                Map<String, Object> data = new HashMap<>();
-                                data.put("status", DatabaseHandler.STATUS_SELECTED);
-                                allTasks.add(dbHandler.updateEntrantStatus(
-                                        String.valueOf(event.getEventId()), doc.getId(), data));
+                                    for (DocumentSnapshot doc : winners) {
+                                        Map<String, Object> data = new HashMap<>();
+                                        data.put("status", DatabaseHandler.STATUS_SELECTED);
+                                        tasks.add(dbHandler.updateEntrantStatus(
+                                                String.valueOf(event.getEventId()), doc.getId(), data));
 
-                                // Fetch winner's profile to get their name for the notification
-                                dbHandler.getUser(doc.getId()).addOnSuccessListener(winnerDoc -> {
-                                    String receiverName = buildFullName(
-                                            winnerDoc.getString("firstName"),
-                                            winnerDoc.getString("lastName"),
-                                            "Entrant");
+                                        tasks.add(dbHandler.getUser(doc.getId())
+                                                .continueWithTask(userTask -> {
+                                                    if (!userTask.isSuccessful()) {
+                                                        throw userTask.getException();
+                                                    }
+                                                    DocumentSnapshot winnerDoc = userTask.getResult();
+                                                    String receiverName = buildFullName(
+                                                            winnerDoc.getString("firstName"),
+                                                            winnerDoc.getString("lastName"),
+                                                            "Entrant");
 
-                                    Notification win = Notification.createLotteryWin(
-                                            organizerId, organizerName,
-                                            doc.getId(), receiverName,
-                                            String.valueOf(event.getEventId()), event.getName());
-                                    allTasks.add(win.send());
-                                });
-                            }
+                                                    Notification win = Notification.createLotteryWin(
+                                                            organizerId, organizerName,
+                                                            doc.getId(), receiverName,
+                                                            String.valueOf(event.getEventId()), event.getName());
+                                                    return win.send();
+                                                }));
+                                    }
 
-                            for (DocumentSnapshot doc : losers) {
-                                // Losers stay on waiting list — just notify them
-                                dbHandler.getUser(doc.getId()).addOnSuccessListener(loserDoc -> {
-                                    String receiverName = buildFullName(
-                                            loserDoc.getString("firstName"),
-                                            loserDoc.getString("lastName"),
-                                            "Entrant");
+                                    for (DocumentSnapshot doc : losers) {
+                                        tasks.add(dbHandler.getUser(doc.getId())
+                                                .continueWithTask(userTask -> {
+                                                    if (!userTask.isSuccessful()) {
+                                                        throw userTask.getException();
+                                                    }
+                                                    DocumentSnapshot loserDoc = userTask.getResult();
+                                                    String receiverName = buildFullName(
+                                                            loserDoc.getString("firstName"),
+                                                            loserDoc.getString("lastName"),
+                                                            "Entrant");
 
-                                    Notification loss = Notification.createLotteryLoss(
-                                            organizerId, organizerName,
-                                            doc.getId(), receiverName,
-                                            String.valueOf(event.getEventId()), event.getName());
-                                    allTasks.add(loss.send());
-                                });
-                            }
+                                                    Notification loss = Notification.createLotteryLoss(
+                                                            organizerId, organizerName,
+                                                            doc.getId(), receiverName,
+                                                            String.valueOf(event.getEventId()), event.getName());
+                                                    loss.setType(Notification.TYPE_GENERAL);
+                                                    return loss.send();
+                                                }));
+                                    }
 
-                            Toast.makeText(itemView.getContext(),
-                                    "Selected " + winnersCount + " entrant(s)!",
-                                    Toast.LENGTH_SHORT).show();
-                            bind(event, dateFormat, null, null); // Refresh list
-                        });
+                                    com.google.android.gms.tasks.Tasks.whenAll(tasks)
+                                            .addOnSuccessListener(unused -> {
+                                                Toast.makeText(itemView.getContext(),
+                                                        "Selected " + winnersToSelect + " entrant(s)!",
+                                                        Toast.LENGTH_SHORT).show();
+                                                bind(event, dateFormat, null, null);
+                                            })
+                                            .addOnFailureListener(e ->
+                                                    Toast.makeText(itemView.getContext(),
+                                                            "Failed to select winners. Try again.",
+                                                            Toast.LENGTH_SHORT).show());
+                                })
+                                .addOnFailureListener(e ->
+                                        Toast.makeText(itemView.getContext(),
+                                                "Unable to fetch organizer profile", Toast.LENGTH_SHORT).show());
                     });
         }
 
@@ -447,10 +468,6 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
                 posterImage.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
                 posterImage.setAlpha(0.3f);
             }
-
-            event.fetchEntrantCount().addOnSuccessListener(count ->
-                    waitlistText.setText(count + " people in waitlist")
-            );
 
             cancelBtn.setOnClickListener(v -> {
                 if (cancelListener != null) cancelListener.onCancel(event);
@@ -544,7 +561,11 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
 
             statusSpinner.setSelection(0);
 
+            // Step 1: fetch all entrant docs from events/{eventId}/entrants/
             dbHandler.getEntrantsForEvent(currentEventId).addOnSuccessListener(queryDocumentSnapshots -> {
+
+                int waitingCount = 0;
+                // Map entrantId → status (scoped to this event)
                 Map<String, String> statusMap = new HashMap<>();
                 List<com.google.android.gms.tasks.Task<DocumentSnapshot>> profileTasks = new ArrayList<>();
 
@@ -555,7 +576,15 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
                         statusMap.put(entrantId, status);
                         profileTasks.add(dbHandler.getUser(entrantId));
                     }
+                    if (DatabaseHandler.STATUS_WAITING.equals(status)) {
+                        waitingCount++;
+                    }
                 }
+
+                String label = waitingCount == 1
+                        ? "1 person in waitlist"
+                        : waitingCount + " people in waitlist";
+                waitlistText.setText(label);
 
                 if (!profileTasks.isEmpty()) {
                     com.google.android.gms.tasks.Tasks.whenAllSuccess(profileTasks)
@@ -725,6 +754,7 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
                                 organizerId, currentEventName,
                                 receiverId, receiverName,
                                 currentEventId, currentEventName);
+                        notification.setType(Notification.TYPE_GENERAL);
                         break;
                     case 3: // Waiting List Invite
                         notification = Notification.createWaitingListInvite(
@@ -843,11 +873,9 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
                 dbHandler.updateEntrantStatus(String.valueOf(event.getEventId()), entrant.getDeviceId(), registrationData)
                         .addOnSuccessListener(aVoid -> {
                             Toast.makeText(itemView.getContext(), "Invited " + entrant.getFirstName(), Toast.LENGTH_SHORT).show();
-                            String organizerId = Settings.Secure.getString(
-                                    itemView.getContext().getContentResolver(), Settings.Secure.ANDROID_ID);
-                            Notification.createWaitingListInvite(organizerId, "Organizer",
-                                    entrant.getDeviceId(), String.valueOf(event.getEventId()),
-                                    String.valueOf(event.getEventId()), event.getName()).send();
+                            // Trigger notification
+                            String organizerId = Settings.Secure.getString(itemView.getContext().getContentResolver(), Settings.Secure.ANDROID_ID);
+                            Notification.createWaitingListInvite(organizerId, "Organizer", entrant.getDeviceId(), String.valueOf(event.getEventId()), String.valueOf(event.getEventId()), event.getName()).send();
                         });
             });
 
@@ -1056,7 +1084,7 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
             View dialogView = LayoutInflater.from(itemView.getContext()).inflate(R.layout.dialog_replacement_selection, null);
             builder.setView(dialogView);
 
-            TextView emptyText = dialogView.findViewById(R.id.tv_declined_empty);
+            TextView emptyText = dialogView.findViewById(R.id.tv_replacement_empty);
             RecyclerView declinedRv = dialogView.findViewById(R.id.rv_declined_users);
             Button notifyBtn = dialogView.findViewById(R.id.btn_notify_declined);
 
@@ -1066,36 +1094,54 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
 
             String eventId = String.valueOf(event.getEventId());
 
+            notifyBtn.setEnabled(false);
             dbHandler.getEntrantsForEvent(eventId).addOnSuccessListener(queryDocumentSnapshots -> {
-                List<com.google.android.gms.tasks.Task<DocumentSnapshot>> profileTasks = new ArrayList<>();
+                List<com.google.android.gms.tasks.Task<DocumentSnapshot>> waitingProfileTasks = new ArrayList<>();
+                final int[] declinedOrCancelled = {0};
 
                 for (QueryDocumentSnapshot doc : queryDocumentSnapshots) {
-                    if ("declined".equals(doc.getString("status"))) {
-                        String entrantId = doc.getString("entrantId");
-                        profileTasks.add(dbHandler.getUser(entrantId));
+                    String status = doc.getString("status");
+                    String entrantId = doc.getString("entrantId");
+                    if (DatabaseHandler.STATUS_WAITING.equals(status) && entrantId != null) {
+                        waitingProfileTasks.add(dbHandler.getUser(entrantId));
+                    }
+                    if (DatabaseHandler.STATUS_DECLINED.equals(status) ||
+                            DatabaseHandler.STATUS_CANCELLED.equals(status)) {
+                        declinedOrCancelled[0]++;
                     }
                 }
 
-                if (profileTasks.isEmpty()) {
+                if (waitingProfileTasks.isEmpty()) {
+                    emptyText.setText(R.string.replacement_empty_waiting);
                     emptyText.setVisibility(View.VISIBLE);
                     declinedRv.setVisibility(View.GONE);
                     notifyBtn.setEnabled(false);
-                } else {
-                    com.google.android.gms.tasks.Tasks.whenAllSuccess(profileTasks).addOnSuccessListener(profiles -> {
-                        List<ReplacementAdapter.ReplacementItem> items = new ArrayList<>();
-                        for (Object obj : profiles) {
-                            DocumentSnapshot profileDoc = (DocumentSnapshot) obj;
-                            Entrant entrant = Entrant.fromMap(profileDoc.getId(), profileDoc.getData());
-                            if (entrant != null) {
-                                items.add(new ReplacementAdapter.ReplacementItem(entrant));
-                            }
-                        }
-                        replacementAdapter.setItems(items, items.size());
-                        emptyText.setVisibility(View.GONE);
-                        declinedRv.setVisibility(View.VISIBLE);
-                        notifyBtn.setEnabled(true);
-                    });
+                    return;
                 }
+
+                com.google.android.gms.tasks.Tasks.whenAllSuccess(waitingProfileTasks).addOnSuccessListener(profiles -> {
+                    List<ReplacementAdapter.ReplacementItem> items = new ArrayList<>();
+                    for (Object obj : profiles) {
+                        DocumentSnapshot profileDoc = (DocumentSnapshot) obj;
+                        Entrant entrant = Entrant.fromMap(profileDoc.getId(), profileDoc.getData());
+                        if (entrant != null) {
+                            items.add(new ReplacementAdapter.ReplacementItem(entrant));
+                        }
+                    }
+
+                    int allowedSelections = Math.min(items.size(), declinedOrCancelled[0]);
+                    replacementAdapter.setItems(items, allowedSelections);
+                    declinedRv.setVisibility(View.VISIBLE);
+
+                    if (allowedSelections <= 0) {
+                        emptyText.setText(R.string.replacement_empty_no_declines);
+                        emptyText.setVisibility(View.VISIBLE);
+                        notifyBtn.setEnabled(false);
+                    } else {
+                        emptyText.setVisibility(View.GONE);
+                        notifyBtn.setEnabled(true);
+                    }
+                });
             });
 
             AlertDialog dialog = builder.create();

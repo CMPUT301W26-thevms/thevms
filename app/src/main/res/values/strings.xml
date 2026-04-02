@@ -60,4 +60,8 @@
     <string name="guideline_item_2">2. Random Selection</string>
     <string name="guideline_item_3">3. Notification &amp; Confirmation</string>
     <string name="btn_dismiss">Dismiss</string>
+
+    <!-- Replacement Selection -->
+    <string name="replacement_empty_waiting">No waiting entrants available yet.</string>
+    <string name="replacement_empty_no_declines">No cancellations or declines to replace yet.</string>
 </resources>

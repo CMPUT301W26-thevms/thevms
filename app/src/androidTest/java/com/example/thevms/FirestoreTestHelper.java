@@ -4,6 +4,7 @@ import android.content.Context;
 import android.location.Location;
 import android.location.LocationManager;
 import android.os.SystemClock;
+import android.util.Log;
 
 import androidx.test.platform.app.InstrumentationRegistry;
 
@@ -34,6 +35,7 @@ import java.util.concurrent.TimeoutException;
  * Designed for use in Instrumented (UI) and Unit tests.
  */
 public class FirestoreTestHelper {
+    private static final String TAG = "FirestoreTestHelper";
 
     private final DatabaseHandler dbHandler;
 
@@ -228,8 +230,17 @@ public class FirestoreTestHelper {
         mockLocation.setAccuracy(1.0f);
         mockLocation.setElapsedRealtimeNanos(SystemClock.elapsedRealtimeNanos());
 
-        Tasks.await(fusedClient.setMockMode(true), 5, TimeUnit.SECONDS);
-        Tasks.await(fusedClient.setMockLocation(mockLocation), 5, TimeUnit.SECONDS);
+        try {
+            Tasks.await(fusedClient.setMockMode(true), 5, TimeUnit.SECONDS);
+            Tasks.await(fusedClient.setMockLocation(mockLocation), 5, TimeUnit.SECONDS);
+        } catch (ExecutionException e) {
+            Throwable cause = e.getCause();
+            if (cause instanceof SecurityException) {
+                Log.w(TAG, "Fused mock location not allowed; falling back to LocationManager test providers", cause);
+            } else {
+                throw e;
+            }
+        }
 
         Thread.sleep(2000);
     }
