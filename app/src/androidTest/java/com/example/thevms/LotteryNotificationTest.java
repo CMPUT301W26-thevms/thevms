@@ -102,23 +102,33 @@ public class LotteryNotificationTest {
 
         boolean foundWinnerNotification = false;
         boolean foundLoserNotification = false;
+        int inviteCount = 0;
+        int generalCount = 0;
 
         for (QueryDocumentSnapshot doc : notificationSnapshot) {
             String receiverId = doc.getString("receiverId");
             String type = doc.getString("type");
             String title = doc.getString("title");
 
-            if (WINNER_ID.equals(receiverId)) {
-                foundWinnerNotification = true;
+            if (Notification.TYPE_INVITE.equals(type)) {
+                inviteCount++;
                 assertEquals("Winner notification type should be invite", Notification.TYPE_INVITE, type);
                 assertTrue("Winner notification title should contain Lottery", title.contains("Lottery"));
-            } else if (LOSER_ID.equals(receiverId)) {
-                foundLoserNotification = true;
+                assertTrue("Winner notification should go to one of the seeded entrants",
+                        WINNER_ID.equals(receiverId) || LOSER_ID.equals(receiverId));
+                foundWinnerNotification = true;
+            } else if (Notification.TYPE_GENERAL.equals(type)) {
+                generalCount++;
                 assertEquals("Loser notification type should be general", Notification.TYPE_GENERAL, type);
                 assertTrue("Loser notification title should contain Lottery", title.contains("Lottery"));
+                assertTrue("Loser notification should go to one of the seeded entrants",
+                        WINNER_ID.equals(receiverId) || LOSER_ID.equals(receiverId));
+                foundLoserNotification = true;
             }
         }
 
+        assertEquals("Should have exactly 1 invite notification", 1, inviteCount);
+        assertEquals("Should have exactly 1 general notification", 1, generalCount);
         assertTrue("Should have sent a notification to the winner", foundWinnerNotification);
         assertTrue("Should have sent a notification to the loser", foundLoserNotification);
     }

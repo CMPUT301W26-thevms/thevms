@@ -1,5 +1,7 @@
 package com.example.thevms;
 
+import static android.Manifest.permission.ACCESS_COARSE_LOCATION;
+import static android.Manifest.permission.ACCESS_FINE_LOCATION;
 import static androidx.test.espresso.Espresso.onView;
 import static androidx.test.espresso.action.ViewActions.click;
 import static androidx.test.espresso.assertion.ViewAssertions.doesNotExist;
@@ -22,6 +24,7 @@ import androidx.test.espresso.ViewAction;
 import androidx.test.espresso.ViewAssertion;
 import androidx.test.espresso.contrib.RecyclerViewActions;
 import androidx.test.ext.junit.runners.AndroidJUnit4;
+import androidx.test.rule.GrantPermissionRule;
 
 import com.example.thevms.model.Entrant;
 import com.example.thevms.model.Event;
@@ -32,6 +35,7 @@ import com.google.android.gms.tasks.Tasks;
 
 import org.hamcrest.Matcher;
 import org.junit.Before;
+import org.junit.Rule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
@@ -47,6 +51,10 @@ public class AdminEventTest {
 
     private FirestoreTestHelper testHelper;
     private String adminDeviceId;
+
+    @Rule
+    public GrantPermissionRule locationPermissionRule =
+            GrantPermissionRule.grant(ACCESS_FINE_LOCATION, ACCESS_COARSE_LOCATION);
 
     @Before
     public void setUp() throws Exception {
@@ -73,6 +81,8 @@ public class AdminEventTest {
 
         Event event2 = Tasks.await(Event.create("Event Two", "Description Two", organizer, null, null, pastStart, futureEnd, new Date(), new Date(), false, null, null, false), 5, TimeUnit.SECONDS);
         Tasks.await(event2.save(), 5, TimeUnit.SECONDS);
+
+        testHelper.setMockLocation(53.5461, -113.4938);
     }
 
     /**
