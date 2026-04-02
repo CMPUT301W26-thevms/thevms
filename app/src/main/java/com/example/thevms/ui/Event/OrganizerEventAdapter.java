@@ -280,17 +280,25 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
                             return;
                         }
 
+                        winnersCount = Math.min(winnersCount, waitingList.size());
+                        final int winnersToSelect = winnersCount;
                         Collections.shuffle(waitingList);
 
-                        for (int i = 0; i < winnersCount; i++) {
+                        List<com.google.android.gms.tasks.Task<Void>> updateTasks = new ArrayList<>();
+                        for (int i = 0; i < winnersToSelect; i++) {
                             DocumentSnapshot doc = waitingList.get(i);
                             Map<String, Object> data = new HashMap<>();
                             data.put("status", DatabaseHandler.STATUS_SELECTED);
-                            dbHandler.updateEntrantStatus(String.valueOf(event.getEventId()), doc.getId(), data);
+                            updateTasks.add(dbHandler.updateEntrantStatus(String.valueOf(event.getEventId()), doc.getId(), data));
                         }
 
-                        Toast.makeText(itemView.getContext(), "Selected " + winnersCount + " entrant(s)!", Toast.LENGTH_SHORT).show();
-                        bind(event, dateFormat, null, null); // Refresh list
+                        com.google.android.gms.tasks.Tasks.whenAllSuccess(updateTasks)
+                                .addOnSuccessListener(unused -> {
+                                    Toast.makeText(itemView.getContext(), "Selected " + winnersToSelect + " entrant(s)!", Toast.LENGTH_SHORT).show();
+                                    bind(event, dateFormat, null, null); // Refresh list only after Firestore updates apply
+                                })
+                                .addOnFailureListener(e ->
+                                        Toast.makeText(itemView.getContext(), "Failed to select winners. Try again.", Toast.LENGTH_SHORT).show());
                     });
         }
 
