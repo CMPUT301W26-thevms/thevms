@@ -84,7 +84,7 @@ public class SearchFragment extends Fragment implements OnMapReadyCallback {
     private static final LatLng DEFAULT_MAP_CENTER = new LatLng(53.5461, -113.4938);
     private static final float DEFAULT_MAP_ZOOM = 11.5f;
     private static final float DISTANCE_LABEL_ZOOM_THRESHOLD = 13.5f;
-    private static final float INITIAL_FOCUS_ZOOM = 12.8f;
+    private static final float INITIAL_FOCUS_ZOOM = 11.8f;
     private static final double MAX_AUTO_FIT_LAT_SPAN = 0.30d;
     private static final double MAX_AUTO_FIT_LNG_SPAN = 0.30d;
     private static final int DEFAULT_MAP_TOP_PADDING_DP = 148;
@@ -148,6 +148,7 @@ public class SearchFragment extends Fragment implements OnMapReadyCallback {
     private boolean isAdmin = false;
     private String selectedMarkerKey = null;
     private boolean hasCenteredMapOnce = false;
+    private boolean hasCenteredOnUserLocationOnce = false;
     private int lastRenderedMarkerZoomBucket = Integer.MIN_VALUE;
     private boolean lastRenderedDistanceMode = false;
     private boolean preserveMapViewportOnNextFilterApply = false;
@@ -309,9 +310,13 @@ public class SearchFragment extends Fragment implements OnMapReadyCallback {
     }
 
     private void updateCurrentUserLocation(@NonNull Location location) {
+        if (!isAdded()) {
+            return;
+        }
         currentUserLocation = location;
         updateRecenterButtonState();
-        refreshMap(new ArrayList<>(filteredEvents));
+        boolean shouldCenterOnUser = !hasCenteredOnUserLocationOnce;
+        refreshMap(new ArrayList<>(filteredEvents), shouldCenterOnUser || !hasCenteredMapOnce);
     }
 
     @SuppressLint("MissingPermission")
@@ -409,7 +414,7 @@ public class SearchFragment extends Fragment implements OnMapReadyCallback {
     }
 
     private void drawUserLocation(@NonNull Location location) {
-        if (googleMap == null) {
+        if (googleMap == null || !isAdded()) {
             return;
         }
 
@@ -438,12 +443,18 @@ public class SearchFragment extends Fragment implements OnMapReadyCallback {
     }
 
     private void showLocationButton() {
+        if (!isAdded()) {
+            return;
+        }
         if (retryLocationBtn != null) {
             retryLocationBtn.setVisibility(View.VISIBLE);
         }
     }
 
     private void updateRecenterButtonState() {
+        if (!isAdded()) {
+            return;
+        }
         if (retryLocationBtn == null) {
             return;
         }
@@ -529,6 +540,28 @@ public class SearchFragment extends Fragment implements OnMapReadyCallback {
         if (bottomSheet != null) {
             BottomSheetBehavior.from(bottomSheet).setState(BottomSheetBehavior.STATE_EXPANDED);
         }
+    }
+
+    @VisibleForTesting
+    public void selectMarkerForTesting(double latitude, double longitude) {
+        selectedMarkerKey = String.format(Locale.US, "%.5f,%.5f", latitude, longitude);
+        if (bottomSheetBehavior != null) {
+            bottomSheetBehavior.setPeekHeight(dpToPx(SELECTED_SHEET_PEEK_HEIGHT_DP), true);
+            bottomSheetBehavior.setState(BottomSheetBehavior.STATE_COLLAPSED);
+        }
+        applyFilters();
+    }
+
+    @VisibleForTesting
+    public void clearSelectedMarkerForTesting() {
+        selectedMarkerKey = null;
+        preserveMapViewportOnNextFilterApply = true;
+        applyDefaultMapViewportState();
+        if (bottomSheetBehavior != null) {
+            bottomSheetBehavior.setPeekHeight(dpToPx(DEFAULT_SHEET_PEEK_HEIGHT_DP), true);
+            bottomSheetBehavior.setState(BottomSheetBehavior.STATE_COLLAPSED);
+        }
+        applyFilters();
     }
 
     /**
@@ -798,7 +831,7 @@ public class SearchFragment extends Fragment implements OnMapReadyCallback {
     }
 
     private void refreshMap(List<Event> mapEvents, boolean shouldAdjustCamera) {
-        if (googleMap == null) {
+        if (googleMap == null || !isAdded()) {
             return;
         }
 
@@ -859,7 +892,13 @@ public class SearchFragment extends Fragment implements OnMapReadyCallback {
             return;
         }
 
-        if (selectedMarker != null) {
+        if (currentUserLocation != null && !hasCenteredOnUserLocationOnce) {
+            googleMap.animateCamera(CameraUpdateFactory.newLatLngZoom(
+                    new LatLng(currentUserLocation.getLatitude(), currentUserLocation.getLongitude()),
+                    INITIAL_FOCUS_ZOOM
+            ));
+            hasCenteredOnUserLocationOnce = true;
+        } else if (selectedMarker != null) {
             centerMapOnSelectedMarker(selectedMarker);
         } else if (buckets.size() == 1) {
             Event event = buckets.values().iterator().next().get(0);
@@ -984,6 +1023,9 @@ public class SearchFragment extends Fragment implements OnMapReadyCallback {
     }
 
     private BitmapDescriptor createMarkerIcon(boolean selected, String label) {
+        if (!isAdded()) {
+            return BitmapDescriptorFactory.defaultMarker();
+        }
         float zoom = googleMap != null && googleMap.getCameraPosition() != null
                 ? googleMap.getCameraPosition().zoom
                 : DEFAULT_MAP_ZOOM;
@@ -1025,6 +1067,9 @@ public class SearchFragment extends Fragment implements OnMapReadyCallback {
     }
 
     private BitmapDescriptor createBlueDotIcon() {
+        if (!isAdded()) {
+            return BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_AZURE);
+        }
         int size = dpToPx(24);
         Bitmap bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888);
         Canvas canvas = new Canvas(bitmap);
@@ -1043,6 +1088,9 @@ public class SearchFragment extends Fragment implements OnMapReadyCallback {
     }
 
     private int dpToPx(int dp) {
+        if (!isAdded()) {
+            return dp;
+        }
         return Math.round(dp * requireContext().getResources().getDisplayMetrics().density);
     }
 }
