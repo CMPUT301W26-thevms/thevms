@@ -32,7 +32,7 @@ public class ReplacementAdapter extends RecyclerView.Adapter<ReplacementAdapter.
     void setItems(List<ReplacementItem> replacements, int maxSelectable) {
         items.clear();
         items.addAll(replacements);
-        this.maxSelectable = maxSelectable;
+        this.maxSelectable = Math.max(0, maxSelectable);
         notifyDataSetChanged();
     }
 
@@ -60,6 +60,7 @@ public class ReplacementAdapter extends RecyclerView.Adapter<ReplacementAdapter.
                 " " + (item.entrant.getLastName() != null ? item.entrant.getLastName() : "");
         holder.nameText.setText(fullName.trim().isEmpty() ? "Unnamed Entrant" : fullName);
         holder.checkBox.setChecked(item.selected);
+        holder.checkBox.setEnabled(maxSelectable > 0);
         holder.checkBox.setOnCheckedChangeListener((buttonView, isChecked) -> {
             int selectedCount = getSelectedItems().size();
             if (isChecked && selectedCount >= maxSelectable) {

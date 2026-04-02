@@ -58,7 +58,8 @@ public class ReplacementSelectionTest {
 
     private static final String DECLINED_ONE_ID = "declined-001";
     private static final String DECLINED_TWO_ID = "declined-002";
-    private static final String WAITING_ID = "waiting-003";
+    private static final String WAITING_ONE_ID = "waiting-101";
+    private static final String WAITING_TWO_ID = "waiting-102";
 
     private FirestoreTestHelper helper;
     private ActivityScenario<MyEventsActivity> scenario;
@@ -86,23 +87,23 @@ public class ReplacementSelectionTest {
     }
 
     @Test
-    public void replacementDialog_displaysDeclinedEntrantsWithSelectionSymbols() throws Exception {
+    public void replacementDialog_displaysWaitingEntrantsFromPool() throws Exception {
         openReplacementDialog();
 
-        onView(withId(R.id.tv_declined_empty))
+        onView(withId(R.id.tv_replacement_empty))
                 .check(matches(withEffectiveVisibility(ViewMatchers.Visibility.GONE)));
         onView(withId(R.id.rv_declined_users)).check(matches(isDisplayed()));
         onView(withId(R.id.btn_notify_declined))
                 .check(matches(allOf(isDisplayed(), isEnabled(), withText(containsString("Notify")))));
 
-        onView(allOf(withId(R.id.tv_replacement_name), withText("Declined One")))
+        onView(allOf(withId(R.id.tv_replacement_name), withText("Waiting One")))
                 .check(matches(isDisplayed()));
-        onView(allOf(withId(R.id.cb_replacement_select), hasSibling(withText("Declined One"))))
+        onView(allOf(withId(R.id.cb_replacement_select), hasSibling(withText("Waiting One"))))
                 .check(matches(allOf(isDisplayed(), isNotChecked())));
 
-        onView(allOf(withId(R.id.tv_replacement_name), withText("Declined Two")))
+        onView(allOf(withId(R.id.tv_replacement_name), withText("Waiting Two")))
                 .check(matches(isDisplayed()));
-        onView(allOf(withId(R.id.cb_replacement_select), hasSibling(withText("Declined Two"))))
+        onView(allOf(withId(R.id.cb_replacement_select), hasSibling(withText("Waiting Two"))))
                 .check(matches(allOf(isDisplayed(), isNotChecked())));
     }
 
@@ -110,8 +111,8 @@ public class ReplacementSelectionTest {
     public void notifyButton_updatesOnlyCheckedEntrants() throws Exception {
         openReplacementDialog();
 
-        ViewInteraction firstCheckbox = onView(allOf(withId(R.id.cb_replacement_select), hasSibling(withText("Declined One"))));
-        ViewInteraction secondCheckbox = onView(allOf(withId(R.id.cb_replacement_select), hasSibling(withText("Declined Two"))));
+        ViewInteraction firstCheckbox = onView(allOf(withId(R.id.cb_replacement_select), hasSibling(withText("Waiting One"))));
+        ViewInteraction secondCheckbox = onView(allOf(withId(R.id.cb_replacement_select), hasSibling(withText("Waiting Two"))));
 
         firstCheckbox.perform(click());
         firstCheckbox.check(matches(isChecked()));
@@ -128,28 +129,35 @@ public class ReplacementSelectionTest {
 
         FirebaseFirestore db = helper.getDbHandler().getDb();
 
-        DocumentSnapshot firstDoc = Tasks.await(db.collection(DatabaseHandler.COLLECTION_EVENTS)
+        DocumentSnapshot waitingOneDoc = Tasks.await(db.collection(DatabaseHandler.COLLECTION_EVENTS)
+                .document(String.valueOf(eventId))
+                .collection(DatabaseHandler.COLLECTION_ENTRANTS)
+                .document(WAITING_ONE_ID)
+                .get(), 10, TimeUnit.SECONDS);
+        assertEquals(DatabaseHandler.STATUS_SELECTED, waitingOneDoc.getString("status"));
+
+        DocumentSnapshot waitingTwoDoc = Tasks.await(db.collection(DatabaseHandler.COLLECTION_EVENTS)
+                .document(String.valueOf(eventId))
+                .collection(DatabaseHandler.COLLECTION_ENTRANTS)
+                .document(WAITING_TWO_ID)
+                .get(), 10, TimeUnit.SECONDS);
+        assertEquals(DatabaseHandler.STATUS_WAITING, waitingTwoDoc.getString("status"));
+
+        DocumentSnapshot declinedDoc = Tasks.await(db.collection(DatabaseHandler.COLLECTION_EVENTS)
                 .document(String.valueOf(eventId))
                 .collection(DatabaseHandler.COLLECTION_ENTRANTS)
                 .document(DECLINED_ONE_ID)
                 .get(), 10, TimeUnit.SECONDS);
-        assertEquals(DatabaseHandler.STATUS_SELECTED, firstDoc.getString("status"));
-
-        DocumentSnapshot secondDoc = Tasks.await(db.collection(DatabaseHandler.COLLECTION_EVENTS)
-                .document(String.valueOf(eventId))
-                .collection(DatabaseHandler.COLLECTION_ENTRANTS)
-                .document(DECLINED_TWO_ID)
-                .get(), 10, TimeUnit.SECONDS);
-        assertEquals(DatabaseHandler.STATUS_DECLINED, secondDoc.getString("status"));
+        assertEquals(DatabaseHandler.STATUS_DECLINED, declinedDoc.getString("status"));
 
         QuerySnapshot notifiedFirst = Tasks.await(db.collection(DatabaseHandler.COLLECTION_NOTIFICATIONS)
-                .whereEqualTo("receiverId", DECLINED_ONE_ID)
+                .whereEqualTo("receiverId", WAITING_ONE_ID)
                 .whereEqualTo("eventId", String.valueOf(eventId))
                 .get(), 10, TimeUnit.SECONDS);
         assertEquals(1, notifiedFirst.size());
 
         QuerySnapshot notifiedSecond = Tasks.await(db.collection(DatabaseHandler.COLLECTION_NOTIFICATIONS)
-                .whereEqualTo("receiverId", DECLINED_TWO_ID)
+                .whereEqualTo("receiverId", WAITING_TWO_ID)
                 .whereEqualTo("eventId", String.valueOf(eventId))
                 .get(), 10, TimeUnit.SECONDS);
         assertTrue(notifiedSecond.isEmpty());
@@ -175,8 +183,9 @@ public class ReplacementSelectionTest {
         Tasks.await(event.save(), 10, TimeUnit.SECONDS);
 
         seedEntrant(event.getEventId(), DECLINED_ONE_ID, "Declined", "One", DatabaseHandler.STATUS_DECLINED);
-        seedEntrant(event.getEventId(), DECLINED_TWO_ID, "Declined", "Two", DatabaseHandler.STATUS_DECLINED);
-        seedEntrant(event.getEventId(), WAITING_ID, "Waiting", "User", DatabaseHandler.STATUS_WAITING);
+        seedEntrant(event.getEventId(), DECLINED_TWO_ID, "Cancelled", "User", DatabaseHandler.STATUS_CANCELLED);
+        seedEntrant(event.getEventId(), WAITING_ONE_ID, "Waiting", "One", DatabaseHandler.STATUS_WAITING);
+        seedEntrant(event.getEventId(), WAITING_TWO_ID, "Waiting", "Two", DatabaseHandler.STATUS_WAITING);
         return event.getEventId();
     }
 
