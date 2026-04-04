@@ -918,7 +918,7 @@ class com.example.thevms.ui.Event.ReplacementAdapter$ReplacementViewHolder {
 }
 
 
-
+' Inheritance and Nested Classes
 com.example.thevms.ui.Event.Adapter <|-- com.example.thevms.ui.Event.AttendeeAdapter
 com.example.thevms.ui.Event.AttendeeAdapter +.. com.example.thevms.ui.Event.AttendeeAdapter$OnCancelEntrantListener
 com.example.thevms.ui.Event.AttendeeAdapter +.. com.example.thevms.ui.Event.AttendeeAdapter$ViewHolder
@@ -984,36 +984,97 @@ com.example.thevms.ui.Event.ReplacementAdapter +.. com.example.thevms.ui.Event.R
 com.example.thevms.ui.Event.ReplacementAdapter +.. com.example.thevms.ui.Event.ReplacementAdapter$ReplacementViewHolder
 com.example.thevms.ui.Event.ViewHolder <|-- com.example.thevms.ui.Event.ReplacementAdapter$ReplacementViewHolder
 
+
+' Aggregation / Composition (Has-a)
 com.example.thevms.ui.Event.AttendeeAdapter "1" o-- "*" com.example.thevms.model.AttendeeItem
+com.example.thevms.ui.Event.AttendeeAdapter "1" o-- "1" com.example.thevms.model.DatabaseHandler
+
+com.example.thevms.model.Notification "1" o-- "1" com.example.thevms.model.DatabaseHandler
+com.example.thevms.model.Notification "1" o-- "1" com.example.thevms.model.UserRole
+
 com.example.thevms.model.Organizer "1" o-- "*" com.example.thevms.model.Event
+
 com.example.thevms.ui.MyEventsActivity "1" o-- "1" com.example.thevms.ui.Event.OrganizerEventAdapter
 com.example.thevms.ui.MyEventsActivity "1" o-- "1" com.example.thevms.model.DatabaseHandler
+com.example.thevms.ui.MyEventsActivity "1" o-- "1" com.example.thevms.model.Event
+
 com.example.thevms.ui.Event.OrganizerEventAdapter "1" o-- "*" com.example.thevms.model.Event
+
 com.example.thevms.ui.Event.OrganizerEventAdapter$ViewHolder "1" o-- "1" com.example.thevms.ui.Event.AttendeeAdapter
+com.example.thevms.ui.Event.OrganizerEventAdapter$ViewHolder "1" o-- "1" com.example.thevms.ui.Event.CommentAdapter
+com.example.thevms.ui.Event.OrganizerEventAdapter$ViewHolder "1" o-- "1" com.example.thevms.ui.Event.ReplacementAdapter
 com.example.thevms.ui.Event.OrganizerEventAdapter$ViewHolder "1" o-- "1" com.example.thevms.model.DatabaseHandler
+
+com.example.thevms.ui.Event.CommentAdapter "1" o-- "*" com.example.thevms.model.Comment
+
 com.example.thevms.ui.Event.EventAdapter "1" o-- "*" com.example.thevms.model.Event
+
+com.example.thevms.ui.Event.EventAdapter$EventViewHolder "1" o-- "1" com.example.thevms.ui.Event.CommentAdapter
+
+com.example.thevms.ui.NotificationAdapter "1" o-- "*" com.example.thevms.model.Notification
+
+com.example.thevms.ui.Event.EventDetailActivity "1" o-- "1" com.example.thevms.model.Event
+com.example.thevms.ui.Event.EventDetailActivity "1" o-- "1" com.example.thevms.ui.Event.EventAdapter$EventViewHolder
+
 com.example.thevms.model.Event "1" o-- "1" com.example.thevms.model.DatabaseHandler
 com.example.thevms.model.Event "1" o-- "1" com.example.thevms.model.Organizer
 com.example.thevms.model.Event "1" o-- "*" com.example.thevms.model.Entrant
+
 com.example.thevms.model.Entrant "1" o-- "1" com.example.thevms.model.DatabaseHandler
 com.example.thevms.model.Entrant "1" o-- "1" com.example.thevms.model.UserRole
+
 com.example.thevms.ui.Admin.AdminProfilesFragment "1" o-- "1" com.example.thevms.ui.Admin.AdminProfilesFragment$ProfileAdapter
 com.example.thevms.ui.Admin.AdminProfilesFragment "1" o-- "*" com.example.thevms.model.Entrant
 com.example.thevms.ui.Admin.AdminProfilesFragment "1" o-- "1" com.example.thevms.model.DatabaseHandler
+
 com.example.thevms.ui.Admin.AdminProfilesFragment$ProfileAdapter "1" o-- "*" com.example.thevms.model.Entrant
+
+com.example.thevms.ui.MainActivity "1" o-- "1" com.example.thevms.model.UserRole
+
 com.example.thevms.ui.SearchFragment "1" o-- "1" com.example.thevms.ui.Event.EventAdapter
 com.example.thevms.ui.SearchFragment "1" o-- "*" com.example.thevms.model.Event
+
+com.example.thevms.ui.Event.InviteEntrantAdapter "1" o-- "*" com.example.thevms.model.Entrant
+
 com.example.thevms.model.AttendeeItem "1" o-- "1" com.example.thevms.model.Entrant
 
+com.example.thevms.ui.Admin.AdminImagesFragment "1" o-- "1" com.example.thevms.ui.Admin.AdminImagesFragment$ImageAdapter
+com.example.thevms.ui.Admin.AdminImagesFragment "1" o-- "*" com.example.thevms.ui.Admin.AdminImagesFragment$AdminImageItem
+com.example.thevms.ui.Admin.AdminImagesFragment "1" o-- "1" com.example.thevms.model.DatabaseHandler
+
+com.example.thevms.ui.Admin.AdminImagesFragment$ImageAdapter "1" o-- "*" com.example.thevms.ui.Admin.AdminImagesFragment$AdminImageItem
+
+com.example.thevms.ui.Admin.AdminLogsFragment "1" o-- "1" com.example.thevms.ui.NotificationAdapter
+com.example.thevms.ui.Admin.AdminLogsFragment "1" o-- "1" com.example.thevms.model.DatabaseHandler
+
+com.example.thevms.ui.Admin.AdminEventsFragment "1" o-- "1" com.example.thevms.ui.Event.EventAdapter
+com.example.thevms.ui.Admin.AdminEventsFragment "1" o-- "*" com.example.thevms.model.Event
+com.example.thevms.ui.Admin.AdminEventsFragment "1" o-- "1" com.example.thevms.model.DatabaseHandler
+
+com.example.thevms.ui.InboxFragment "1" o-- "1" com.example.thevms.ui.NotificationAdapter
+com.example.thevms.ui.InboxFragment "1" o-- "1" com.example.thevms.model.DatabaseHandler
+
+com.example.thevms.ui.Event.ReplacementAdapter "1" o-- "*" com.example.thevms.ui.Event.ReplacementAdapter$ReplacementItem
+
+com.example.thevms.ui.Event.ReplacementAdapter$ReplacementItem "1" o-- "1" com.example.thevms.model.Entrant
+
+
+' Navigability (Direct Associations)
 com.example.thevms.ui.SignupActivity --> com.example.thevms.ui.MainActivity
 com.example.thevms.ui.MainActivity --> com.example.thevms.ui.SearchFragment
 com.example.thevms.ui.MainActivity --> com.example.thevms.ui.ProfileFragment
 com.example.thevms.ui.MainActivity --> com.example.thevms.ui.CreateEventFragment
+com.example.thevms.ui.MainActivity --> com.example.thevms.ui.InboxFragment
+com.example.thevms.ui.MainActivity --> com.example.thevms.ui.EntrantEventsFragment
 com.example.thevms.ui.MainActivity --> com.example.thevms.ui.Admin.AdminActivity
 com.example.thevms.ui.ProfileFragment --> com.example.thevms.ui.SettingsActivity
 com.example.thevms.ui.ProfileFragment --> com.example.thevms.ui.MyEventsActivity
+com.example.thevms.ui.ProfileFragment --> com.example.thevms.ui.GuidelinesActivity
 com.example.thevms.ui.Admin.AdminActivity --> com.example.thevms.ui.SearchFragment
 com.example.thevms.ui.Admin.AdminActivity --> com.example.thevms.ui.Admin.AdminProfilesFragment
 com.example.thevms.ui.Admin.AdminActivity --> com.example.thevms.ui.Admin.AdminEventsFragment
+com.example.thevms.ui.Admin.AdminActivity --> com.example.thevms.ui.Admin.AdminImagesFragment
+com.example.thevms.ui.Admin.AdminActivity --> com.example.thevms.ui.Admin.AdminLogsFragment
+com.example.thevms.ui.Event.EventAdapter$EventViewHolder --> com.example.thevms.ui.Event.EventDetailActivity
 
 @enduml
