@@ -12,11 +12,11 @@ import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.FrameLayout;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.Spinner;
 import android.widget.TextView;
@@ -36,12 +36,16 @@ import com.example.thevms.model.Event;
 import com.example.thevms.model.Notification;
 import com.example.thevms.model.Organizer;
 import com.google.android.gms.tasks.Tasks;
+import com.google.android.material.textfield.TextInputEditText;
 import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.ListenerRegistration;
 import com.google.firebase.firestore.QueryDocumentSnapshot;
-
-import com.google.android.material.textfield.TextInputEditText;
+import com.google.zxing.BarcodeFormat;
+import com.google.zxing.MultiFormatWriter;
+import com.google.zxing.WriterException;
+import com.google.zxing.common.BitMatrix;
+import com.journeyapps.barcodescanner.BarcodeEncoder;
 
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -154,9 +158,9 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
      */
     public static class ViewHolder extends RecyclerView.ViewHolder {
         TextView nameText, distanceText, waitlistText, dateText, descriptionText, exportCsvText, mapText;
+        Button cancelBtn, lotteryBtn, postCommentBtn, updatePosterBtn, inviteBtn, showQrBtn, replacementBtn;
         // ── NEW: bell icon for sending notifications ──────────────────────────
         TextView notifyBellText;
-        Button cancelBtn, lotteryBtn, replacementBtn, postCommentBtn, updatePosterBtn, inviteBtn;
         RecyclerView attendeesRv, commentsRv;
         ImageView posterImage;
         Spinner statusSpinner;
@@ -194,6 +198,7 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
             replacementBtn = itemView.findViewById(R.id.btn_pick_replacements);
             updatePosterBtn = itemView.findViewById(R.id.btn_update_poster);
             inviteBtn = itemView.findViewById(R.id.btn_invite_entrants);
+            showQrBtn = itemView.findViewById(R.id.btn_show_qr);
             attendeesRv = itemView.findViewById(R.id.rv_attendees);
             commentsRv = itemView.findViewById(R.id.rv_comments);
             posterImage = itemView.findViewById(R.id.iv_event_poster);
@@ -202,8 +207,8 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
             mapText = itemView.findViewById(R.id.tv_view_map);
             mapContainer = itemView.findViewById(R.id.map_container_inline);
             commentEditText = itemView.findViewById(R.id.et_organizer_comment);
-            postCommentBtn  = itemView.findViewById(R.id.btn_post_organizer_comment);
-            notifyBellText  = itemView.findViewById(R.id.tv_notify_bell);
+            postCommentBtn = itemView.findViewById(R.id.btn_post_organizer_comment);
+            notifyBellText = itemView.findViewById(R.id.tv_notify_bell);
 
             attendeesRv.setLayoutManager(new LinearLayoutManager(itemView.getContext()));
             attendeeAdapter = new AttendeeAdapter();
@@ -241,7 +246,8 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
                 }
 
                 @Override
-                public void onNothingSelected(AdapterView<?> parent) {}
+                public void onNothingSelected(AdapterView<?> parent) {
+                }
             });
 
             // Export CSV
@@ -274,7 +280,7 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
                             if (DatabaseHandler.STATUS_WAITING.equals(status)) {
                                 waitingList.add(doc);
                             } else if (DatabaseHandler.STATUS_SELECTED.equals(status) ||
-                                       DatabaseHandler.STATUS_ACCEPTED.equals(status)) {
+                                    DatabaseHandler.STATUS_ACCEPTED.equals(status)) {
                                 currentSelectedOrAccepted++;
                             }
                         }
@@ -394,14 +400,21 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
                 Button positive = dialog.getButton(AlertDialog.BUTTON_POSITIVE);
                 positive.setOnClickListener(v -> {
                     String raw = input.getText() != null ? input.getText().toString().trim() : "";
-                    if (raw.isEmpty()) { input.setError("Required"); return; }
+                    if (raw.isEmpty()) {
+                        input.setError("Required");
+                        return;
+                    }
                     int requested;
                     try {
                         requested = Integer.parseInt(raw);
                     } catch (NumberFormatException ex) {
-                        input.setError("Enter a whole number"); return;
+                        input.setError("Enter a whole number");
+                        return;
                     }
-                    if (requested <= 0) { input.setError("Must be greater than 0"); return; }
+                    if (requested <= 0) {
+                        input.setError("Must be greater than 0");
+                        return;
+                    }
                     dialog.dismiss();
                     runLottery(event, requested);
                 });
@@ -418,7 +431,7 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
          * @param updatePosterListener The listener for poster update.
          */
         public void bind(Event event, SimpleDateFormat dateFormat, OnEventCancelListener cancelListener, OnEventUpdatePosterListener updatePosterListener) {
-            currentEventId   = String.valueOf(event.getEventId());
+            currentEventId = String.valueOf(event.getEventId());
             currentEventName = event.getName() != null ? event.getName() : "Event";
             itemView.setTag(currentEventId);
 
@@ -536,6 +549,11 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
                 if (updatePosterListener != null) updatePosterListener.onUpdatePoster(event);
             });
 
+            // Hide QR button for private events
+            showQrBtn.setVisibility(event.isPrivate() ? View.GONE : View.VISIBLE);
+            if (!event.isPrivate())
+                showQrBtn.setOnClickListener(v -> showQrCodeDialog(event));
+
             inviteBtn.setVisibility(event.isPrivate() ? View.VISIBLE : View.GONE);
             inviteBtn.setOnClickListener(v -> showInviteDialog(event));
 
@@ -593,6 +611,36 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
             setupComments(currentEventId);
         }
 
+        private void showQrCodeDialog(Event event) {
+            AlertDialog.Builder builder = new AlertDialog.Builder(itemView.getContext());
+            View dialogView = LayoutInflater.from(itemView.getContext()).inflate(R.layout.dialog_qr_code, null);
+            builder.setView(dialogView);
+
+            ImageView qrImage = dialogView.findViewById(R.id.iv_qr_code);
+            Button closeBtn = dialogView.findViewById(R.id.btn_close_qr);
+            TextView title = dialogView.findViewById(R.id.tv_qr_title);
+
+            title.setText(event.getName() + " QR Code");
+
+            // Encode the deep link URL into the QR code
+            // Deep link format: thevms://event?id=EVENT_ID
+            String qrData = "thevms://event?id=" + event.getEventId();
+            MultiFormatWriter multiFormatWriter = new MultiFormatWriter();
+            try {
+                BitMatrix bitMatrix = multiFormatWriter.encode(qrData, BarcodeFormat.QR_CODE, 500, 500);
+                BarcodeEncoder barcodeEncoder = new BarcodeEncoder();
+                Bitmap bitmap = barcodeEncoder.createBitmap(bitMatrix);
+                qrImage.setImageBitmap(bitmap);
+            } catch (WriterException e) {
+                Log.e("OrganizerEventAdapter", "Error generating QR code", e);
+                Toast.makeText(itemView.getContext(), "Error generating QR code", Toast.LENGTH_SHORT).show();
+            }
+
+            AlertDialog dialog = builder.create();
+            closeBtn.setOnClickListener(v -> dialog.dismiss());
+            dialog.show();
+        }
+
         private void showNotificationDialog() {
             List<AttendeeItem> recipients = attendeeAdapter.getFilteredAttendees();
 
@@ -606,8 +654,8 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
             View dialogView = LayoutInflater.from(itemView.getContext())
                     .inflate(R.layout.dialog_send_notification, null);
 
-            Spinner typeSpinner    = dialogView.findViewById(R.id.spinner_notification_type);
-            EditText messageEdit   = dialogView.findViewById(R.id.et_notification_message);
+            Spinner typeSpinner = dialogView.findViewById(R.id.spinner_notification_type);
+            EditText messageEdit = dialogView.findViewById(R.id.et_notification_message);
             TextView recipientText = dialogView.findViewById(R.id.tv_recipient_count);
 
             recipientText.setText("Will be sent to " + recipients.size() + " entrant(s)");
@@ -626,7 +674,10 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
                 public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
                     messageEdit.setText(getDefaultMessage(position));
                 }
-                @Override public void onNothingSelected(AdapterView<?> parent) {}
+
+                @Override
+                public void onNothingSelected(AdapterView<?> parent) {
+                }
             });
 
             messageEdit.setText(getDefaultMessage(0));
@@ -669,6 +720,7 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
                     return "You have a new update regarding " + currentEventName + ".";
             }
         }
+
         /**
          * Maps the dropdown index to a Firestore notification type string.
          * Lottery Win and Waiting List Invite are TYPE_INVITE since they require a user action.
@@ -683,7 +735,7 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
             List<com.google.android.gms.tasks.Task<Void>> sendTasks = new ArrayList<>();
 
             for (AttendeeItem item : recipients) {
-                String receiverId   = item.getEntrant().getDeviceId();
+                String receiverId = item.getEntrant().getDeviceId();
                 String receiverName = buildFullName(
                         item.getEntrant().getFirstName(),
                         item.getEntrant().getLastName(),
@@ -744,6 +796,7 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
                                     Toast.LENGTH_LONG).show()
                     );
         }
+
         @VisibleForTesting
         public static int determineWinnerCount(int requested, int waitingCount, Integer maxAttendees, int currentSelected) {
             if (requested <= 0 || waitingCount <= 0) return 0;
@@ -780,7 +833,10 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
             });
 
             searchEt.addTextChangedListener(new TextWatcher() {
-                @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+                @Override
+                public void beforeTextChanged(CharSequence s, int start, int count, int after) {
+                }
+
                 @Override
                 public void onTextChanged(CharSequence s, int start, int before, int count) {
                     String query = s.toString().toLowerCase();
@@ -831,7 +887,10 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
             if (commentsListener != null) commentsListener.remove();
 
             commentsListener = dbHandler.listenToComments(eventId, (value, error) -> {
-                if (error != null) { Log.w("OrganizerEventAdapter", "Listen failed."); return; }
+                if (error != null) {
+                    Log.w("OrganizerEventAdapter", "Listen failed.");
+                    return;
+                }
                 if (value == null) return;
 
                 List<Comment> comments = new ArrayList<>();
@@ -961,7 +1020,7 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
         private String buildFullName(String first, String last, String fallback) {
             StringBuilder sb = new StringBuilder();
             if (first != null && !first.isEmpty()) sb.append(first);
-            if (last  != null && !last.isEmpty()) {
+            if (last != null && !last.isEmpty()) {
                 if (sb.length() > 0) sb.append(" ");
                 sb.append(last);
             }
@@ -988,7 +1047,7 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
 
                                         for (QueryDocumentSnapshot doc : queryDocumentSnapshots) {
                                             String entrantId = doc.getString("entrantId");
-                                            String status    = doc.getString("status");
+                                            String status = doc.getString("status");
                                             if (entrantId != null) {
                                                 statusMap.put(entrantId, status);
                                                 profileTasks.add(dbHandler.getUser(entrantId));
@@ -1108,7 +1167,9 @@ public class OrganizerEventAdapter extends RecyclerView.Adapter<OrganizerEventAd
     }
 
     static class InterceptableMapView extends com.google.android.gms.maps.MapView {
-        public InterceptableMapView(android.content.Context context) { super(context); }
+        public InterceptableMapView(android.content.Context context) {
+            super(context);
+        }
 
         @Override
         public boolean dispatchTouchEvent(android.view.MotionEvent event) {

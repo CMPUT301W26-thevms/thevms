@@ -7,9 +7,11 @@ import static androidx.test.espresso.matcher.ViewMatchers.isDisplayed;
 import static androidx.test.espresso.matcher.ViewMatchers.withId;
 import static androidx.test.espresso.matcher.ViewMatchers.withText;
 import static org.hamcrest.Matchers.allOf;
+import static org.hamcrest.Matchers.not;
 
 import android.content.Context;
 import android.provider.Settings;
+import android.view.View;
 
 import androidx.test.core.app.ActivityScenario;
 import androidx.test.espresso.UiController;
@@ -25,14 +27,11 @@ import com.example.thevms.model.Organizer;
 import com.example.thevms.ui.MyEventsActivity;
 import com.google.android.gms.tasks.Tasks;
 
+import org.hamcrest.Matcher;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
-
-import android.view.View;
-
-import org.hamcrest.Matcher;
 
 import java.util.Date;
 import java.util.HashMap;
@@ -96,7 +95,7 @@ public class MyEventsActivityTest {
     private void seedUserAndEntrant(long eventId, String userId, String firstName, String lastName,
                                     double lat, double lng) throws Exception {
         DatabaseHandler db = testHelper.getDbHandler();
-        
+
         // 1. Create User Profile
         Map<String, Object> userData = new HashMap<>();
         userData.put("firstName", firstName);
@@ -112,7 +111,7 @@ public class MyEventsActivityTest {
         registrationData.put("registrationTime", new Date());
         registrationData.put("entrantLat", lat);
         registrationData.put("entrantLng", lng);
-        
+
         Tasks.await(db.getDb().collection(DatabaseHandler.COLLECTION_EVENTS)
                 .document(String.valueOf(eventId))
                 .collection(DatabaseHandler.COLLECTION_ENTRANTS)
@@ -135,20 +134,61 @@ public class MyEventsActivityTest {
     }
 
     @Test
-    public void testMapButton() throws InterruptedException {
+    public void testShowQrCodeDialog() throws InterruptedException {
+        // Wait for data to load
         Thread.sleep(2000);
 
+        // Check if the QR button is visible
         onView(withId(R.id.rv_my_events))
-                .check(matches(MainActivityTest.hasDescendant(withText("John Doe"))));
+                .check(matches(MainActivityTest.hasDescendant(withId(R.id.btn_show_qr))));
+
+        // Click the "Show QR" button
         onView(withId(R.id.rv_my_events))
-                .check(matches(MainActivityTest.hasDescendant(withId(R.id.tv_view_map))));
+                .perform(RecyclerViewActions.actionOnItemAtPosition(0, clickChildViewWithId(R.id.btn_show_qr)));
 
+        // Wait for dialog to appear
+        Thread.sleep(1000);
+
+        // Verify that the dialog is displayed with the correct title and the QR image
+        onView(withText("My Test Event QR Code")).check(matches(isDisplayed()));
+        onView(withId(R.id.iv_qr_code)).check(matches(isDisplayed()));
+
+        // Close the dialog
+        onView(withId(R.id.btn_close_qr)).perform(click());
+    }
+
+    @Test
+    public void testPrivateEventShowQrNotVisible() throws Exception {
+        // Close scenario from setUp
+        scenario.close();
+        testHelper.clearDatabase();
+
+        // Seed a private event
+        Organizer organizer = new Organizer(deviceId, "org@example.com", "Main", "Organizer", null);
+        Event event = Tasks.await(Event.create(
+                "Private Event",
+                "Description",
+                organizer,
+                null,
+                null,
+                new Date(),
+                new Date(System.currentTimeMillis() + 86400000),
+                new Date(),
+                new Date(System.currentTimeMillis() + 3600000),
+                false,
+                0.0,
+                null,
+                true // isPrivate = true
+        ), 10, TimeUnit.SECONDS);
+        Tasks.await(event.save(), 10, TimeUnit.SECONDS);
+
+        // Relaunch scenario
+        scenario = ActivityScenario.launch(MyEventsActivity.class);
+        Thread.sleep(2000);
+
+        // Verify that btn_show_qr is NOT visible for private event
         onView(withId(R.id.rv_my_events))
-                .perform(RecyclerViewActions.actionOnItemAtPosition(0, clickChildViewWithId(R.id.tv_view_map)));
-
-        Thread.sleep(1500);
-
-        onView(withId(R.id.map_container_inline)).check(matches(isDisplayed()));
+                .check(matches(not(MainActivityTest.hasDescendant(allOf(withId(R.id.btn_show_qr), isDisplayed())))));
     }
 
     private static ViewAction clickChildViewWithId(final int id) {
