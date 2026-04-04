@@ -19,8 +19,10 @@ import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
 
 import com.example.thevms.R;
+import com.example.thevms.model.DatabaseHandler;
 import com.example.thevms.model.Entrant;
 import com.example.thevms.model.UserRole;
+import com.google.firebase.firestore.ListenerRegistration;
 
 /**
  * Fragment for displaying user profile information.
@@ -32,6 +34,7 @@ public class ProfileFragment extends Fragment {
     private LinearLayout myEventsButton;
     private LinearLayout howItWorksButton;
     private Button deleteProfileButton;
+    private ListenerRegistration userProfileListener;
 
     @Nullable
     @Override
@@ -149,38 +152,64 @@ public class ProfileFragment extends Fragment {
     @Override
     public void onResume() {
         super.onResume();
-        // Refresh profile data whenever the fragment becomes visible
-        loadUserProfile();
+        startUserProfileListener();
     }
 
     /**
-     * Fetches the user profile from the database based on the device ID and populates the UI.
+     * Starts a real-time listener for the current user's profile and keeps the UI in sync.
      */
-    private void loadUserProfile() {
+    private void startUserProfileListener() {
         if (getContext() == null) return;
+
+        if (userProfileListener != null) {
+            return;
+        }
 
         @SuppressLint("HardwareIds")
         String deviceId = Settings.Secure.getString(getContext().getContentResolver(), Settings.Secure.ANDROID_ID);
 
-        Entrant.getOrCreate(deviceId).addOnSuccessListener(entrant -> {
-            if (isAdded()) { // Check if fragment is still attached
-                String fullName = entrant.getFirstName() + " " + entrant.getLastName();
-                nameText.setText(fullName);
-                emailText.setText(entrant.getEmail() != null ? entrant.getEmail() : "No email provided");
-                phoneText.setText(entrant.getPhoneNumber() != null ? entrant.getPhoneNumber() : "No phone number provided");
-
-                // Show "My Events" only for Organizers and Admins
-                UserRole role = entrant.getRole();
-                if (role == UserRole.ORGANIZER || role == UserRole.ADMIN) {
-                    myEventsButton.setVisibility(View.VISIBLE);
-                } else {
-                    myEventsButton.setVisibility(View.GONE);
+        userProfileListener = new DatabaseHandler().listenToUser(deviceId, (snapshot, error) -> {
+            if (error != null) {
+                if (isAdded()) {
+                    Toast.makeText(getContext(), "Failed to load profile", Toast.LENGTH_SHORT).show();
                 }
+                return;
             }
-        }).addOnFailureListener(e -> {
-            if (isAdded()) {
-                Toast.makeText(getContext(), "Failed to load profile", Toast.LENGTH_SHORT).show();
+
+            if (!isAdded() || snapshot == null) {
+                return;
+            }
+
+            Entrant entrant = snapshot.exists()
+                    ? Entrant.fromMap(deviceId, snapshot.getData())
+                    : new Entrant(deviceId, null, null, null, null, true, UserRole.ENTRANT);
+
+            if (entrant == null) {
+                return;
+            }
+
+            String firstName = entrant.getFirstName() != null ? entrant.getFirstName() : "";
+            String lastName = entrant.getLastName() != null ? entrant.getLastName() : "";
+            String fullName = (firstName + " " + lastName).trim();
+            nameText.setText(fullName.isEmpty() ? "No name provided" : fullName);
+            emailText.setText(entrant.getEmail() != null ? entrant.getEmail() : "No email provided");
+            phoneText.setText(entrant.getPhoneNumber() != null ? entrant.getPhoneNumber() : "No phone number provided");
+
+            UserRole role = entrant.getRole();
+            if (role == UserRole.ORGANIZER || role == UserRole.ADMIN) {
+                myEventsButton.setVisibility(View.VISIBLE);
+            } else {
+                myEventsButton.setVisibility(View.GONE);
             }
         });
+    }
+
+    @Override
+    public void onPause() {
+        if (userProfileListener != null) {
+            userProfileListener.remove();
+            userProfileListener = null;
+        }
+        super.onPause();
     }
 }

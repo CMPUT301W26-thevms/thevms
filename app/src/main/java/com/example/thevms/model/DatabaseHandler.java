@@ -172,6 +172,19 @@ public class DatabaseHandler {
     }
 
     /**
+     * Listens for real-time updates to a specific user's profile document.
+     *
+     * @param userId The user ID (device ID).
+     * @param listener Callback to handle profile updates.
+     * @return ListenerRegistration to stop listening when needed.
+     */
+    public ListenerRegistration listenToUser(String userId, EventListener<DocumentSnapshot> listener) {
+        return getDb().collection(COLLECTION_USERS)
+                .document(userId)
+                .addSnapshotListener(listener);
+    }
+
+    /**
      * Retrieves all user profiles from the database.
      *
      * @return Task containing QuerySnapshot of all users.
