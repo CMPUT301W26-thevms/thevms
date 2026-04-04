@@ -222,31 +222,6 @@
                             </LinearLayout>
 
                             <LinearLayout
-                                android:id="@+id/btn_events"
-                                android:layout_width="match_parent"
-                                android:layout_height="wrap_content"
-                                android:background="?attr/selectableItemBackground"
-                                android:clickable="true"
-                                android:focusable="true"
-                                android:gravity="center_vertical"
-                                android:orientation="horizontal"
-                                android:paddingVertical="12dp">
-
-                                <ImageView
-                                    android:layout_width="24dp"
-                                    android:layout_height="24dp"
-                                    android:src="@android:drawable/btn_star_big_off"
-                                    app:tint="@android:color/black" />
-
-                                <TextView
-                                    android:layout_width="wrap_content"
-                                    android:layout_height="wrap_content"
-                                    android:layout_marginStart="16dp"
-                                    android:text="Events"
-                                    android:textColor="@android:color/black" />
-                            </LinearLayout>
-
-                            <LinearLayout
                                 android:id="@+id/btn_my_events"
                                 android:layout_width="match_parent"
                                 android:layout_height="wrap_content"
