@@ -16,9 +16,11 @@ import androidx.drawerlayout.widget.DrawerLayout;
 import androidx.fragment.app.Fragment;
 
 import com.example.thevms.R;
+import com.example.thevms.model.DatabaseHandler;
 import com.example.thevms.model.Entrant;
 import com.example.thevms.model.UserRole;
 import com.example.thevms.ui.Admin.AdminActivity;
+import com.google.firebase.firestore.ListenerRegistration;
 import com.google.android.material.bottomnavigation.BottomNavigationView;
 
 /**
@@ -29,6 +31,8 @@ public class MainActivity extends AppCompatActivity {
 
     private DrawerLayout drawerLayout;
     private BottomNavigationView bottomNav;
+    private ListenerRegistration userRoleListener;
+    private UserRole lastKnownRole;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -59,6 +63,7 @@ public class MainActivity extends AppCompatActivity {
 
         // Check user role and update UI
         checkUserRoleAndAdjustUI(bottomNav);
+        startUserRoleListener();
 
         // Initialize Admin Panel
         AdminActivity.init(this);
@@ -134,19 +139,69 @@ public class MainActivity extends AppCompatActivity {
         String deviceId = Settings.Secure.getString(getContentResolver(), Settings.Secure.ANDROID_ID);
 
         Entrant.getOrCreate(deviceId).addOnSuccessListener(entrant -> {
-            UserRole role = entrant.getRole();
-            if (role == UserRole.ORGANIZER || role == UserRole.ADMIN) {
-                MenuItem addItem = bottomNav.getMenu().findItem(R.id.nav_add);
-                if (addItem != null) {
-                    addItem.setVisible(true);
-                }
-            }
-            if (role == UserRole.ADMIN) {
-                MenuItem adminItem = bottomNav.getMenu().findItem(R.id.nav_admin_settings);
-                if (adminItem != null) {
-                    adminItem.setVisible(true);
-                }
-            }
+            applyRoleToNavigation(entrant.getRole());
         });
+    }
+
+    private void startUserRoleListener() {
+        @SuppressLint("HardwareIds")
+        String deviceId = Settings.Secure.getString(getContentResolver(), Settings.Secure.ANDROID_ID);
+
+        userRoleListener = new DatabaseHandler().listenToUser(deviceId, (snapshot, error) -> {
+            if (error != null || snapshot == null || !snapshot.exists()) {
+                return;
+            }
+
+            Entrant entrant = Entrant.fromMap(deviceId, snapshot.getData());
+            if (entrant == null) {
+                return;
+            }
+
+            UserRole newRole = entrant.getRole();
+            applyRoleToNavigation(newRole);
+
+            if (lastKnownRole != null && lastKnownRole != newRole) {
+                relaunchForRoleChange();
+                return;
+            }
+
+            lastKnownRole = newRole;
+        });
+    }
+
+    private void applyRoleToNavigation(UserRole role) {
+        if (bottomNav == null) {
+            return;
+        }
+
+        Menu menu = bottomNav.getMenu();
+        MenuItem addItem = menu.findItem(R.id.nav_add);
+        if (addItem != null) {
+            addItem.setVisible(role == UserRole.ORGANIZER || role == UserRole.ADMIN);
+        }
+
+        MenuItem adminItem = menu.findItem(R.id.nav_admin_settings);
+        if (adminItem != null) {
+            adminItem.setVisible(role == UserRole.ADMIN);
+        }
+    }
+
+    private void relaunchForRoleChange() {
+        if (isFinishing()) {
+            return;
+        }
+
+        startActivity(getIntent());
+        finish();
+        overridePendingTransition(0, 0);
+    }
+
+    @Override
+    protected void onDestroy() {
+        if (userRoleListener != null) {
+            userRoleListener.remove();
+            userRoleListener = null;
+        }
+        super.onDestroy();
     }
 }
