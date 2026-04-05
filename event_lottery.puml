@@ -4,18 +4,27 @@ class com.example.thevms.ui.Event.AttendeeAdapter {
 - List<AttendeeItem> allAttendees
 - List<AttendeeItem> filteredAttendees
 - String activeStatus
+- String eventId
+- String eventName
+- String organizerId
+- String organizerName
+- DatabaseHandler dbHandler
 - OnCancelEntrantListener cancelListener
 + void setOnCancelEntrantListener(OnCancelEntrantListener)
++ void setEventContext(String,String,String,String)
 + void setAttendees(List<AttendeeItem>)
 + void filterByStatus(String)
 - void applyFilter(String)
++ List<AttendeeItem> getFilteredAttendees()
 + void exportFilteredListAsCsv(Context,String)
 - String escapeCsv(String)
 + ViewHolder onCreateViewHolder(ViewGroup,int)
 + void onBindViewHolder(ViewHolder,int)
 + int getItemCount()
+- String buildDisplayName(AttendeeItem)
+- String getDeviceId(Context)
 }
-note right of com.example.thevms.ui.Event.AttendeeAdapter : Manages the display and status-based\nfiltering of event participants.
+
 
 interface com.example.thevms.ui.Event.AttendeeAdapter$OnCancelEntrantListener {
 ~ void onCancel(AttendeeItem)
@@ -25,33 +34,60 @@ class com.example.thevms.ui.Event.AttendeeAdapter$ViewHolder {
 ~ TextView nameText
 ~ ImageView statusIcon
 ~ Button cancelBtn
-+ <<Create>> ViewHolder(View)
+~ ImageButton assignCoOrganizerBtn
+}
+
+class com.example.thevms.model.Notification {
++ {static} String TYPE_GENERAL
++ {static} String TYPE_INVITE
+- String id
+- String title
+- String senderId
+- String senderName
+- UserRole senderRole
+- String receiverId
+- String receiverName
+- Date timestamp
+- String description
+- String type
+- String eventId
+- DatabaseHandler dbHandler
++ {static} Notification createLotteryWin(String,String,String,String,String,String)
++ {static} Notification createLotteryLoss(String,String,String,String,String,String)
++ {static} Notification createWaitingListInvite(String,String,String,String,String,String)
++ {static} Notification createCoOrganizerInvite(String,String,String,String,String,String)
++ Task<Void> send()
++ Task<Void> delete()
++ String getId()
++ void setId(String)
++ String getTitle()
++ void setTitle(String)
++ String getSenderId()
++ void setSenderId(String)
++ String getSenderName()
++ void setSenderName(String)
++ UserRole getSenderRole()
++ void setSenderRole(UserRole)
++ String getReceiverId()
++ void setReceiverId(String)
++ String getReceiverName()
++ void setReceiverName(String)
++ Date getTimestamp()
++ void setTimestamp(Date)
++ String getDescription()
++ void setDescription(String)
++ String getType()
++ void setType(String)
++ String getEventId()
++ void setEventId(String)
 }
 
 
 class com.example.thevms.model.Organizer {
 ~ List<Event> currentEvents
-+ <<Create>> Organizer(String,String,String,String,String)
-+ <<Create>> Organizer(String,String,String,String,String,boolean)
 + {static} Organizer fromMap(String,Map<String,Object>)
 + void createEvent(Date,Date,Date,Date,String,String,Location,Integer,Integer)
 + void sendNotification(List<Entrant>,Event)
-}
-note left of com.example.thevms.model.Organizer : An Entrant with elevated privileges\nto manage their own events.
-
-enum com.example.thevms.model.UserRole {
-+  ENTRANT
-+  ORGANIZER
-+  ADMIN
-}
-
-class com.example.thevms.ui.Admin.AdminActivity {
-- Activity activity
-- DrawerLayout drawerLayout
-+ <<Create>> AdminActivity(Activity)
-+ {static} void init(Activity)
-- void setupClickListeners()
-- void handleAction(String)
 }
 
 
@@ -61,9 +97,12 @@ class com.example.thevms.ui.MyEventsActivity {
 - ProgressBar loadingBar
 - TextView emptyText
 - DatabaseHandler dbHandler
+- Event eventToUpdate
+- ActivityResultLauncher<Intent> pickImageLauncher
 # void onCreate(Bundle)
 - void showCancelConfirmationDialog(Event)
 - void loadMyEvents()
+- byte[] compressImage(Bitmap)
 }
 
 
@@ -71,50 +110,110 @@ class com.example.thevms.ui.EntrantEventsFragment {
 - RecyclerView recyclerView
 - ProgressBar loadingBar
 - TextView emptyText
-- DatabaseHandler dbHandler
+- Runnable pendingLocationPermissionGrantedAction
+- Runnable pendingLocationPermissionDeniedAction
+- ActivityResultLauncher<String[]> locationPermissionLauncher
 + View onCreateView(LayoutInflater,ViewGroup,Bundle)
-- void loadDashboardBasedOnRole()
+- void loadRegisteredEvents()
 - void setupEntrantView(Entrant)
-- void setupOrganizerView(String)
-- void setupAdminView()
 - void updateUI(List<Event>,String)
 - void handleFailure(String)
+- boolean hasLocationPermission()
 }
 
 
 class com.example.thevms.ui.Event.OrganizerEventAdapter {
 - {static} String[] STATUS_LABELS
 - {static} String[] STATUS_VALUES
+- {static} String[] NOTIFICATION_TYPE_LABELS
 - List<Event> events
 - {static} SimpleDateFormat dateFormat
 - OnEventCancelListener cancelListener
+- OnEventUpdatePosterListener updatePosterListener
 + void setEvents(List<Event>)
 + void setOnEventCancelListener(OnEventCancelListener)
++ void setOnEventUpdatePosterListener(OnEventUpdatePosterListener)
 + ViewHolder onCreateViewHolder(ViewGroup,int)
 + void onBindViewHolder(ViewHolder,int)
 + int getItemCount()
 }
-note top of com.example.thevms.ui.Event.OrganizerEventAdapter : Controller for the organizer's dashboard\nview of their hosted events.
+
 
 interface com.example.thevms.ui.Event.OrganizerEventAdapter$OnEventCancelListener {
 ~ void onCancel(Event)
 }
 
+interface com.example.thevms.ui.Event.OrganizerEventAdapter$OnEventUpdatePosterListener {
+~ void onUpdatePoster(Event)
+}
+
 class com.example.thevms.ui.Event.OrganizerEventAdapter$ViewHolder {
 ~ TextView nameText
 ~ Button cancelBtn
+~ TextView notifyBellText
 ~ RecyclerView attendeesRv
+~ ImageView posterImage
 ~ Spinner statusSpinner
+~ EditText commentEditText
 ~ AttendeeAdapter attendeeAdapter
+~ CommentAdapter commentAdapter
+~ ReplacementAdapter replacementAdapter
 ~ DatabaseHandler dbHandler
 ~ FirebaseFirestore db
+~ com.google.android.gms.maps.MapView mapView
+~ FrameLayout mapContainer
+~ ListenerRegistration commentsListener
 ~ String currentEventName
-+ <<Create>> ViewHolder(View)
-- void runLottery(Event)
-+ void bind(Event,SimpleDateFormat,OnEventCancelListener)
+~ String currentEventId
+~ boolean mapVisible
+~ boolean mapInitialized
+- void runLottery(Event,int)
+- void showWinnerSelectionDialog(Event)
++ void bind(Event,SimpleDateFormat,OnEventCancelListener,OnEventUpdatePosterListener)
+- void showQrCodeDialog(Event)
+- void showNotificationDialog()
+- String getDefaultMessage(int)
+- void sendNotificationsToFilteredList(List<AttendeeItem>,String,int)
++ {static} int determineWinnerCount(int,int,Integer,int)
+- void showInviteDialog(Event)
+- void setupComments(String)
+- void postOrganizerComment(String)
+- void renderMapMarkers(com.google.android.gms.maps.GoogleMap,Event,List<com.google.android.gms.maps.model.LatLng>)
+- com.google.android.gms.maps.model.BitmapDescriptor createUserLocationIcon(float)
+- void showDeleteCommentConfirmation(String,String)
+- String buildFullName(String,String,String)
 - void cancelEntrantAndSelectNext(String,String)
+- void showReplacementDialog(Event)
 }
 
+
+class com.example.thevms.ui.Event.OrganizerEventAdapter$InterceptableMapView {
++ boolean dispatchTouchEvent(android.view.MotionEvent)
+}
+
+class com.example.thevms.ui.Event.CommentAdapter {
+- List<Comment> comments
+- List<String> commentIds
+- SimpleDateFormat dateFormat
+- boolean showDeleteButton
+- OnCommentDeleteListener deleteListener
++ void setComments(List<Comment>,List<String>)
++ void setShowDeleteButton(boolean)
++ void setOnCommentDeleteListener(OnCommentDeleteListener)
++ CommentViewHolder onCreateViewHolder(ViewGroup,int)
++ void onBindViewHolder(CommentViewHolder,int)
++ int getItemCount()
+}
+
+
+interface com.example.thevms.ui.Event.CommentAdapter$OnCommentDeleteListener {
+~ void onDelete(Comment,String)
+}
+
+class com.example.thevms.ui.Event.CommentAdapter$CommentViewHolder {
+~ TextView firstNameTextView
+~ ImageButton deleteButton
+}
 
 class com.example.thevms.ui.Event.EventAdapter {
 - List<Event> events
@@ -123,29 +222,50 @@ class com.example.thevms.ui.Event.EventAdapter {
 - SimpleDateFormat dateFormat
 - SimpleDateFormat fullDateFormat
 - Set<Long> expandedEventIds
+- Set<Long> expandedCommentIds
++ {static} android.location.Location testLocation
+- LocationPermissionRequester locationPermissionRequester
 + void setEvents(List<Event>)
 + void setAdmin(boolean)
 + void setManagementMode(boolean)
++ void setLocationPermissionRequester(LocationPermissionRequester)
++ {static} void setTestLocation(android.location.Location)
 + EventViewHolder onCreateViewHolder(ViewGroup,int)
 + void onBindViewHolder(EventViewHolder,int)
 + int getItemCount()
 }
 
 
+interface com.example.thevms.ui.Event.EventAdapter$LocationPermissionRequester {
+~ void requestLocationPermission(boolean,Runnable,Runnable)
+}
+
 class com.example.thevms.ui.Event.EventAdapter$EventViewHolder {
+- com.google.android.gms.location.FusedLocationProviderClient fusedLocationClient
 ~ TextView nameTextView
 ~ Button joinButton
 ~ ImageView eventImageView
 ~ TextView regStatusMessage
 ~ View expandableDetails
-+ <<Create>> EventViewHolder(View)
-+ void bind(Event,SimpleDateFormat,SimpleDateFormat,boolean,boolean,boolean,Runnable,java.util.function.Consumer<Boolean>)
-- void updateEntrantCount(Event,String)
+~ RecyclerView commentsRecyclerView
+~ EditText commentEditText
+~ CommentAdapter commentAdapter
+~ ListenerRegistration commentsListener
+- LocationPermissionRequester locationPermissionRequester
++ void bind(Event,SimpleDateFormat,SimpleDateFormat,boolean,boolean,boolean,boolean,LocationPermissionRequester,Runnable,java.util.function.Consumer<Boolean>,java.util.function.Consumer<Boolean>)
+- void setupComments(String,String,DatabaseHandler,boolean)
+- void showDeleteCommentConfirmation(String,String)
+- void updateEntrantInfo(Event,String)
 - void updateUIBasedOnStatus(String,Event,String,DatabaseHandler)
 - void setupJoinButton(Event,String)
 - void setupLeaveButton(Event,String)
 - void setupAcceptDeclineButtons(Event,String,DatabaseHandler)
 - void refreshUI(Event,String)
+- void joinEvent(Event,String,android.location.Location)
+- void handleLocationResult(android.location.Location,Event,String)
+- void joinEventWithBestEffortLocation(Event,String)
+- boolean hasLocationPermission()
+- void checkLocation(Event,String)
 - void showDeleteConfirmation(Event,Runnable)
 }
 
@@ -154,90 +274,61 @@ class com.example.thevms.ui.NavBarActivity {
 # void onCreate(Bundle)
 }
 
-class com.example.thevms.ui.SettingsActivity {
-- TextInputEditText firstNameEdit
-- MaterialSwitch notificationSwitch
-# void onCreate(Bundle)
-- boolean validateInputs()
-- void showConfirmDialog(String)
-- void handleUpdate(String)
-- void loadUserSettings(String)
+class com.example.thevms.ui.NotificationAdapter {
+- List<Notification> notifications
+- OnNotificationDeleteListener deleteListener
+- OnInviteActionListener inviteActionListener
+- boolean isReadOnly
++ void setNotifications(List<Notification>)
++ void setOnNotificationDeleteListener(OnNotificationDeleteListener)
++ void setOnInviteActionListener(OnInviteActionListener)
++ NotificationViewHolder onCreateViewHolder(ViewGroup,int)
++ void onBindViewHolder(NotificationViewHolder,int)
++ int getItemCount()
+}
+
+
+interface com.example.thevms.ui.NotificationAdapter$OnNotificationDeleteListener {
+~ void onDelete(Notification)
+}
+
+interface com.example.thevms.ui.NotificationAdapter$OnInviteActionListener {
+~ void onAccept(Notification)
+~ void onReject(Notification)
+}
+
+class com.example.thevms.ui.NotificationAdapter$NotificationViewHolder {
+~ TextView title
+~ ImageButton btnDelete
+~ LinearLayout inviteActionsContainer
+~ MaterialButton btnAccept
++ void bind(Notification)
 }
 
 
 class com.example.thevms.model.Admin {
-+ <<Create>> Admin(String,String,String,String,String)
-+ <<Create>> Admin(String,String,String,String,String,boolean)
 + {static} Admin fromMap(String,Map<String,Object>)
 + void removeEvent(Event,List<Event>)
 }
-note left of com.example.thevms.model.Admin : System administrator with the ability\nto moderate events and user accounts.
 
-class com.example.thevms.ui.CreateEventFragment {
-- EditText etName
-- Button btnConfirm
-- Button btnRegStartDate
-- Date regStartDate
-- SimpleDateFormat dateTimeFormat
-+ View onCreateView(LayoutInflater,ViewGroup,Bundle)
-+ void onViewCreated(View,Bundle)
-+ void setTestingDates(Date,Date,Date,Date)
-- void showDateTimePicker(int)
-- void handleCreateEvent()
-- void showCancelConfirmationDialog()
-}
-
-
-class com.example.thevms.model.DatabaseHandler {
-- FirebaseFirestore db
-+ {static} String COLLECTION_EVENTS
-+ {static} String COLLECTION_USERS
-+ {static} String COLLECTION_ENTRANTS
-+ {static} String STATUS_WAITING
-+ {static} String STATUS_SELECTED
-+ {static} String STATUS_ACCEPTED
-+ {static} String STATUS_REJECTED
-+ {static} String STATUS_INVITED
-+ {static} String STATUS_DECLINED
-+ {static} String STATUS_CANCELLED
-+ <<Create>> DatabaseHandler()
-+ <<Create>> DatabaseHandler(FirebaseFirestore)
-+ void useEmulator(String,int)
-+ Task<Long> getNextEventId()
-+ Task<Void> saveEvent(Long,Map<String,Object>)
-+ Task<QuerySnapshot> getAllEvents()
-+ Task<QuerySnapshot> getEventsByOrganizer(String)
-+ ListenerRegistration listenToEvent(String,EventListener<DocumentSnapshot>)
-+ Task<Void> saveUser(String,Map<String,Object>)
-+ Task<DocumentSnapshot> getUser(String)
-+ Task<QuerySnapshot> getAllUsers()
-+ Task<Void> deleteUserAccountCompletely(String)
-+ Task<Void> deleteUser(String)
-+ Task<Void> updateEntrantStatus(String,String,Map<String,Object>)
-+ Task<String> getEntrantStatus(String,String)
-+ ListenerRegistration listenToEntrantStatus(String,String,EventListener<DocumentSnapshot>)
-+ Task<QuerySnapshot> getEntrantsForEvent(String)
-+ Task<QuerySnapshot> getRegistrationsForEntrant(String)
-+ Task<Void> deleteEvent(String)
-+ Task<Long> getEntrantCount(String)
-+ Task<Void> selectAndInviteNextEntrant(String)
-+ FirebaseFirestore getDb()
-}
-note right of com.example.thevms.model.DatabaseHandler : Central utility for all Firestore interactions,\nmaintaining data consistency across the app.
-
-class com.example.thevms.ui.Admin.AdminEventsFragment {
-- RecyclerView recyclerView
-- TextView emptyStateText
-- ProgressBar loadingSpinner
-- EventAdapter adapter
-- List<Event> events
-- DatabaseHandler dbHandler
-+ View onCreateView(LayoutInflater,ViewGroup,Bundle)
-- void setLoading(boolean)
-- void loadEvents()
+class com.example.thevms.ui.Event.EventDetailActivity {
+- Event event
+- EventAdapter.EventViewHolder viewHolder
+- boolean isAdmin
+- boolean isExpanded
+- boolean isCommentsExpanded
+- SimpleDateFormat dateFormat
+- SimpleDateFormat fullDateFormat
+# void onCreate(Bundle)
+- void loadEvent(String)
 - void updateUI()
++ void requestLocationPermission(boolean,Runnable,Runnable)
 }
 
+
+class com.example.thevms.ui.GuidelinesActivity {
+# void onCreate(Bundle)
+}
 
 class com.example.thevms.model.Event {
 - DatabaseHandler dbHandler
@@ -245,28 +336,32 @@ class com.example.thevms.model.Event {
 - String name
 - String description
 - Organizer organizer
-- Location location
+- String location
+- Location geoLocation
 - String locationName
 - String qrCode
-- String imageUrl
+- byte[] photo
 - Date registrationStartTime
 - Date registrationEndTime
 - Date eventStartTime
 - Date eventEndTime
 - Integer maxAttendees
+- Integer maxWaitlist
 - boolean geolocationRequired
 - Double limitDistance
 - HashMap<Entrant,Boolean> entrantList
 - long entrantCount
-- <<Create>> Event(Long,String,String,Organizer,Location,String,Date,Date,Date,Date)
-+ {static} Task<Event> create(String,String,Organizer,Location,String,Date,Date,Date,Date)
+- Double radius
+- boolean isPrivate
+- String generateSimpleQrCodeString()
++ {static} Task<Event> create(String,String,Organizer,String,byte[],Date,Date,Date,Date,boolean,Double,Location,boolean)
 - {static} Date toDate(Object)
 + {static} Event fromMap(Map<String,Object>)
 + {static} Event fromDoc(DocumentSnapshot)
 + Task<Void> save()
 - Map<String,Object> toMap()
 + Task<Boolean> inEvent(Entrant)
-+ Task<Void> addEntrant(Entrant)
++ Task<Void> addEntrant(Entrant,Location)
 + Task<Void> removeEntrant(Entrant)
 + Task<Long> fetchEntrantCount()
 + long getEntrantCount()
@@ -277,12 +372,12 @@ class com.example.thevms.model.Event {
 + void setDescription(String)
 + Organizer getOrganizer()
 + void setOrganizer(Organizer)
-+ Location getLocation()
-+ void setLocation(Location)
++ String getLocation()
++ void setLocation(String)
 + String getLocationName()
 + void setLocationName(String)
-+ String getImageUrl()
-+ void setImageUrl(String)
++ byte[] getPhoto()
++ void setPhoto(byte[])
 + Date getRegistrationStartTime()
 + void setRegistrationStartTime(Date)
 + Date getRegistrationEndTime()
@@ -291,14 +386,25 @@ class com.example.thevms.model.Event {
 + void setEventStartTime(Date)
 + Date getEventEndTime()
 + void setEventEndTime(Date)
++ HashMap<Entrant,Boolean> getEntrantList()
 + Integer getMaxAttendees()
 + void setMaxAttendees(Integer)
++ Integer getMaxWaitlist()
++ void setMaxWaitlist(Integer)
 + boolean isGeolocationRequired()
 + void setGeolocationRequired(boolean)
++ Double getRadius()
++ void setRadius(Double)
++ Location getGeoLocation()
++ void setGeoLocation(Location)
 + Double getLimitDistance()
 + void setLimitDistance(Double)
++ boolean isPrivate()
++ void setPrivate(boolean)
++ String getQrCode()
++ void setQrCode(String)
 }
-note left of com.example.thevms.model.Event : Core entity representing an event\nand its lottery configuration.
+
 
 class com.example.thevms.model.Entrant {
 # DatabaseHandler dbHandler
@@ -309,10 +415,8 @@ class com.example.thevms.model.Entrant {
 - String phoneNumber
 - boolean notificationsEnabled
 - UserRole role
-+ <<Create>> Entrant(String,String,String,String,String)
-+ <<Create>> Entrant(String,String,String,String,String,boolean)
-+ <<Create>> Entrant(String,String,String,String,String,boolean,UserRole)
 + Task<Void> save()
++ {static} Task<Void> deleteAccount(String)
 # Map<String,Object> toMap()
 + {static} Entrant fromMap(String,Map<String,Object>)
 + {static} Task<Entrant> getOrCreate(String)
@@ -333,16 +437,6 @@ class com.example.thevms.model.Entrant {
 + void setRole(UserRole)
 + void registerInEvent(Event)
 + void unregisterFromEvent(Event)
-}
-note left of com.example.thevms.model.Entrant : Primary user class representing anyone\nregistered in the system.
-
-class com.example.thevms.ui.ProfileFragment {
-- TextView nameText
-- LinearLayout settingsButton
-- LinearLayout myEventsButton
-+ View onCreateView(LayoutInflater,ViewGroup,Bundle)
-+ void onResume()
-- void loadUserProfile()
 }
 
 
@@ -371,7 +465,6 @@ class com.example.thevms.ui.Admin.AdminProfilesFragment$ProfileAdapter {
 - Runnable onActionStarted
 - Runnable onActionSuccess
 - Runnable onActionFailure
-+ <<Create>> ProfileAdapter(List<Entrant>,String,Runnable,Runnable,Runnable)
 + ViewHolder onCreateViewHolder(ViewGroup,int)
 + void onBindViewHolder(ViewHolder,int)
 - void showDeleteConfirmation(View,Entrant)
@@ -383,9 +476,7 @@ class com.example.thevms.ui.Admin.AdminProfilesFragment$ProfileAdapter {
 class com.example.thevms.ui.Admin.AdminProfilesFragment$ProfileAdapter$ViewHolder {
 ~ TextView nameText
 ~ MaterialButton deleteButton
-+ <<Create>> ViewHolder(View)
 }
-
 
 class com.example.thevms.ui.SignupActivity {
 - TextInputEditText firstNameEdit
@@ -398,23 +489,53 @@ class com.example.thevms.ui.SignupActivity {
 class com.example.thevms.ui.MainActivity {
 - DrawerLayout drawerLayout
 - BottomNavigationView bottomNav
+- ListenerRegistration userRoleListener
+- UserRole lastKnownRole
 # void onCreate(Bundle)
 + void navigateToFragment(Fragment,int)
 + void openAdminDrawer()
 - void checkUserRoleAndAdjustUI(BottomNavigationView)
+- void startUserRoleListener()
+- void applyRoleToNavigation(UserRole)
+- void relaunchForRoleChange()
+# void onDestroy()
 }
-note top of com.example.thevms.ui.MainActivity : The main entry point and navigation hub\nfor the application.
+
 
 class com.example.thevms.ui.SearchFragment {
+- {static} LatLng DEFAULT_MAP_CENTER
+- {static} float DEFAULT_MAP_ZOOM
+- {static} float DISTANCE_LABEL_ZOOM_THRESHOLD
+- {static} float INITIAL_FOCUS_ZOOM
+- {static} double MAX_AUTO_FIT_LAT_SPAN
+- {static} double MAX_AUTO_FIT_LNG_SPAN
+- {static} int DEFAULT_MAP_TOP_PADDING_DP
+- {static} int DEFAULT_MAP_BOTTOM_PADDING_DP
+- {static} int DEFAULT_SHEET_PEEK_HEIGHT_DP
+- {static} int SELECTED_SHEET_PEEK_HEIGHT_DP
+- {static} int RECENTER_BUTTON_CLEARANCE_DP
 - EditText searchEditText
 - ImageView clearSearchIcon
 - Button filterDateRangeBtn
 - Button filterTimeRangeBtn
+- Button filterCapacityBtn
 - Button clearFiltersBtn
+- MaterialButton retryLocationBtn
 - TextView resultsCountText
 - RecyclerView eventsRecyclerView
 - EventAdapter eventAdapter
 - ImageButton btnAdminBurger
+- BottomSheetBehavior<View> bottomSheetBehavior
+- GoogleMap googleMap
+- FusedLocationProviderClient fusedLocationClient
+- Location currentUserLocation
+- Marker userLocationMarker
+- Circle userLocationHalo
+- LocationCallback liveLocationCallback
+- List<Marker> eventMarkers
+- Runnable pendingLocationPermissionGrantedAction
+- Runnable pendingLocationPermissionDeniedAction
+- ActivityResultLauncher<String[]> locationPermissionLauncher
 - List<Event> allEvents
 - List<Event> filteredEvents
 - String nameFilter
@@ -424,24 +545,86 @@ class com.example.thevms.ui.SearchFragment {
 - Integer startTimeMinute
 - Integer endTimeHour
 - Integer endTimeMinute
+- Integer targetCapacityFilter
 - boolean isAdmin
+- String selectedMarkerKey
+- boolean hasCenteredMapOnce
+- boolean hasCenteredOnUserLocationOnce
+- int lastRenderedMarkerZoomBucket
+- boolean lastRenderedDistanceMode
+- boolean preserveMapViewportOnNextFilterApply
 - SimpleDateFormat dateFormat
 + View onCreateView(LayoutInflater,ViewGroup,Bundle)
++ void onResume()
 - void setupListeners()
-+ void setTestingFilters(Long,Long,Integer,Integer,Integer,Integer)
+- void setupMap()
+- void ensureMapLocationEnabled()
+- void retryLocationRequest()
+- void enableUserLocation()
+- void updateCurrentUserLocation(Location)
+- void fetchUserLocationAndRender()
+- void requestFreshLocationUpdates()
+- Location getBestLastKnownLocation()
+- boolean isSystemLocationEnabled()
+- void drawUserLocation(Location)
+- void showLocationButton()
+- void updateRecenterButtonState()
+- void showCapacityPickerDialog()
++ void setTestingFilters(Long,Long,Integer,Integer,Integer,Integer,Integer)
 + void expandBottomSheet()
++ void selectMarkerForTesting(double,double)
++ void clearSelectedMarkerForTesting()
 - void checkUserRoleAndFetchEvents()
 - void fetchEvents()
+- boolean hasLocationPermission()
 - void showDateRangePicker()
 - void showTimeRangePicker()
 - void applyFilters()
+- boolean hasActiveFilters()
+- boolean containsMarkerKey(List<Event>,String)
+- String getMarkerKey(Event)
++ void onMapReady(GoogleMap)
+- void refreshMap(List<Event>)
+- void refreshMap(List<Event>,boolean)
+- void clearEventMarkers()
+- boolean shouldUseFocusedInitialViewport(List<LatLng>)
+- void applyDefaultMapViewportState()
+- void applySelectedMapViewportState()
+- void centerMapOnUserLocation()
+- void centerMapOnSelectedMarker(Marker)
+- String buildMarkerLabel(Event,int)
+- boolean shouldShowDistanceLabel()
+- boolean shouldRefreshMarkersForCameraChange()
+- int getMarkerZoomBucket()
+- BitmapDescriptor createMarkerIcon(boolean,String)
+- BitmapDescriptor createBlueDotIcon()
+- int dpToPx(int)
 }
 
+
+class com.example.thevms.ui.Event.InviteEntrantAdapter {
+- List<Entrant> entrants
+- OnInviteClickListener inviteClickListener
++ void setEntrants(List<Entrant>)
++ void setOnInviteClickListener(OnInviteClickListener)
++ ViewHolder onCreateViewHolder(ViewGroup,int)
++ void onBindViewHolder(ViewHolder,int)
++ int getItemCount()
+}
+
+
+interface com.example.thevms.ui.Event.InviteEntrantAdapter$OnInviteClickListener {
+~ void onInvite(Entrant)
+}
+
+class com.example.thevms.ui.Event.InviteEntrantAdapter$ViewHolder {
+~ TextView nameText
+~ Button inviteButton
+}
 
 class com.example.thevms.model.AttendeeItem {
 - Entrant entrant
 - String status
-+ <<Create>> AttendeeItem(Entrant,String)
 + Entrant getEntrant()
 + String getStatus()
 + void setStatus(String)
@@ -449,8 +632,293 @@ class com.example.thevms.model.AttendeeItem {
 }
 
 
+enum com.example.thevms.model.UserRole {
++  ENTRANT
++  ORGANIZER
++  ADMIN
+}
+
+class com.example.thevms.model.Comment {
+- String userId
+- String firstName
+- String lastName
+- String text
+- Date timestamp
+- boolean isOrganizer
++ String getUserId()
++ void setUserId(String)
++ String getFirstName()
++ void setFirstName(String)
++ String getLastName()
++ void setLastName(String)
++ String getText()
++ void setText(String)
++ Date getTimestamp()
++ void setTimestamp(Date)
++ boolean getIsOrganizer()
++ void setIsOrganizer(boolean)
+}
 
 
+class com.example.thevms.ui.Admin.AdminActivity {
+- Activity activity
+- DrawerLayout drawerLayout
++ {static} void init(Activity)
+- void setupClickListeners()
+- void handleAction(String)
+}
+
+
+class com.example.thevms.ui.Admin.AdminImagesFragment {
+- RecyclerView recyclerView
+- TextView emptyStateText
+- ProgressBar loadingSpinner
+- ImageAdapter adapter
+- List<AdminImageItem> imageItems
+- DatabaseHandler dbHandler
++ View onCreateView(LayoutInflater,ViewGroup,Bundle)
+- void setLoading(boolean)
+- void loadImages()
+- void updateUI()
+- void deleteImage(AdminImageItem)
+}
+
+
+class com.example.thevms.ui.Admin.AdminImagesFragment$AdminImageItem {
+~ byte[] imageData
+~ String type
+~ String sourceName
+~ String documentId
+~ String collection
+}
+
+interface com.example.thevms.ui.Admin.AdminImagesFragment$OnDeleteClickListener {
+~ void onDelete(AdminImageItem)
+}
+
+class com.example.thevms.ui.Admin.AdminImagesFragment$ImageAdapter {
+- List<AdminImageItem> items
+- OnDeleteClickListener deleteListener
++ ViewHolder onCreateViewHolder(ViewGroup,int)
++ void onBindViewHolder(ViewHolder,int)
++ int getItemCount()
+}
+
+
+class com.example.thevms.ui.Admin.AdminImagesFragment$ImageAdapter$ViewHolder {
+~ ImageView imageView
+~ TextView typeText
+~ MaterialButton deleteButton
+}
+
+class com.example.thevms.ui.SettingsActivity {
+- TextInputEditText firstNameEdit
+- MaterialSwitch notificationSwitch
+# void onCreate(Bundle)
+- void showDeleteAccountConfirmation(String)
+- void handleDeleteAccount(String)
+- boolean validateInputs()
+- void showConfirmDialog(String)
+- void handleUpdate(String)
+- void loadUserSettings(String)
+}
+
+
+class com.example.thevms.ui.Admin.AdminLogsFragment {
+- RecyclerView recyclerView
+- NotificationAdapter adapter
+- SwipeRefreshLayout swipeRefreshLayout
+- TextView emptyLogsText
+- DatabaseHandler dbHandler
+- ListenerRegistration logsListener
++ View onCreateView(LayoutInflater,ViewGroup,Bundle)
+- void setupRecyclerView()
+- void setupSwipeRefresh()
++ void onStart()
++ void onStop()
+- void startListeningToLogs()
+- void updateEmptyState(boolean)
+}
+
+
+class com.example.thevms.ui.CreateEventFragment {
+- EditText etName
+- EditText etMaxAttendees
+- Button btnConfirm
+- Button btnRegStartDate
+- Date regStartDate
+- SimpleDateFormat dateTimeFormat
+- com.google.android.material.materialswitch.MaterialSwitch switchGeo
+- View layoutLimitDistance
+- EditText etLimitDistance
+- com.google.android.material.materialswitch.MaterialSwitch switchPrivate
+- Uri posterUri
+- android.location.Location testingLocation
+- android.location.Location selectedEventLocation
+- ExecutorService geocodingExecutor
+- Handler mainHandler
++ View onCreateView(LayoutInflater,ViewGroup,Bundle)
++ void onViewCreated(View,Bundle)
++ void onDestroy()
++ void setTestingDates(Date,Date,Date,Date)
++ void setTestingLocation(double,double)
+- void showDateTimePicker(int)
+- void handleCreateEvent()
+- byte[] uriToBytes(Uri)
+- void showCancelConfirmationDialog()
+- void previewLocationOnMap()
+- void showLocationPreviewDialog(String,android.location.Location)
+- android.location.Location resolveLocationForPreview(String)
+- android.location.Location getLocationFromAddress(String)
+- android.location.Location copyLocation(android.location.Location)
+}
+
+
+class com.example.thevms.ui.CreateEventFragment$LocationPreviewDialogFragment {
++ {static} String REQUEST_KEY
++ {static} String RESULT_LATITUDE
++ {static} String RESULT_LONGITUDE
+- {static} String ARG_LABEL
+- {static} String ARG_LAT
+- {static} String ARG_LNG
+- {static} String ARG_HAS_INITIAL
+- android.location.Location pendingLocation
++ {static} LocationPreviewDialogFragment newInstance(String,android.location.Location)
++ android.app.Dialog onCreateDialog(Bundle)
+- void installMapTouchInterceptor(View)
+- void requestParentsNotToIntercept(View,boolean)
+}
+
+
+class com.example.thevms.model.DatabaseHandler {
+- FirebaseFirestore db
++ {static} String COLLECTION_EVENTS
++ {static} String COLLECTION_USERS
++ {static} String COLLECTION_ENTRANTS
++ {static} String COLLECTION_COMMENTS
++ {static} String COLLECTION_NOTIFICATIONS
++ {static} String STATUS_WAITING
++ {static} String STATUS_SELECTED
++ {static} String STATUS_ACCEPTED
++ {static} String STATUS_REJECTED
++ {static} String STATUS_INVITED
++ {static} String STATUS_DECLINED
++ {static} String STATUS_CANCELLED
++ {static} String STATUS_CO_ORGANIZER
++ void useEmulator(String,int)
++ Task<Long> getNextEventId()
++ Task<Void> saveEvent(Long,Map<String,Object>)
++ Task<QuerySnapshot> getAllEvents()
++ Task<QuerySnapshot> getEventsByOrganizer(String)
++ ListenerRegistration listenToEvent(String,EventListener<DocumentSnapshot>)
++ Task<Void> saveUser(String,Map<String,Object>)
++ Task<DocumentSnapshot> getUser(String)
++ ListenerRegistration listenToUser(String,EventListener<DocumentSnapshot>)
++ Task<QuerySnapshot> getAllUsers()
++ Task<Void> deleteUserAccountCompletely(String)
++ Task<Void> deleteUser(String)
++ Task<Void> updateEntrantStatus(String,String,Map<String,Object>)
++ Task<String> getEntrantStatus(String,String)
++ ListenerRegistration listenToEntrantStatus(String,String,EventListener<DocumentSnapshot>)
++ Task<QuerySnapshot> getEntrantsForEvent(String)
++ Task<QuerySnapshot> getRegistrationsForEntrant(String)
++ Task<Void> deleteEvent(String)
++ Task<Long> getEntrantCount(String)
++ Task<Void> selectAndInviteNextEntrant(String)
++ Task<Void> sendNotification(String,String,String)
++ Task<DocumentReference> addComment(String,Comment)
++ ListenerRegistration listenToComments(String,EventListener<QuerySnapshot>)
++ Task<Void> deleteComment(String,String)
++ Task<Void> sendNotification(Notification)
++ ListenerRegistration listenToNotifications(String,EventListener<QuerySnapshot>)
++ ListenerRegistration listenToAllNotifications(EventListener<QuerySnapshot>)
++ Task<Void> markNotificationAsRead(String)
++ Task<Void> deleteNotification(String)
++ Task<Void> assignCoOrganizer(String,String,String,String,String,String)
++ Task<Boolean> isCoOrganizer(String,String)
++ Task<QuerySnapshot> getEntrantsWithLocations(String)
++ FirebaseFirestore getDb()
+}
+
+
+class com.example.thevms.ui.Admin.AdminEventsFragment {
+- RecyclerView recyclerView
+- TextView emptyStateText
+- ProgressBar loadingSpinner
+- EventAdapter adapter
+- List<Event> events
+- DatabaseHandler dbHandler
++ View onCreateView(LayoutInflater,ViewGroup,Bundle)
+- void setLoading(boolean)
+- void loadEvents()
+- void updateUI()
+}
+
+
+class com.example.thevms.ui.ProfileFragment {
+- TextView nameText
+- LinearLayout settingsButton
+- LinearLayout myEventsButton
+- LinearLayout howItWorksButton
+- Button deleteProfileButton
+- ListenerRegistration userProfileListener
++ View onCreateView(LayoutInflater,ViewGroup,Bundle)
+- void showDeleteAccountConfirmation(String)
+- void handleDeleteAccount(String)
++ void onResume()
+- void startUserProfileListener()
++ void onPause()
+}
+
+
+class com.example.thevms.ui.InboxFragment {
+- RecyclerView recyclerView
+- NotificationAdapter adapter
+- TextView emptyInboxText
+- SwipeRefreshLayout swipeRefreshLayout
+- DatabaseHandler dbHandler
+- ListenerRegistration notificationsListener
+- String deviceId
+- MaterialButton btnCycleTestNotifications
+- int testCycleIndex
+- boolean isInitialLoad
++ View onCreateView(LayoutInflater,ViewGroup,Bundle)
+- void setupRecyclerView()
+- void handleInviteAction(Notification,boolean)
+- void performRejectLogic(Notification)
+- void showDeleteConfirmationDialog(Notification)
+- void setupTestButtons()
+- void setupSwipeRefresh()
++ void onStart()
++ void onStop()
+- void listenToNotifications()
+- void updateEmptyState(boolean)
+}
+
+
+class com.example.thevms.ui.Event.ReplacementAdapter {
+- List<ReplacementItem> items
+- int maxSelectable
+~ void setItems(List<ReplacementItem>,int)
+~ List<ReplacementItem> getSelectedItems()
++ ReplacementViewHolder onCreateViewHolder(ViewGroup,int)
++ void onBindViewHolder(ReplacementViewHolder,int)
++ int getItemCount()
+}
+
+
+class com.example.thevms.ui.Event.ReplacementAdapter$ReplacementItem {
+~ Entrant entrant
+~ boolean selected
+}
+
+class com.example.thevms.ui.Event.ReplacementAdapter$ReplacementViewHolder {
+~ TextView nameText
+~ CheckBox checkBox
+}
+
+
+' Inheritance and Nested Classes
 com.example.thevms.ui.Event.Adapter <|-- com.example.thevms.ui.Event.AttendeeAdapter
 com.example.thevms.ui.Event.AttendeeAdapter +.. com.example.thevms.ui.Event.AttendeeAdapter$OnCancelEntrantListener
 com.example.thevms.ui.Event.AttendeeAdapter +.. com.example.thevms.ui.Event.AttendeeAdapter$ViewHolder
@@ -460,17 +928,29 @@ androidx.appcompat.app.AppCompatActivity <|-- com.example.thevms.ui.MyEventsActi
 androidx.fragment.app.Fragment <|-- com.example.thevms.ui.EntrantEventsFragment
 com.example.thevms.ui.Event.Adapter <|-- com.example.thevms.ui.Event.OrganizerEventAdapter
 com.example.thevms.ui.Event.OrganizerEventAdapter +.. com.example.thevms.ui.Event.OrganizerEventAdapter$OnEventCancelListener
+com.example.thevms.ui.Event.OrganizerEventAdapter +.. com.example.thevms.ui.Event.OrganizerEventAdapter$OnEventUpdatePosterListener
 com.example.thevms.ui.Event.OrganizerEventAdapter +.. com.example.thevms.ui.Event.OrganizerEventAdapter$ViewHolder
 com.example.thevms.ui.Event.ViewHolder <|-- com.example.thevms.ui.Event.OrganizerEventAdapter$ViewHolder
+com.example.thevms.ui.Event.OrganizerEventAdapter +.. com.example.thevms.ui.Event.OrganizerEventAdapter$InterceptableMapView
+com.example.thevms.ui.Event.MapView <|-- com.example.thevms.ui.Event.OrganizerEventAdapter$InterceptableMapView
+com.example.thevms.ui.Event.Adapter <|-- com.example.thevms.ui.Event.CommentAdapter
+com.example.thevms.ui.Event.CommentAdapter +.. com.example.thevms.ui.Event.CommentAdapter$OnCommentDeleteListener
+com.example.thevms.ui.Event.CommentAdapter +.. com.example.thevms.ui.Event.CommentAdapter$CommentViewHolder
+com.example.thevms.ui.Event.ViewHolder <|-- com.example.thevms.ui.Event.CommentAdapter$CommentViewHolder
 com.example.thevms.ui.Event.Adapter <|-- com.example.thevms.ui.Event.EventAdapter
+com.example.thevms.ui.Event.EventAdapter +.. com.example.thevms.ui.Event.EventAdapter$LocationPermissionRequester
 com.example.thevms.ui.Event.EventAdapter +.. com.example.thevms.ui.Event.EventAdapter$EventViewHolder
 com.example.thevms.ui.Event.ViewHolder <|-- com.example.thevms.ui.Event.EventAdapter$EventViewHolder
 androidx.appcompat.app.AppCompatActivity <|-- com.example.thevms.ui.NavBarActivity
-androidx.appcompat.app.AppCompatActivity <|-- com.example.thevms.ui.SettingsActivity
+com.example.thevms.ui.Adapter <|-- com.example.thevms.ui.NotificationAdapter
+com.example.thevms.ui.NotificationAdapter +.. com.example.thevms.ui.NotificationAdapter$OnNotificationDeleteListener
+com.example.thevms.ui.NotificationAdapter +.. com.example.thevms.ui.NotificationAdapter$OnInviteActionListener
+com.example.thevms.ui.NotificationAdapter +.. com.example.thevms.ui.NotificationAdapter$NotificationViewHolder
+com.example.thevms.ui.ViewHolder <|-- com.example.thevms.ui.NotificationAdapter$NotificationViewHolder
 com.example.thevms.model.Organizer <|-- com.example.thevms.model.Admin
-androidx.fragment.app.Fragment <|-- com.example.thevms.ui.CreateEventFragment
-androidx.fragment.app.Fragment <|-- com.example.thevms.ui.Admin.AdminEventsFragment
-androidx.fragment.app.Fragment <|-- com.example.thevms.ui.ProfileFragment
+com.example.thevms.ui.Event.LocationPermissionRequester <|.. com.example.thevms.ui.Event.EventDetailActivity
+androidx.appcompat.app.AppCompatActivity <|-- com.example.thevms.ui.Event.EventDetailActivity
+androidx.appcompat.app.AppCompatActivity <|-- com.example.thevms.ui.GuidelinesActivity
 androidx.fragment.app.Fragment <|-- com.example.thevms.ui.Admin.AdminProfilesFragment
 com.example.thevms.ui.Admin.AdminProfilesFragment +.. com.example.thevms.ui.Admin.AdminProfilesFragment$ProfileAdapter
 com.example.thevms.ui.Admin.Adapter <|-- com.example.thevms.ui.Admin.AdminProfilesFragment$ProfileAdapter
@@ -478,38 +958,123 @@ com.example.thevms.ui.Admin.AdminProfilesFragment$ProfileAdapter +.. com.example
 com.example.thevms.ui.Admin.ViewHolder <|-- com.example.thevms.ui.Admin.AdminProfilesFragment$ProfileAdapter$ViewHolder
 androidx.appcompat.app.AppCompatActivity <|-- com.example.thevms.ui.SignupActivity
 androidx.appcompat.app.AppCompatActivity <|-- com.example.thevms.ui.MainActivity
+com.google.android.gms.maps.OnMapReadyCallback <|.. com.example.thevms.ui.SearchFragment
 androidx.fragment.app.Fragment <|-- com.example.thevms.ui.SearchFragment
+com.example.thevms.ui.Event.Adapter <|-- com.example.thevms.ui.Event.InviteEntrantAdapter
+com.example.thevms.ui.Event.InviteEntrantAdapter +.. com.example.thevms.ui.Event.InviteEntrantAdapter$OnInviteClickListener
+com.example.thevms.ui.Event.InviteEntrantAdapter +.. com.example.thevms.ui.Event.InviteEntrantAdapter$ViewHolder
+com.example.thevms.ui.Event.ViewHolder <|-- com.example.thevms.ui.Event.InviteEntrantAdapter$ViewHolder
+androidx.fragment.app.Fragment <|-- com.example.thevms.ui.Admin.AdminImagesFragment
+com.example.thevms.ui.Admin.AdminImagesFragment +.. com.example.thevms.ui.Admin.AdminImagesFragment$AdminImageItem
+com.example.thevms.ui.Admin.AdminImagesFragment +.. com.example.thevms.ui.Admin.AdminImagesFragment$OnDeleteClickListener
+com.example.thevms.ui.Admin.AdminImagesFragment +.. com.example.thevms.ui.Admin.AdminImagesFragment$ImageAdapter
+com.example.thevms.ui.Admin.Adapter <|-- com.example.thevms.ui.Admin.AdminImagesFragment$ImageAdapter
+com.example.thevms.ui.Admin.AdminImagesFragment$ImageAdapter +.. com.example.thevms.ui.Admin.AdminImagesFragment$ImageAdapter$ViewHolder
+com.example.thevms.ui.Admin.ViewHolder <|-- com.example.thevms.ui.Admin.AdminImagesFragment$ImageAdapter$ViewHolder
+androidx.appcompat.app.AppCompatActivity <|-- com.example.thevms.ui.SettingsActivity
+androidx.fragment.app.Fragment <|-- com.example.thevms.ui.Admin.AdminLogsFragment
+androidx.fragment.app.Fragment <|-- com.example.thevms.ui.CreateEventFragment
+com.example.thevms.ui.CreateEventFragment +.. com.example.thevms.ui.CreateEventFragment$LocationPreviewDialogFragment
+com.example.thevms.ui.DialogFragment <|-- com.example.thevms.ui.CreateEventFragment$LocationPreviewDialogFragment
+androidx.fragment.app.Fragment <|-- com.example.thevms.ui.Admin.AdminEventsFragment
+androidx.fragment.app.Fragment <|-- com.example.thevms.ui.ProfileFragment
+androidx.fragment.app.Fragment <|-- com.example.thevms.ui.InboxFragment
+com.example.thevms.ui.Event.Adapter <|-- com.example.thevms.ui.Event.ReplacementAdapter
+com.example.thevms.ui.Event.ReplacementAdapter +.. com.example.thevms.ui.Event.ReplacementAdapter$ReplacementItem
+com.example.thevms.ui.Event.ReplacementAdapter +.. com.example.thevms.ui.Event.ReplacementAdapter$ReplacementViewHolder
+com.example.thevms.ui.Event.ViewHolder <|-- com.example.thevms.ui.Event.ReplacementAdapter$ReplacementViewHolder
 
+
+' Aggregation / Composition (Has-a)
 com.example.thevms.ui.Event.AttendeeAdapter "1" o-- "*" com.example.thevms.model.AttendeeItem
+com.example.thevms.ui.Event.AttendeeAdapter "1" o-- "1" com.example.thevms.model.DatabaseHandler
+
+com.example.thevms.model.Notification "1" o-- "1" com.example.thevms.model.DatabaseHandler
+com.example.thevms.model.Notification "1" o-- "1" com.example.thevms.model.UserRole
+
 com.example.thevms.model.Organizer "1" o-- "*" com.example.thevms.model.Event
+
 com.example.thevms.ui.MyEventsActivity "1" o-- "1" com.example.thevms.ui.Event.OrganizerEventAdapter
 com.example.thevms.ui.MyEventsActivity "1" o-- "1" com.example.thevms.model.DatabaseHandler
+com.example.thevms.ui.MyEventsActivity "1" o-- "1" com.example.thevms.model.Event
+
 com.example.thevms.ui.Event.OrganizerEventAdapter "1" o-- "*" com.example.thevms.model.Event
+
 com.example.thevms.ui.Event.OrganizerEventAdapter$ViewHolder "1" o-- "1" com.example.thevms.ui.Event.AttendeeAdapter
+com.example.thevms.ui.Event.OrganizerEventAdapter$ViewHolder "1" o-- "1" com.example.thevms.ui.Event.CommentAdapter
+com.example.thevms.ui.Event.OrganizerEventAdapter$ViewHolder "1" o-- "1" com.example.thevms.ui.Event.ReplacementAdapter
 com.example.thevms.ui.Event.OrganizerEventAdapter$ViewHolder "1" o-- "1" com.example.thevms.model.DatabaseHandler
+
+com.example.thevms.ui.Event.CommentAdapter "1" o-- "*" com.example.thevms.model.Comment
+
 com.example.thevms.ui.Event.EventAdapter "1" o-- "*" com.example.thevms.model.Event
+
+com.example.thevms.ui.Event.EventAdapter$EventViewHolder "1" o-- "1" com.example.thevms.ui.Event.CommentAdapter
+
+com.example.thevms.ui.NotificationAdapter "1" o-- "*" com.example.thevms.model.Notification
+
+com.example.thevms.ui.Event.EventDetailActivity "1" o-- "1" com.example.thevms.model.Event
+com.example.thevms.ui.Event.EventDetailActivity "1" o-- "1" com.example.thevms.ui.Event.EventAdapter$EventViewHolder
+
 com.example.thevms.model.Event "1" o-- "1" com.example.thevms.model.DatabaseHandler
 com.example.thevms.model.Event "1" o-- "1" com.example.thevms.model.Organizer
 com.example.thevms.model.Event "1" o-- "*" com.example.thevms.model.Entrant
+
 com.example.thevms.model.Entrant "1" o-- "1" com.example.thevms.model.DatabaseHandler
 com.example.thevms.model.Entrant "1" o-- "1" com.example.thevms.model.UserRole
+
 com.example.thevms.ui.Admin.AdminProfilesFragment "1" o-- "1" com.example.thevms.ui.Admin.AdminProfilesFragment$ProfileAdapter
 com.example.thevms.ui.Admin.AdminProfilesFragment "1" o-- "*" com.example.thevms.model.Entrant
 com.example.thevms.ui.Admin.AdminProfilesFragment "1" o-- "1" com.example.thevms.model.DatabaseHandler
+
 com.example.thevms.ui.Admin.AdminProfilesFragment$ProfileAdapter "1" o-- "*" com.example.thevms.model.Entrant
+
+com.example.thevms.ui.MainActivity "1" o-- "1" com.example.thevms.model.UserRole
+
 com.example.thevms.ui.SearchFragment "1" o-- "1" com.example.thevms.ui.Event.EventAdapter
 com.example.thevms.ui.SearchFragment "1" o-- "*" com.example.thevms.model.Event
+
+com.example.thevms.ui.Event.InviteEntrantAdapter "1" o-- "*" com.example.thevms.model.Entrant
+
 com.example.thevms.model.AttendeeItem "1" o-- "1" com.example.thevms.model.Entrant
 
+com.example.thevms.ui.Admin.AdminImagesFragment "1" o-- "1" com.example.thevms.ui.Admin.AdminImagesFragment$ImageAdapter
+com.example.thevms.ui.Admin.AdminImagesFragment "1" o-- "*" com.example.thevms.ui.Admin.AdminImagesFragment$AdminImageItem
+com.example.thevms.ui.Admin.AdminImagesFragment "1" o-- "1" com.example.thevms.model.DatabaseHandler
+
+com.example.thevms.ui.Admin.AdminImagesFragment$ImageAdapter "1" o-- "*" com.example.thevms.ui.Admin.AdminImagesFragment$AdminImageItem
+
+com.example.thevms.ui.Admin.AdminLogsFragment "1" o-- "1" com.example.thevms.ui.NotificationAdapter
+com.example.thevms.ui.Admin.AdminLogsFragment "1" o-- "1" com.example.thevms.model.DatabaseHandler
+
+com.example.thevms.ui.Admin.AdminEventsFragment "1" o-- "1" com.example.thevms.ui.Event.EventAdapter
+com.example.thevms.ui.Admin.AdminEventsFragment "1" o-- "*" com.example.thevms.model.Event
+com.example.thevms.ui.Admin.AdminEventsFragment "1" o-- "1" com.example.thevms.model.DatabaseHandler
+
+com.example.thevms.ui.InboxFragment "1" o-- "1" com.example.thevms.ui.NotificationAdapter
+com.example.thevms.ui.InboxFragment "1" o-- "1" com.example.thevms.model.DatabaseHandler
+
+com.example.thevms.ui.Event.ReplacementAdapter "1" o-- "*" com.example.thevms.ui.Event.ReplacementAdapter$ReplacementItem
+
+com.example.thevms.ui.Event.ReplacementAdapter$ReplacementItem "1" o-- "1" com.example.thevms.model.Entrant
+
+
+' Navigability (Direct Associations)
 com.example.thevms.ui.SignupActivity --> com.example.thevms.ui.MainActivity
 com.example.thevms.ui.MainActivity --> com.example.thevms.ui.SearchFragment
 com.example.thevms.ui.MainActivity --> com.example.thevms.ui.ProfileFragment
 com.example.thevms.ui.MainActivity --> com.example.thevms.ui.CreateEventFragment
+com.example.thevms.ui.MainActivity --> com.example.thevms.ui.InboxFragment
+com.example.thevms.ui.MainActivity --> com.example.thevms.ui.EntrantEventsFragment
 com.example.thevms.ui.MainActivity --> com.example.thevms.ui.Admin.AdminActivity
 com.example.thevms.ui.ProfileFragment --> com.example.thevms.ui.SettingsActivity
 com.example.thevms.ui.ProfileFragment --> com.example.thevms.ui.MyEventsActivity
+com.example.thevms.ui.ProfileFragment --> com.example.thevms.ui.GuidelinesActivity
 com.example.thevms.ui.Admin.AdminActivity --> com.example.thevms.ui.SearchFragment
 com.example.thevms.ui.Admin.AdminActivity --> com.example.thevms.ui.Admin.AdminProfilesFragment
 com.example.thevms.ui.Admin.AdminActivity --> com.example.thevms.ui.Admin.AdminEventsFragment
+com.example.thevms.ui.Admin.AdminActivity --> com.example.thevms.ui.Admin.AdminImagesFragment
+com.example.thevms.ui.Admin.AdminActivity --> com.example.thevms.ui.Admin.AdminLogsFragment
+com.example.thevms.ui.Event.EventAdapter$EventViewHolder --> com.example.thevms.ui.Event.EventDetailActivity
 
 @enduml
