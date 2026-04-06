@@ -1,7 +1,6 @@
 package com.example.thevms;
 
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
 import com.example.thevms.model.Notification;
@@ -49,7 +48,7 @@ public class NotificationTest {
     public void testCreateLotteryLoss() {
         Notification loss = Notification.createLotteryLoss("sId", "Org", "rId", "User", "eId", "My Event");
         assertEquals("Lottery Results", loss.getTitle());
-        assertEquals(Notification.TYPE_INVITE, loss.getType());
+        assertEquals(Notification.TYPE_GENERAL, loss.getType());
         assertTrue(loss.getDescription().contains("My Event"));
         assertTrue(loss.getDescription().contains("not selected"));
     }
