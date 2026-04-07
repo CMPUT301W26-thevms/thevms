@@ -432,7 +432,7 @@ public class EventAdapter extends RecyclerView.Adapter<EventAdapter.EventViewHol
             event.fetchEntrantCount().addOnSuccessListener(count -> {
                 String text = String.format(Locale.getDefault(), "☆ %d people joined", count);
                 if (statusPrefix != null && !statusPrefix.isEmpty()) {
-                    text = statusPrefix + " (" + text + ")";
+                    text = statusPrefix + "\n(" + text + ")";
                 }
                 statusTextView.setText(text);
 

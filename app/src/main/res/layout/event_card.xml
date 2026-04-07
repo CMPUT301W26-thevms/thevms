@@ -40,20 +40,24 @@
             android:textSize="20sp"
             android:textStyle="bold" />
 
-        <LinearLayout
+        <androidx.constraintlayout.widget.ConstraintLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="4dp"
-            android:gravity="center_vertical"
-            android:orientation="horizontal">
+            android:layout_marginTop="4dp">
 
             <TextView
                 android:id="@+id/event_status_info"
-                android:layout_width="wrap_content"
+                android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:text="☆ 0 people joined"
                 android:textColor="@android:color/darker_gray"
-                android:textSize="16sp" />
+                android:textSize="16sp"
+                app:layout_constraintBottom_toBottomOf="parent"
+                app:layout_constraintEnd_toStartOf="@+id/event_location_info"
+                app:layout_constraintHorizontal_bias="0"
+                app:layout_constraintHorizontal_weight="1"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintTop_toTopOf="parent" />
 
             <TextView
                 android:id="@+id/event_location_info"
@@ -62,8 +66,14 @@
                 android:layout_marginStart="16dp"
                 android:text="📍 Location"
                 android:textColor="@android:color/darker_gray"
-                android:textSize="16sp" />
-        </LinearLayout>
+                android:textSize="16sp"
+                android:gravity="end"
+                app:layout_constrainedWidth="true"
+                app:layout_constraintBottom_toBottomOf="parent"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintStart_toEndOf="@+id/event_status_info"
+                app:layout_constraintTop_toTopOf="parent" />
+        </androidx.constraintlayout.widget.ConstraintLayout>
 
         <TextView
             android:id="@+id/event_waitlist_info"
@@ -106,10 +116,10 @@
                     android:id="@+id/event_registration_status_message"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
+                    android:layout_marginBottom="4dp"
                     android:textColor="#E53935"
                     android:textSize="11sp"
-                    android:visibility="gone"
-                    android:layout_marginBottom="4dp" />
+                    android:visibility="gone" />
 
                 <LinearLayout
                     android:layout_width="wrap_content"
